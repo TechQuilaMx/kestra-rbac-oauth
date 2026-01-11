@@ -1,0 +1,13 @@
+kestra:
+  queue:
+    type: memory
+  repository:
+    type: memory
+  queues:
+    min-poll-interval: 10ms
+    max-poll-interval: 100ms
+    poll-switch-interval: 5s
+  server:
+    liveness:
+      enabled: false
+    termination-grace-period: 5s

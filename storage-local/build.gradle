@@ -1,0 +1,11 @@
+configurations {
+    implementation.extendsFrom(micronaut)
+}
+
+dependencies {
+    annotationProcessor project(":processor")
+    implementation project(":core")
+
+    testAnnotationProcessor project(":processor")
+    testImplementation project(':tests')
+}

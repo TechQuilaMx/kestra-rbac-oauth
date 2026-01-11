@@ -1,0 +1,733 @@
+import net.e175.klaus.zip.ZipPrefixer
+import org.owasp.dependencycheck.gradle.extension.AnalyzerExtension
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "net.e175.klaus:zip-prefixer:0.4.0"
+    }
+}
+
+plugins {
+    // micronaut
+    id "java"
+    id 'java-library'
+    id "idea"
+    id "com.gradleup.shadow" version "8.3.9"
+    id "application"
+
+    // test
+    id "com.adarshr.test-logger" version "4.0.0"
+    id "org.sonarqube" version "7.2.2.6593"
+    id 'jacoco-report-aggregation'
+
+    // helper
+    id "com.github.ben-manes.versions" version "0.53.0"
+
+    // front
+    id 'com.github.node-gradle.node' version '7.1.0'
+
+    // release
+    id 'net.researchgate.release' version '3.1.0'
+    id "com.gorylenko.gradle-git-properties" version "2.5.4"
+    id 'signing'
+    id "com.vanniktech.maven.publish" version "0.35.0"
+
+    // OWASP dependency check
+    id "org.owasp.dependencycheck" version "12.1.9" apply false
+}
+
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+    }
+}
+
+/**********************************************************************************************************************\
+ * Main
+ **********************************************************************************************************************/
+final mainClassName = "io.kestra.cli.App"
+final targetJavaVersion = JavaVersion.VERSION_21
+
+application {
+    mainClass = mainClassName
+}
+
+java {
+    sourceCompatibility = targetJavaVersion
+    targetCompatibility = targetJavaVersion
+}
+
+dependencies {
+    implementation project(":cli")
+    testImplementation project(":cli")
+}
+
+/**********************************************************************************************************************\
+ * Dependencies
+ **********************************************************************************************************************/
+allprojects {
+
+    tasks.withType(GenerateModuleMetadata).configureEach {
+        suppressedValidationErrors.add('enforced-platform')
+    }
+
+    if (it.name != 'platform') {
+        group = "io.kestra"
+
+        java {
+            sourceCompatibility = targetJavaVersion
+            targetCompatibility = targetJavaVersion
+        }
+
+        repositories {
+            mavenCentral()
+        }
+
+        // micronaut
+        apply plugin: "java"
+        apply plugin: "java-library"
+        apply plugin: "idea"
+        apply plugin: "jacoco"
+
+        configurations {
+            developmentOnly // for dependencies that are needed for development only
+            micronaut
+        }
+
+        // dependencies
+        dependencies {
+            // Platform
+            annotationProcessor enforcedPlatform(project(":platform"))
+            implementation enforcedPlatform(project(":platform"))
+            api enforcedPlatform(project(":platform"))
+            micronaut enforcedPlatform(project(":platform"))
+
+            // lombok
+            annotationProcessor "org.projectlombok:lombok"
+            compileOnly 'org.projectlombok:lombok'
+
+            // micronaut
+            annotationProcessor "io.micronaut:micronaut-inject-java"
+            annotationProcessor "io.micronaut.validation:micronaut-validation-processor"
+            micronaut "io.micronaut:micronaut-inject"
+            micronaut "io.micronaut.validation:micronaut-validation"
+            micronaut "io.micronaut.beanvalidation:micronaut-hibernate-validator"
+            micronaut "io.micronaut:micronaut-runtime"
+            micronaut "io.micronaut:micronaut-retry"
+            micronaut "io.micronaut:micronaut-jackson-databind"
+            micronaut "io.micronaut.data:micronaut-data-model"
+            micronaut "io.micronaut:micronaut-management"
+            micronaut "io.micrometer:micrometer-core"
+            micronaut "io.micronaut.micrometer:micronaut-micrometer-registry-prometheus"
+            micronaut "io.micronaut:micronaut-http-client"
+            micronaut "io.micronaut.reactor:micronaut-reactor-http-client"
+            micronaut "io.micronaut.tracing:micronaut-tracing-opentelemetry-http"
+
+            // logs
+            implementation "org.slf4j:slf4j-api"
+            implementation "ch.qos.logback:logback-classic"
+            implementation "org.codehaus.janino:janino"
+            implementation group: 'org.apache.logging.log4j', name: 'log4j-to-slf4j'
+            implementation group: 'org.slf4j', name: 'jul-to-slf4j'
+            implementation group: 'org.slf4j', name: 'jcl-over-slf4j'
+            implementation group: 'org.fusesource.jansi', name: 'jansi'
+
+            // OTEL
+            implementation "io.opentelemetry:opentelemetry-exporter-otlp"
+
+            // jackson
+            implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core'
+            implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind'
+            implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations'
+            implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml'
+            implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names'
+            implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-guava'
+            implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310'
+            implementation group: 'com.fasterxml.uuid', name: 'java-uuid-generator'
+
+            // kestra
+            implementation group: 'com.devskiller.friendly-id', name: 'friendly-id'
+            implementation (group: 'net.thisptr', name: 'jackson-jq') {
+                exclude group: 'com.fasterxml.jackson.core'
+            }
+
+            // exposed utils
+            api group: 'com.google.guava', name: 'guava'
+            api group: 'commons-io', name: 'commons-io'
+            api group: 'org.apache.commons', name: 'commons-lang3'
+            api "io.swagger.core.v3:swagger-annotations"
+        }
+    }
+}
+
+/**********************************************************************************************************************\
+ * Test
+ **********************************************************************************************************************/
+subprojects {subProj ->
+
+    if (subProj.name != 'platform' && subProj.name != 'jmh-benchmarks') {
+
+        apply plugin: "com.adarshr.test-logger"
+        apply plugin: 'jacoco'
+
+        java {
+            sourceCompatibility = targetJavaVersion
+            targetCompatibility = targetJavaVersion
+        }
+
+        configurations {
+            agent {
+                canBeResolved = true
+                canBeConsumed = true
+            }
+            mockitoAgent
+        }
+
+        dependencies {
+            // Platform
+            testAnnotationProcessor enforcedPlatform(project(":platform"))
+            testImplementation enforcedPlatform(project(":platform"))
+
+            // lombok
+            testAnnotationProcessor "org.projectlombok:lombok:"
+            testCompileOnly 'org.projectlombok:lombok'
+
+            // micronaut
+            testAnnotationProcessor "io.micronaut:micronaut-inject-java"
+            testAnnotationProcessor "io.micronaut.validation:micronaut-validation-processor"
+            testImplementation "io.micronaut.test:micronaut-test-junit5"
+
+            testImplementation "org.junit.jupiter:junit-jupiter-engine"
+            testImplementation "org.junit.jupiter:junit-jupiter-params"
+            testImplementation "org.junit-pioneer:junit-pioneer"
+            testImplementation 'org.mockito:mockito-junit-jupiter'
+            mockitoAgent("org.mockito:mockito-core:5.21.0") {
+                transitive = false // just the core
+            }
+
+            // hamcrest
+            testImplementation 'org.hamcrest:hamcrest'
+            testImplementation 'org.hamcrest:hamcrest-library'
+            testImplementation 'org.exparity:hamcrest-date'
+
+            //assertj
+            testImplementation 'org.assertj:assertj-core'
+
+            agent "org.aspectj:aspectjweaver:1.9.25.1"
+
+            testImplementation platform("io.qameta.allure:allure-bom")
+            testImplementation "io.qameta.allure:allure-junit5"
+        }
+
+        def commonTestConfig = { Test t ->
+            t.ignoreFailures = true
+            t.finalizedBy jacocoTestReport
+
+            // set Xmx for test workers
+            t.maxHeapSize = '4g'
+
+            // configure en_US default locale for tests
+            t.systemProperty 'user.language', 'en'
+            t.systemProperty 'user.country', 'US'
+
+            t.environment 'SECRET_MY_SECRET', "{\"secretKey\":\"secretValue\"}".bytes.encodeBase64().toString()
+            t.environment 'SECRET_NEW_LINE', "cGFzc3dvcmR2ZXJ5dmVyeXZleXJsb25ncGFzc3dvcmR2ZXJ5dmVyeXZleXJsb25ncGFzc3dvcmR2\nZXJ5dmVyeXZleXJsb25ncGFzc3dvcmR2ZXJ5dmVyeXZleXJsb25ncGFzc3dvcmR2ZXJ5dmVyeXZl\neXJsb25n"
+            t.environment 'SECRET_WEBHOOK_KEY', "secretKey".bytes.encodeBase64().toString()
+            t.environment 'SECRET_NON_B64_SECRET', "some secret value"
+            t.environment 'SECRET_PASSWORD', "cGFzc3dvcmQ="
+            t.environment 'ENV_TEST1', "true"
+            t.environment 'ENV_TEST2', "Pass by env"
+
+
+//            if (subProj.name == 'core' || subProj.name == 'jdbc-h2' || subProj.name == 'jdbc-mysql' || subProj.name == 'jdbc-postgres') {
+//                // JUnit 5 parallel settings
+//                t.systemProperty 'junit.jupiter.execution.parallel.enabled', 'true'
+//                t.systemProperty 'junit.jupiter.execution.parallel.mode.default', 'concurrent'
+//                t.systemProperty 'junit.jupiter.execution.parallel.mode.classes.default', 'same_thread'
+//                t.systemProperty 'junit.jupiter.execution.parallel.config.strategy', 'dynamic'
+//            }
+        }
+
+        tasks.register('integrationTest', Test) { Test t ->
+            description = 'Runs integration tests'
+            group = 'verification'
+
+            useJUnitPlatform {
+                includeTags 'integration'
+            }
+
+            testClassesDirs = sourceSets.test.output.classesDirs
+            classpath = sourceSets.test.runtimeClasspath
+
+            reports {
+                junitXml.required = true
+                junitXml.outputPerTestCase = true
+                junitXml.mergeReruns = true
+                junitXml.includeSystemErrLog = true
+                junitXml.outputLocation = layout.buildDirectory.dir("test-results/test")
+            }
+
+            // Integration tests typically not parallel (but you can enable)
+            maxParallelForks = 1
+            commonTestConfig(t)
+        }
+
+        tasks.register('unitTest', Test) { Test t ->
+            description = 'Runs unit tests'
+            group = 'verification'
+
+            useJUnitPlatform {
+                excludeTags 'flaky', 'integration'
+            }
+
+            testClassesDirs = sourceSets.test.output.classesDirs
+            classpath = sourceSets.test.runtimeClasspath
+
+            reports {
+                junitXml.required = true
+                junitXml.outputPerTestCase = true
+                junitXml.mergeReruns = true
+                junitXml.includeSystemErrLog = true
+                junitXml.outputLocation = layout.buildDirectory.dir("test-results/test")
+            }
+
+            commonTestConfig(t)
+        }
+
+        tasks.register('flakyTest', Test) { Test t ->
+            group = 'verification'
+            description = 'Runs tests tagged @Flaky but does not fail the build.'
+
+            useJUnitPlatform {
+                includeTags 'flaky'
+            }
+
+            reports {
+                junitXml.required = true
+                junitXml.outputPerTestCase = true
+                junitXml.mergeReruns = true
+                junitXml.includeSystemErrLog = true
+                junitXml.outputLocation = layout.buildDirectory.dir("test-results/flakyTest")
+            }
+            commonTestConfig(t)
+        }
+
+        // test task (default)
+        tasks.named('test', Test) { Test t ->
+            group = 'verification'
+            description = 'Runs all non-flaky tests.'
+
+            useJUnitPlatform {
+                excludeTags 'flaky'
+            }
+            reports {
+                junitXml.required = true
+                junitXml.outputPerTestCase = true
+                junitXml.mergeReruns = true
+                junitXml.includeSystemErrLog = true
+                junitXml.outputLocation = layout.buildDirectory.dir("test-results/test")
+            }
+            commonTestConfig(t)
+            jvmArgs = [
+                "-javaagent:${configurations.agent.singleFile}",
+                "-javaagent:${configurations.mockitoAgent.singleFile}"
+            ]
+        }
+
+        tasks.named('check') {
+            dependsOn(tasks.named('test'))// default behaviour
+        }
+
+        testlogger {
+            theme = 'mocha-parallel'
+            showExceptions = true
+            showFullStackTraces = true
+            showCauses = true
+            slowThreshold = 2000
+            showStandardStreams = true
+            showPassedStandardStreams = false
+            showSkippedStandardStreams = true
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('testCodeCoverageReport', JacocoReport)
+    finalizedBy jacocoTestReport
+}
+
+tasks.register('unitTest') {
+    // No jacocoTestReport here, because it depends by default on :test,
+    // and that would make :test being run twice in our CI.
+    // In practice the report will be generated later in the CI by :check.
+}
+
+tasks.register('integrationTest') {
+    dependsOn tasks.named('testCodeCoverageReport', JacocoReport)
+    finalizedBy jacocoTestReport
+}
+
+tasks.register('flakyTest') {
+    dependsOn tasks.named('testCodeCoverageReport', JacocoReport)
+    finalizedBy jacocoTestReport
+}
+
+tasks.named('testCodeCoverageReport') {
+    dependsOn ':core:copyGradleProperties'
+    dependsOn ':ui:assembleFrontend'
+}
+
+/**********************************************************************************************************************\
+ * Sonar
+ **********************************************************************************************************************/
+subprojects {
+    sonar {
+        properties {
+            property "sonar.coverage.jacoco.xmlReportPaths", "$projectDir.parentFile.path/build/reports/jacoco/testCodeCoverageReport/testCodeCoverageReport.xml,$projectDir.parentFile.path/build/reports/jacoco/test/testCodeCoverageReport.xml"
+        }
+    }
+}
+
+sonar {
+    properties {
+        property "sonar.projectKey", "kestra-io_kestra"
+        property "sonar.organization", "kestra-io"
+        property "sonar.host.url", "https://sonarcloud.io"
+    }
+}
+
+/**********************************************************************************************************************\
+ * OWASP Dependency check
+ **********************************************************************************************************************/
+apply plugin: 'org.owasp.dependencycheck'
+
+dependencyCheck {
+    // fail only on HIGH and CRITICAL vulnerabilities, we may want to lower to 5 (mid-medium) later
+    failBuildOnCVSS = 7
+
+    // disable the .NET assembly analyzer as otherwise it wants to analyze EXE file
+    analyzers(new Action<AnalyzerExtension>() {
+        @Override
+        void execute(AnalyzerExtension analyzerExtension) {
+            analyzerExtension.assemblyEnabled = false
+        }
+    })
+
+    // configure a suppression file
+    suppressionFile = "$projectDir/owasp-dependency-suppressions.xml"
+
+    nvd.apiKey = System.getenv("NVD_API_KEY")
+}
+
+/**********************************************************************************************************************\
+ * Micronaut
+ **********************************************************************************************************************/
+allprojects {
+    gradle.projectsEvaluated {
+        tasks.withType(JavaCompile).configureEach {
+            options.encoding = "UTF-8"
+            options.compilerArgs.add("-parameters")
+            options.compilerArgs.add("-Xlint:all")
+            options.compilerArgs.add("-Xlint:-processing")
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.compilerArgs.add("-parameters")
+}
+
+run.classpath += configurations.developmentOnly
+test.classpath += configurations.developmentOnly
+
+run.jvmArgs(
+    "-noverify",
+    "-XX:TieredStopAtLevel=1",
+    "-Dcom.sun.management.jmxremote",
+    '-Dmicronaut.environments=dev,override'
+)
+
+/**********************************************************************************************************************\
+ * Jar
+ **********************************************************************************************************************/
+jar {
+    manifest {
+        attributes(
+            "Main-Class": mainClassName,
+            "X-Kestra-Name": project.name,
+            "X-Kestra-Title": project.name,
+            "X-Kestra-Group": project.group,
+            "X-Kestra-Version": project.version
+        )
+    }
+}
+
+shadowJar {
+    archiveClassifier.set(null)
+    mergeServiceFiles()
+    zip64 = true
+}
+
+distZip.dependsOn shadowJar
+distTar.dependsOn shadowJar
+startScripts.dependsOn shadowJar
+startShadowScripts.dependsOn jar
+shadowJar.dependsOn 'ui:assembleFrontend'
+shadowJar.dependsOn jar
+
+/**********************************************************************************************************************\
+ * Executable Jar
+ **********************************************************************************************************************/
+def executableDir = layout.buildDirectory.dir("executable")
+def executable = layout.buildDirectory.file("executable/${project.name}-${project.version}").get().asFile
+
+tasks.register('writeExecutableJar') {
+    group = "build"
+    description = "Write an executable jar from shadow jar"
+    dependsOn = [shadowJar]
+
+    final shadowJarFile =  tasks.shadowJar.outputs.files.singleFile
+    inputs.file shadowJarFile
+    outputs.file executable
+    outputs.cacheIf { true }
+
+    doFirst {
+        executableDir.get().asFile.mkdirs()
+    }
+
+    doLast {
+        executable.setBytes(shadowJarFile.readBytes())
+        ByteArrayOutputStream executableBytes = new ByteArrayOutputStream()
+        executableBytes.write("\n: <<END_OF_KESTRA_SELFRUN\r\n".getBytes())
+        executableBytes.write(file("gradle/jar/selfrun.bat").readBytes())
+        executableBytes.write("\r\n".getBytes())
+        executableBytes.write("END_OF_KESTRA_SELFRUN\r\n\n".getBytes())
+        executableBytes.write(file("gradle/jar/selfrun.sh").readBytes())
+        ZipPrefixer.applyPrefixBytesToZip(executable.toPath(), executableBytes.toByteArray())
+        executable.setExecutable(true)
+    }
+}
+
+tasks.register('executableJar', Zip) {
+    group = "build"
+    description = "Zip the executable jar"
+    dependsOn = [writeExecutableJar]
+
+    archiveFileName = "${project.name}-${project.version}.zip"
+    destinationDirectory = layout.buildDirectory.dir('archives')
+
+    from executableDir
+    archiveClassifier.set(null)
+}
+
+/**********************************************************************************************************************\
+ * Standalone
+ **********************************************************************************************************************/
+tasks.register('runLocal', JavaExec) {
+    group = "application"
+    description = "Run Kestra as server local"
+    classpath = project(":cli").sourceSets.main.runtimeClasspath
+    mainClass = mainClassName
+    environment 'MICRONAUT_ENVIRONMENTS', 'override'
+    args 'server', 'local', '--plugins', 'local/plugins'
+}
+
+tasks.register('runStandalone', JavaExec) {
+    group = "application"
+    description = "Run Kestra as server local"
+    classpath = project(":cli").sourceSets.main.runtimeClasspath
+    mainClass = mainClassName
+    environment 'MICRONAUT_ENVIRONMENTS', 'override'
+    args 'server', 'standalone', '--plugins', 'local/plugins'
+}
+
+/**********************************************************************************************************************\
+ * Publish
+ **********************************************************************************************************************/
+subprojects {subProject ->
+
+    if (subProject.name != 'jmh-benchmarks' && subProject.name != rootProject.name) {
+        apply plugin: 'signing'
+        apply plugin: "com.vanniktech.maven.publish"
+
+        javadoc {
+            options {
+                locale = 'en_US'
+                encoding = 'UTF-8'
+                addStringOption("Xdoclint:none", "-quiet")
+            }
+        }
+
+        tasks.register('sourcesJar', Jar) {
+            dependsOn = [':core:copyGradleProperties']
+            dependsOn = [':ui:assembleFrontend']
+            archiveClassifier.set('sources')
+            from sourceSets.main.allSource
+        }
+        sourcesJar.dependsOn ':core:copyGradleProperties'
+        sourcesJar.dependsOn ':ui:assembleFrontend'
+
+        tasks.register('javadocJar', Jar) {
+            archiveClassifier.set('javadoc')
+            from javadoc
+        }
+
+        tasks.register('testsJar', Jar) {
+            group = 'build'
+            description = 'Build the tests jar'
+
+            archiveClassifier.set('tests')
+            if (sourceSets.matching { it.name == 'test'}) {
+                from sourceSets.named('test').get().output
+            }
+        }
+
+        //These modules should not be published
+        def unpublishedModules = ["jdbc-mysql", "jdbc-postgres", "webserver"]
+        if (subProject.name in unpublishedModules){
+            return
+        }
+
+        mavenPublishing {
+            publishToMavenCentral(true)
+            signAllPublications()
+
+            coordinates(
+                "${rootProject.group}",
+                subProject.name == "cli" ? rootProject.name : subProject.name,
+                "${rootProject.version}"
+            )
+
+            pom {
+                name        = project.name
+                description = "${project.group}:${project.name}:${rootProject.version}"
+                url         = "https://github.com/kestra-io/${rootProject.name}"
+
+                licenses {
+                    license {
+                        name = "The Apache License, Version 2.0"
+                        url  = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+                    }
+                }
+                developers {
+                    developer {
+                        id    = "tchiotludo"
+                        name  = "Ludovic Dehon"
+                        email = "ldehon@kestra.io"
+                    }
+                }
+                scm {
+                    connection = 'scm:git:'
+                    url = "https://github.com/kestra-io/${rootProject.name}"
+                }
+            }
+        }
+
+        afterEvaluate {
+            publishing {
+                publications {
+                    withType(MavenPublication).configureEach { publication ->
+
+                        if (subProject.name == "platform") {
+                            // Clear all artifacts except the BOM
+                            publication.artifacts.clear()
+                        }
+                    }
+                }
+            }
+        }
+
+        if (subProject.name == 'cli') {
+
+            /* Make sure the special publication is wired *after* every plugin */
+            subProject.afterEvaluate {
+                /* 1. Remove the default java component so Gradle stops expecting
+                       the standard cli-*.jar, sources, javadoc, etc.           */
+                components.removeAll { it.name == "java" }
+
+                /* 2. Replace the publication’s artifacts with shadow + exec */
+                publishing.publications.withType(MavenPublication).configureEach { pub ->
+                    pub.artifacts.clear()
+
+                    // main shadow JAR built at root
+                    pub.artifact(rootProject.tasks.named("shadowJar").get()) {
+                        extension = "jar"
+                    }
+
+                    // executable ZIP built at root
+                    pub.artifact(rootProject.tasks.named("executableJar").get().archiveFile) {
+                        classifier = "exec"
+                        extension  = "zip"
+                    }
+                    pub.artifact(tasks.named("sourcesJar").get())
+                    pub.artifact(tasks.named("javadocJar").get())
+
+                }
+
+                /* 3. Disable Gradle-module metadata for this publication to
+                       avoid the “artifact removed from java component” error. */
+                tasks.withType(GenerateModuleMetadata).configureEach { it.enabled = false }
+
+                /* 4. Make every publish task in :cli wait for the two artifacts */
+                tasks.matching { it.name.startsWith("publish") }.configureEach {
+                    dependsOn rootProject.tasks.named("shadowJar")
+                    dependsOn rootProject.tasks.named("executableJar")
+                }
+            }
+        }
+
+        if (subProject.name != 'platform' && subProject.name != 'cli') {
+            // only if a test source set actually exists (avoids empty artifacts)
+            def hasTests = subProject.extensions.findByName('sourceSets')?.findByName('test') != null
+
+            if (hasTests) {
+                // wire the artifact onto every Maven publication of this subproject
+                publishing {
+                    publications {
+                        withType(MavenPublication).configureEach { pub ->
+                            // keep the normal java component + sources/javadoc already configured
+                            pub.artifact(subProject.tasks.named('testsJar').get())
+                        }
+                    }
+                }
+
+                // make sure publish tasks build the tests jar first
+                tasks.matching { it.name.startsWith('publish') }.configureEach {
+                    dependsOn subProject.tasks.named('testsJar')
+                }
+            }
+        }
+    }
+}
+
+
+
+/**********************************************************************************************************************\
+ * Version
+ **********************************************************************************************************************/
+release {
+    preCommitText = 'chore(version):'
+    preTagCommitMessage = 'update to version'
+    tagCommitMessage = 'tag version'
+    newVersionCommitMessage = 'update snapshot version'
+    tagTemplate = 'v${version}'
+    buildTasks = ['classes']
+
+    git {
+        requireBranch.set('develop')
+    }
+
+    // Dynamically set properties with default values
+    failOnSnapshotDependencies = providers.gradleProperty("release.failOnSnapshotDependencies")
+            .map(val -> Boolean.parseBoolean(val))
+            .getOrElse(true)
+
+    pushReleaseVersionBranch = providers.gradleProperty("release.pushReleaseVersionBranch")
+            .getOrElse(null)
+}

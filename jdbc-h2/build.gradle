@@ -1,0 +1,18 @@
+configurations {
+    implementation.extendsFrom(micronaut)
+}
+
+dependencies {
+    implementation project(":core")
+    implementation project(":jdbc")
+    implementation project(":executor")
+    implementation project(":scheduler")
+
+    implementation("io.micronaut.sql:micronaut-jooq")
+    runtimeOnly("com.h2database:h2")
+
+    testImplementation project(':core').sourceSets.test.output
+    testImplementation project(':jdbc').sourceSets.test.output
+    testImplementation project(':storage-local')
+    testImplementation project(':tests')
+}

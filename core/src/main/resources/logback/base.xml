@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<included>
+    <!-- Remove logback startup log -->
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
+    <!--
+        The pattern is also defined in RunContextLogger.FileAppender.
+        Be careful to change it in both places.
+    -->
+    <property name="pattern" value="%date{HH:mm:ss}.%ms %highlight(%-5.5level) %magenta(%-12.36thread) %cyan(%-12.36logger{36}) %msg%n" />
+
+    <logger name="io.kestra" level="INFO" />
+
+    <!-- Flow execution logs - disabled by default -->
+    <logger name="flow" level="OFF" />
+
+    <!-- Server loggers -->
+    <logger name="worker" level="INFO" />
+    <logger name="executor" level="INFO" />
+    <logger name="scheduler" level="INFO" />
+
+    <logger name="io.kestra.ee.runner.kafka.services.KafkaConsumerService" level="WARN" />
+    <logger name="io.kestra.ee.runner.kafka.services.KafkaProducerService" level="WARN" />
+    <logger name="io.kestra.ee.runner.kafka.services.KafkaStreamService" level="WARN" />
+    <logger name="io.kestra.ee.runner.kafka.services.KafkaAdminService" level="WARN" />
+
+    <!-- The configuration '%s' was supplied but isn't a known config. > https://github.com/apache/kafka/pull/5876 -->
+    <logger name="org.apache.kafka.clients.producer.ProducerConfig" level="ERROR" />
+    <logger name="org.apache.kafka.clients.admin.AdminClientConfig" level="ERROR" />
+    <logger name="org.apache.kafka.clients.consumer.ConsumerConfig" level="ERROR" />
+
+    <!-- Using /tmp directory in the state.dir -->
+    <logger name="org.apache.kafka.streams.processor.internals.StateDirectory" level="ERROR" />
+
+    <!--- Error registering AppInfo mbean -->
+    <logger name="org.apache.kafka.common.utils.AppInfoParser" level="ERROR" />
+
+    <!-- Docker api log before exception -->
+    <logger name="com.github.dockerjava.api" level="OFF" />
+
+    <!-- HealthCheck that report an exception -->
+    <logger name="io.micronaut.management.health.indicator.HealthResult" level="OFF" />
+
+    <!-- Elastic deprecation warning that is not compatible with OpenSearch, we must disable all warnings ... -->
+    <logger name="org.opensearch.client.RestClient" level="ERROR" />
+
+    <!--
+        We enable INFO for DbMigrate otherwise there is nothing displayed on the console when a migration is ongoing,
+        which can be make thinking Kestra is not starting when the migration is long.
+    -->
+    <logger name="org.flywaydb" level="INFO" />
+    <!-- Flyway log when using IF NOT EXISTS -->
+    <logger name="org.flywaydb.core.internal.sqlscript.DefaultSqlScriptExecutor" level="ERROR" />
+</included>

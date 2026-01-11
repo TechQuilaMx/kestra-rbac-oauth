@@ -1,0 +1,31 @@
+endpoints:
+  env:
+    enabled: true
+
+kestra:
+  repository:
+    type: memory
+  queue:
+    type: memory
+  storage:
+    type: local
+    local:
+      base-path: /tmp/unittest
+  plugins:
+    path: /tmp/plugins
+    repositories:
+      central:
+        url: https://repo.maven.apache.org/maven2/
+      sonatype:
+        url: https://central.sonatype.com/repository/maven-snapshots/
+  server:
+    liveness:
+      enabled: false
+    termination-grace-period: 5s
+micronaut:
+  http:
+    services:
+      remote-api:
+        read-idle-timeout: 180s
+        connect-timeout: 180s
+        read-timeout: 180s

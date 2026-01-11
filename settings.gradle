@@ -1,0 +1,30 @@
+rootProject.name = "kestra"
+
+include 'platform'
+
+include 'cli'
+include 'core'
+include 'tests'
+
+include 'runner-memory'
+include 'repository-memory'
+
+include 'storage-local'
+
+include 'jdbc'
+include 'jdbc-h2'
+include 'jdbc-mysql'
+include 'jdbc-postgres'
+
+include 'webserver'
+include 'executor'
+include 'scheduler'
+include 'worker'
+
+include 'ui'
+include 'model'
+include 'processor'
+include 'script'
+include 'e2e-tests'
+
+include 'jmh-benchmarks'
