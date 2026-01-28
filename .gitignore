@@ -64,3 +64,5 @@ core/src/main/resources/gradle.properties
 # Helm chart dependencies (downloaded at build time, not committed)
 charts/kestra/charts/
 charts/kestra-starter/charts/
+
+*package-lock.json
