@@ -8,6 +8,7 @@ import en from "./translations/en.json";
 import {setupTenantRouter} from "./composables/useTenant";
 import * as BasicAuth from "./utils/basicAuth";
 import {useMiscStore} from "override/stores/misc";
+import {useOAuth2Store} from "./stores/oauth2";
 
 
 const app = createApp(App)
@@ -30,7 +31,38 @@ initApp(app, routes, null, en).then(({router, piniaStore}) => {
         try {
             const miscStore = useMiscStore();
             const configs = await miscStore.loadConfigs();
+            
+            // Initialize OAuth2 if enabled
+            const oauth2Store = useOAuth2Store();
+            if (configs.oauth2ClientId) {
+                oauth2Store.initialize(configs);
+            }
 
+            // Handle OAuth2 authentication
+            if (configs.oauth2ClientId && oauth2Store.isInitialized) {
+                // Allow anonymous routes (login, callback, setup)
+                if (to.meta?.anonymous === true) {
+                    return next();
+                }
+
+                // Check if user is authenticated via OAuth2
+                if (!oauth2Store.isAuthenticated) {
+                    const fromPath = to.fullPath !== "/ui/login" ? to.fullPath : undefined
+                    return next({name: "login", query: fromPath ? {from: fromPath} : {}})
+                }
+
+                // Check welcome flow for dashboard routes
+                if (isDashboardRoute(to.name) && await shouldShowWelcome()) {
+                    return next({
+                        name: "welcome",
+                        params: {tenant: to.params.tenant}
+                    });
+                }
+
+                return next();
+            }
+
+            // Fallback to BasicAuth if OAuth2 not configured
             if(!configs.isBasicAuthInitialized) {
                 // Since, Configs takes preference
                 // we need to check if any regex validation error in BE.
