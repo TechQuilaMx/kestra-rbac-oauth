@@ -38,6 +38,9 @@ dependencies {
 
     implementation("de.siegmar:fastcsv")
 
+    // OAuth2 / JWT
+    implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+
     // test
     testAnnotationProcessor project(':processor')
     testImplementation project(':core').sourceSets.test.output

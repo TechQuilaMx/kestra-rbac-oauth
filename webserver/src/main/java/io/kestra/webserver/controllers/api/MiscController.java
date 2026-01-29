@@ -21,9 +21,11 @@ import io.kestra.core.runners.pebble.PebbleExpressionService;
 import io.kestra.core.services.InstanceService;
 import io.kestra.core.utils.EditionProvider;
 import io.kestra.core.utils.VersionProvider;
+import io.kestra.webserver.configurations.OAuth2Configuration;
 import io.kestra.webserver.services.BasicAuthCredentials;
 import io.kestra.webserver.services.BasicAuthService;
 import io.kestra.webserver.services.ai.AiServiceManager;
+import io.kestra.webserver.services.OAuth2Service;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.annotation.Nullable;
@@ -67,6 +69,9 @@ public class MiscController {
 
     @Inject
     Optional<BasicAuthService> basicAuthService = Optional.empty();
+    
+    @Inject
+    Optional<OAuth2Service> oauth2Service = Optional.empty();
 
     @Inject
     Optional<TemplateRepositoryInterface> templateRepository;
@@ -158,6 +163,18 @@ public class MiscController {
                     .color(this.environmentColor)
                     .build()
             );
+        }
+        
+        // Add OAuth2 configuration if enabled
+        if (oauth2Service.isPresent() && oauth2Service.get().isEnabled()) {
+            OAuth2Configuration oauth2Config = oauth2Service.get().getConfiguration();
+            builder
+                .oauth2ClientId(oauth2Config.getClientId())
+                .oauth2AuthEndpoint(oauth2Config.getAuthorizationEndpoint())
+                .oauth2TokenEndpoint(oauth2Config.getTokenEndpoint())
+                .oauth2UserInfoEndpoint(oauth2Config.getUserInfoEndpoint())
+                .oauth2LogoutEndpoint(oauth2Config.getLogoutEndpoint())
+                .oauth2Scope(oauth2Config.getScope());
         }
 
         return builder.build();
@@ -257,6 +274,25 @@ public class MiscController {
         Long pluginsHash;
 
         Boolean isConcurrencyViewEnabled;
+        
+        // OAuth2 configuration fields
+        @JsonInclude
+        String oauth2ClientId;
+        
+        @JsonInclude
+        String oauth2AuthEndpoint;
+        
+        @JsonInclude
+        String oauth2TokenEndpoint;
+        
+        @JsonInclude
+        String oauth2UserInfoEndpoint;
+        
+        @JsonInclude
+        String oauth2LogoutEndpoint;
+        
+        @JsonInclude
+        String oauth2Scope;
     }
 
     @Value

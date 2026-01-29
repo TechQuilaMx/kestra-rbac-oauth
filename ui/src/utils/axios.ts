@@ -156,8 +156,6 @@ export const createAxios = (
                 }
             }
 
-            const authStore = useAuthStore()
-
             if (errorResponse.response.status === 401
                 && (oss || !authStore.isLogged)) {
                 const base_path = window.KESTRA_BASE_PATH.endsWith("/") ? window.KESTRA_BASE_PATH.slice(0, -1) : window.KESTRA_BASE_PATH

@@ -1,5 +1,5 @@
 import {defineStore} from "pinia";
-import OAuth2Manager, {type OAuth2Config} from "@/utils/oauth2";
+import OAuth2Manager, {type OAuth2Config} from "../utils/oauth2";
 
 interface State {
     manager: OAuth2Manager | null;
@@ -25,6 +25,10 @@ export const useOAuth2Store = defineStore("oauth2", {
 
         hasTokens: (state) => {
             return state.manager?.hasTokens() ?? false;
+        },
+
+        getManager: (state) => {
+            return state.manager;
         },
     },
 

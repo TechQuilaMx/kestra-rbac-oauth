@@ -42,7 +42,7 @@
 <script setup lang="ts">
 import {ref, onMounted} from "vue";
 import {useRoute, useRouter} from "vue-router";
-import {useOAuth2Store} from "@/stores/oauth2";
+import {useOAuth2Store} from "../../stores/oauth2";
 
 const route = useRoute();
 const router = useRouter();

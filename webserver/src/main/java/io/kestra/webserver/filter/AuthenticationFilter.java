@@ -9,6 +9,7 @@ import org.reactivestreams.Publisher;
 import io.kestra.core.utils.AuthUtils;
 import io.kestra.webserver.services.BasicAuthService;
 
+import io.kestra.webserver.services.OAuth2Service;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -31,12 +32,16 @@ import reactor.core.scheduler.Schedulers;
 @Requires(property = "kestra.server-type", pattern = "(WEBSERVER|STANDALONE)")
 @Requires(property = "micronaut.security.enabled", notEquals = "true") // don't add this filter in EE
 public class AuthenticationFilter implements HttpServerFilter {
-    private static final String PREFIX = "Basic";
+    private static final String PREFIX_BASIC = "Basic";
+    private static final String PREFIX_BEARER = "Bearer";
     private static final Integer ORDER = ServerFilterPhase.SECURITY.order();
     public static final String BASIC_AUTH_COOKIE_NAME = "BASIC_AUTH";
 
     @Inject
     private BasicAuthService basicAuthService;
+    
+    @Inject
+    private Optional<OAuth2Service> oauth2Service = Optional.empty();
 
     @Override
     public int getOrder() {
@@ -62,7 +67,24 @@ public class AuthenticationFilter implements HttpServerFilter {
                 if (isConfigEndpoint || isOpenUrl || isManagementEndpoint(request)) {
                     return chain.proceed(request);
                 }
+                
+                // Try OAuth2 Bearer token authentication first
+                if (oauth2Service.isPresent() && oauth2Service.get().isEnabled()) {
+                    var bearerToken = fromBearerToken(request);
+                    if (bearerToken.isPresent()) {
+                        // Validate OAuth2 token
+                        var userInfo = oauth2Service.get().validateToken(bearerToken.get());
+                        if (userInfo.isPresent()) {
+                            // Token is valid, proceed with request
+                            return chain.proceed(request);
+                        } else {
+                            // Invalid OAuth2 token
+                            return Mono.just(HttpResponse.unauthorized());
+                        }
+                    }
+                }
 
+                // Fall back to Basic Auth
                 var basicAuth = fromCookie(request)
                     .or(() -> fromAuthorizationHeader(request))
                     .map(BasicAuth::from);
@@ -100,8 +122,15 @@ public class AuthenticationFilter implements HttpServerFilter {
     private Optional<String> fromAuthorizationHeader(HttpRequest<?> request) {
         return request.getHeaders()
             .getAuthorization()
-            .filter(auth -> auth.toLowerCase().startsWith(PREFIX.toLowerCase()))
-            .map(cred -> cred.substring(PREFIX.length() + 1));
+            .filter(auth -> auth.toLowerCase().startsWith(PREFIX_BASIC.toLowerCase()))
+            .map(cred -> cred.substring(PREFIX_BASIC.length() + 1));
+    }
+    
+    private Optional<String> fromBearerToken(HttpRequest<?> request) {
+        return request.getHeaders()
+            .getAuthorization()
+            .filter(auth -> auth.toLowerCase().startsWith(PREFIX_BEARER.toLowerCase()))
+            .map(token -> token.substring(PREFIX_BEARER.length() + 1).trim());
     }
 
     @SuppressWarnings("rawtypes")

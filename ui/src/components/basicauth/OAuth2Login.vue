@@ -43,7 +43,7 @@
 
 <script setup lang="ts">
 import {ref, onMounted} from "vue";
-import {useOAuth2Store} from "@/stores/oauth2";
+import {useOAuth2Store} from "../../stores/oauth2";
 import {useMiscStore} from "override/stores/misc";
 
 const oauth2Store = useOAuth2Store();
