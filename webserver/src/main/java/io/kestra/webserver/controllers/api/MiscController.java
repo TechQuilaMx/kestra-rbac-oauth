@@ -168,6 +168,11 @@ public class MiscController {
         // Add OAuth2 configuration if enabled
         if (oauth2Service.isPresent() && oauth2Service.get().isEnabled()) {
             OAuth2Configuration oauth2Config = oauth2Service.get().getConfiguration();
+            log.info("OAuth2 Configuration: authEndpoint={}, tokenEndpoint={}, userInfoEndpoint={}", 
+                oauth2Config.getAuthorizationEndpoint(),
+                oauth2Config.getTokenEndpoint(),
+                oauth2Config.getUserInfoEndpoint()
+            );
             builder
                 .oauth2ClientId(oauth2Config.getClientId())
                 .oauth2AuthEndpoint(oauth2Config.getAuthorizationEndpoint())

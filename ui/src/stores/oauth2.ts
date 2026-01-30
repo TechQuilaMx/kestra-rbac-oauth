@@ -38,10 +38,29 @@ export const useOAuth2Store = defineStore("oauth2", {
          */
         initialize(config: any) {
             try {
+                // Skip if already initialized
+                if (this.isInitialized && this.manager) {
+                    // Re-check authentication status in case tokens were saved
+                    this.isAuthenticated = this.manager.hasTokens();
+                    if (this.isAuthenticated) {
+                        this.accessToken = this.manager.getAccessToken();
+                    }
+                    return;
+                }
+
                 if (!config || !config.oauth2ClientId) {
                     console.warn("OAuth2 config not provided or incomplete");
                     return;
                 }
+
+                console.log("OAuth2 Config from backend:", {
+                    clientId: config.oauth2ClientId,
+                    authEndpoint: config.oauth2AuthEndpoint,
+                    tokenEndpoint: config.oauth2TokenEndpoint,
+                    userInfoEndpoint: config.oauth2UserInfoEndpoint,
+                    logoutEndpoint: config.oauth2LogoutEndpoint,
+                    scope: config.oauth2Scope,
+                });
 
                 const oauth2Config: OAuth2Config = {
                     clientId: config.oauth2ClientId,

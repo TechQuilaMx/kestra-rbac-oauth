@@ -8,7 +8,9 @@
             </template>
 
             <div v-if="isLoading" class="loading-state">
-                <el-spin :size="50" />
+                <el-icon class="loading-icon" :size="48">
+                    <Loading />
+                </el-icon>
                 <p class="loading-text">Processing your authentication...</p>
                 <p class="loading-subtext">This will only take a moment.</p>
             </div>
@@ -21,7 +23,7 @@
                     show-icon
                     class="error-alert"
                 />
-                <router-link to="/ui/login" class="back-link">
+                <router-link to="/login" class="back-link">
                     <el-button type="primary" class="back-button">
                         Back to Login
                     </el-button>
@@ -42,6 +44,7 @@
 <script setup lang="ts">
 import {ref, onMounted} from "vue";
 import {useRoute, useRouter} from "vue-router";
+import {Loading} from "@element-plus/icons-vue";
 import {useOAuth2Store} from "../../stores/oauth2";
 
 const route = useRoute();
@@ -98,9 +101,15 @@ onMounted(async () => {
 
         // Exchange code for tokens
         await oauth2Store.handleCallback(code, state);
+        
+        console.log("OAuth2 token exchange successful. isAuthenticated:", oauth2Store.isAuthenticated);
 
-        // Success - router will redirect to home
-        // (handleCallback in store calls router.push)
+        // Success - redirect to home
+        isLoading.value = false;
+        // Use a small delay to ensure tokens are persisted before navigation
+        setTimeout(() => {
+            router.replace({name: "home"});
+        }, 100);
     } catch (err: any) {
         error.value = err.message || "Authentication Failed";
         errorDescription.value = "There was an error during the authentication process. Please try again.";

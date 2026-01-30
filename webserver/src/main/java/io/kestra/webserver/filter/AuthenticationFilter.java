@@ -63,8 +63,16 @@ public class AuthenticationFilter implements HttpServerFilter {
                     .map(Collection::stream)
                     .map(stream -> stream.anyMatch(s -> request.getPath().startsWith(s)))
                     .orElse(false);
+                
+                // Check OAuth2 openUrls as well
+                boolean isOAuth2OpenUrl = oauth2Service
+                    .filter(OAuth2Service::isEnabled)
+                    .map(service -> service.getConfiguration().getOpenUrls())
+                    .map(Collection::stream)
+                    .map(stream -> stream.anyMatch(s -> request.getPath().startsWith(s)))
+                    .orElse(false);
 
-                if (isConfigEndpoint || isOpenUrl || isManagementEndpoint(request)) {
+                if (isConfigEndpoint || isOpenUrl || isOAuth2OpenUrl || isManagementEndpoint(request)) {
                     return chain.proceed(request);
                 }
                 

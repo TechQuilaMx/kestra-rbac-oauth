@@ -17,6 +17,8 @@ prettierrc.js
 .attach*
 **/*.class
 **/bin/*
+.sso/
+sso/
 
 ### Configurations
 docker-compose.override.yml
@@ -60,7 +62,6 @@ core/src/main/resources/gradle.properties
 **/allure-results/*
 
 /jmh-benchmarks/src/main/resources/gradle.properties
-
 # Helm chart dependencies (downloaded at build time, not committed)
 charts/kestra/charts/
 charts/kestra-starter/charts/

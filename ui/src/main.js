@@ -36,6 +36,7 @@ initApp(app, routes, null, en).then(({router, piniaStore}) => {
             const oauth2Store = useOAuth2Store();
             if (configs.oauth2ClientId) {
                 oauth2Store.initialize(configs);
+                console.log("OAuth2 initialized. isAuthenticated:", oauth2Store.isAuthenticated, "hasTokens:", oauth2Store.hasTokens);
             }
 
             // Handle OAuth2 authentication
@@ -46,9 +47,16 @@ initApp(app, routes, null, en).then(({router, piniaStore}) => {
                 }
 
                 // Check if user is authenticated via OAuth2
-                if (!oauth2Store.isAuthenticated) {
+                if (!oauth2Store.isAuthenticated && !oauth2Store.hasTokens) {
+                    console.log("OAuth2 not authenticated, redirecting to login");
                     const fromPath = to.fullPath !== "/ui/login" ? to.fullPath : undefined
                     return next({name: "login", query: fromPath ? {from: fromPath} : {}})
+                }
+
+                // Update isAuthenticated if tokens exist
+                if (oauth2Store.hasTokens && !oauth2Store.isAuthenticated) {
+                    oauth2Store.isAuthenticated = true;
+                    oauth2Store.accessToken = oauth2Store.getManager()?.getAccessToken() || null;
                 }
 
                 // Check welcome flow for dashboard routes

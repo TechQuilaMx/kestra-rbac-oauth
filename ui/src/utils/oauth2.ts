@@ -95,40 +95,41 @@ export class OAuth2Manager {
      * Exchange authorization code for access token
      */
     private async exchangeCodeForTokens(code: string): Promise<Tokens> {
-        const body = new URLSearchParams({
-            grant_type: this.config.grantType || "authorization_code",
-            code,
-            client_id: this.config.clientId,
-            redirect_uri: this.config.redirectUri,
-        });
-
-        if (this.config.clientSecret) {
-            body.append("client_secret", this.config.clientSecret);
-        }
-
+        // Call backend endpoint for secure token exchange
+        // The backend will use the client secret securely
         try {
-            const response = await fetch(this.config.tokenEndpoint, {
+            const response = await fetch("/api/v1/oauth2/token", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Content-Type": "application/json",
                 },
-                body: body.toString(),
+                body: JSON.stringify({
+                    code,
+                    redirectUri: this.config.redirectUri,
+                }),
             });
 
             if (!response.ok) {
-                const error = await response.text();
-                throw new Error(`Token exchange failed: ${error}`);
+                try {
+                    const errorData = await response.json();
+                    throw new Error(`Token exchange failed: ${errorData.error || errorData.message || response.statusText}`);
+                } catch (e) {
+                    throw new Error(`Token exchange failed with status ${response.status}: ${response.statusText}`);
+                }
             }
 
-            const data: TokenResponse = await response.json();
+            const data = await response.json();
+            
+            // Parse the token response from the backend
+            const tokenResponse = JSON.parse(data.tokenResponse);
 
             return {
-                accessToken: data.access_token,
-                refreshToken: data.refresh_token,
-                idToken: data.id_token,
-                expiresIn: data.expires_in,
-                expiresAt: Date.now() + data.expires_in * 1000,
-                tokenType: data.token_type || "Bearer",
+                accessToken: tokenResponse.access_token,
+                refreshToken: tokenResponse.refresh_token,
+                idToken: tokenResponse.id_token,
+                expiresIn: tokenResponse.expires_in,
+                expiresAt: Date.now() + tokenResponse.expires_in * 1000,
+                tokenType: tokenResponse.token_type || "Bearer",
             };
         } catch (error) {
             console.error("Token exchange error:", error);
@@ -144,46 +145,46 @@ export class OAuth2Manager {
             throw new Error("No refresh token available");
         }
 
-        const body = new URLSearchParams({
-            grant_type: "refresh_token",
-            refresh_token: this.tokens.refreshToken,
-            client_id: this.config.clientId,
-        });
-
-        if (this.config.clientSecret) {
-            body.append("client_secret", this.config.clientSecret);
-        }
-
         try {
-            const response = await fetch(this.config.tokenEndpoint, {
+            // Call backend endpoint for secure token refresh
+            const response = await fetch("/api/v1/oauth2/refresh", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Content-Type": "application/json",
                 },
-                body: body.toString(),
+                body: JSON.stringify({
+                    refreshToken: this.tokens.refreshToken,
+                }),
             });
 
             if (!response.ok) {
-                // If refresh fails, clear tokens and throw
-                this.clearTokens();
-                throw new Error("Token refresh failed");
+                try {
+                    const errorData = await response.json();
+                    throw new Error(`Token refresh failed: ${errorData.error || response.statusText}`);
+                } catch (e) {
+                    throw new Error(`Token refresh failed with status ${response.status}: ${response.statusText}`);
+                }
             }
 
-            const data: TokenResponse = await response.json();
+            const data = await response.json();
+            
+            // Parse the token response from the backend
+            const tokenResponse = JSON.parse(data.tokenResponse);
 
             const newTokens: Tokens = {
-                accessToken: data.access_token,
-                refreshToken: data.refresh_token || this.tokens.refreshToken,
-                idToken: data.id_token,
-                expiresIn: data.expires_in,
-                expiresAt: Date.now() + data.expires_in * 1000,
-                tokenType: data.token_type || "Bearer",
+                accessToken: tokenResponse.access_token,
+                refreshToken: tokenResponse.refresh_token || this.tokens.refreshToken,
+                idToken: tokenResponse.id_token,
+                expiresIn: tokenResponse.expires_in,
+                expiresAt: Date.now() + tokenResponse.expires_in * 1000,
+                tokenType: tokenResponse.token_type || "Bearer",
             };
 
             this.setTokens(newTokens);
             return newTokens.accessToken;
         } catch (error) {
             console.error("Token refresh error:", error);
+            this.clearTokens();
             throw error;
         }
     }

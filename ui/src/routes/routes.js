@@ -19,8 +19,8 @@ export default [
     {name: "welcome/success", path: "/:tenant?/welcome/success", component: () => import("../components/onboarding/Success.vue")},
 
     // OAuth2 & Authentication
-    {name: "login", path: "/ui/login", component: () => import("../components/basicauth/OAuth2Login.vue"), meta: {anonymous: true, layout: FullScreenLayout}},
-    {name: "oauth2-callback", path: "/ui/oauth2-callback", component: () => import("../components/basicauth/OAuth2Callback.vue"), meta: {anonymous: true, layout: FullScreenLayout}},
+    {name: "login", path: "/login", component: () => import("../components/basicauth/OAuth2Login.vue"), meta: {anonymous: true, layout: FullScreenLayout}},
+    {name: "oauth2-callback", path: "/oauth2-callback", component: () => import("../components/basicauth/OAuth2Callback.vue"), meta: {anonymous: true, layout: FullScreenLayout}},
 
     //Dashboards
     {
