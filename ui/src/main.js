@@ -9,9 +9,15 @@ import {setupTenantRouter} from "./composables/useTenant";
 import * as BasicAuth from "./utils/basicAuth";
 import {useMiscStore} from "override/stores/misc";
 import {useOAuth2Store} from "./stores/oauth2";
+import {vPermission, vRole, vAdmin} from "./directives/permissions";
 
 
 const app = createApp(App)
+
+// Register permission directives
+app.directive('permission', vPermission);
+app.directive('role', vRole);
+app.directive('admin', vAdmin);
 
 const handleAuthError = (error, to) => {
     if (error.message?.includes("401")) {

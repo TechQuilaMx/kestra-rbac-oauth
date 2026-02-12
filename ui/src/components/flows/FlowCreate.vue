@@ -44,11 +44,12 @@
             permission.FLOW,
             action.CREATE,
         )[0];
+        const implicitDefaultNamespaceValid = implicitDefaultNamespace && implicitDefaultNamespace !== "*" ? implicitDefaultNamespace : undefined;
         let flowYaml = "";
         const id = getRandomID();
         const selectedNamespace = (route.query.namespace as string)
             ?? defaultNamespace()
-            ?? implicitDefaultNamespace
+            ?? implicitDefaultNamespaceValid
             ?? "company.team";
 
         if (route.query.copy && flowStore.flow) {

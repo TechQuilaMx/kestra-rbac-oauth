@@ -1,7 +1,10 @@
 package io.kestra.webserver.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.kestra.webserver.configurations.AuthorizationConfiguration;
 import io.kestra.webserver.configurations.OAuth2Configuration;
+import io.kestra.webserver.models.auth.Permission;
+import io.kestra.webserver.models.auth.Role;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Inject;
@@ -15,9 +18,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.Base64;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Service for OAuth2 token validation and user info retrieval
@@ -29,12 +31,18 @@ import java.util.Optional;
 public class OAuth2Service {
     
     private final OAuth2Configuration oauth2Configuration;
+    private final AuthorizationConfiguration authorizationConfiguration;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     
     @Inject
-    public OAuth2Service(OAuth2Configuration oauth2Configuration, ObjectMapper objectMapper) {
+    public OAuth2Service(
+        OAuth2Configuration oauth2Configuration,
+        AuthorizationConfiguration authorizationConfiguration,
+        ObjectMapper objectMapper
+    ) {
         this.oauth2Configuration = oauth2Configuration;
+        this.authorizationConfiguration = authorizationConfiguration;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -45,7 +53,7 @@ public class OAuth2Service {
      * Validate access token by calling userinfo endpoint
      * This is simpler than JWT validation and works with opaque tokens
      */
-    public Optional<UserInfo> validateToken(String accessToken) {
+    public Optional<io.kestra.webserver.models.auth.UserInfo> validateToken(String accessToken) {
         if (StringUtils.isBlank(accessToken)) {
             return Optional.empty();
         }
@@ -69,7 +77,22 @@ public class OAuth2Service {
             if (response.statusCode() == 200) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> userInfoMap = objectMapper.readValue(response.body(), Map.class);
-                return Optional.of(UserInfo.fromMap(userInfoMap));
+                UserInfo rawUserInfo = UserInfo.fromMap(userInfoMap);
+                
+                // Extract roles from userinfo claims
+                List<Role> roles = extractRolesFromClaims(rawUserInfo.additionalClaims());
+                log.debug("Extracted roles for user {}: {}", rawUserInfo.getUsername(), roles);
+                
+                // Get permissions for the roles
+                Set<Permission> permissions = authorizationConfiguration.getPermissionsForRoles(roles);
+                
+                return Optional.of(io.kestra.webserver.models.auth.UserInfo.builder()
+                    .username(rawUserInfo.getUsername())
+                    .email(rawUserInfo.email())
+                    .name(rawUserInfo.name())
+                    .roles(roles)
+                    .permissions(permissions)
+                    .build());
             } else {
                 log.warn("Token validation failed with status code: {}", response.statusCode());
                 return Optional.empty();
@@ -78,6 +101,85 @@ public class OAuth2Service {
             log.error("Error validating token", e);
             return Optional.empty();
         }
+    }
+    
+    /**
+     * Extract roles from token claims
+     * Supports multiple claim structures from different OAuth2 providers
+     */
+    @SuppressWarnings("unchecked")
+    private List<Role> extractRolesFromClaims(Map<String, Object> claims) {
+        List<Role> roles = new ArrayList<>();
+        
+        // Try Keycloak realm_access structure
+        Object realmAccess = claims.get("realm_access");
+        if (realmAccess instanceof Map) {
+            Object rolesObj = ((Map<String, Object>) realmAccess).get("roles");
+            if (rolesObj instanceof List) {
+                roles.addAll(parseRoleList((List<?>) rolesObj));
+            }
+        }
+        
+        // Try Auth0/generic "roles" claim
+        Object rolesObj = claims.get("roles");
+        if (rolesObj instanceof List) {
+            roles.addAll(parseRoleList((List<?>) rolesObj));
+        }
+        
+        // Try "groups" claim (common in Azure AD, Google Workspace)
+        Object groupsObj = claims.get("groups");
+        if (groupsObj instanceof List) {
+            roles.addAll(parseRoleList((List<?>) groupsObj));
+        }
+        
+        // Try custom claim path if configured
+        String customRoleClaim = oauth2Configuration.getRoleClaimPath();
+        if (StringUtils.isNotBlank(customRoleClaim)) {
+            Object customRoles = getNestedClaim(claims, customRoleClaim);
+            if (customRoles instanceof List) {
+                roles.addAll(parseRoleList((List<?>) customRoles));
+            }
+        }
+        
+        // Default to OPERATOR if no roles found
+        if (roles.isEmpty()) {
+            log.warn("No roles found in token claims, defaulting to OPERATOR");
+            roles.add(Role.OPERATOR);
+        }
+        
+        return roles.stream().distinct().collect(Collectors.toList());
+    }
+    
+    /**
+     * Parse list of role strings into Role enums
+     */
+    private List<Role> parseRoleList(List<?> roleList) {
+        return roleList.stream()
+            .filter(obj -> obj instanceof String)
+            .map(obj -> Role.fromString((String) obj))
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get nested claim value using dot notation (e.g., "resource_access.kestra.roles")
+     */
+    @SuppressWarnings("unchecked")
+    private Object getNestedClaim(Map<String, Object> claims, String path) {
+        String[] parts = path.split("\\.");
+        Object current = claims;
+        
+        for (String part : parts) {
+            if (!(current instanceof Map)) {
+                return null;
+            }
+            current = ((Map<String, Object>) current).get(part);
+            if (current == null) {
+                return null;
+            }
+        }
+        
+        return current;
     }
     
     /**

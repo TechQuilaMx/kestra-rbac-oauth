@@ -106,4 +106,12 @@ public class OAuth2Configuration {
      */
     @Nullable
     private String introspectionEndpoint;
+    
+    /**
+     * Custom claim path for extracting roles from token
+     * Use dot notation for nested claims, e.g., "resource_access.kestra.roles"
+     * Default providers: Keycloak uses "realm_access.roles", Auth0 uses "roles"
+     */
+    @Nullable
+    private String roleClaimPath;
 }

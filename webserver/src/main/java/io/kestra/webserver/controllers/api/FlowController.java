@@ -34,8 +34,10 @@ import io.kestra.core.services.PluginDefaultService;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.topologies.FlowTopologyService;
 import io.kestra.core.utils.Rethrow;
+import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.controllers.domain.IdWithNamespace;
 import io.kestra.webserver.converters.QueryFilterFormat;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.BulkResponse;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.CSVUtils;
@@ -266,6 +268,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(consumes = MediaType.APPLICATION_YAML)
     @Operation(tags = { "Flows" }, summary = "Create a flow from yaml source")
+    @RequirePermission(Permission.FLOWS_CREATE)
     public HttpResponse<FlowWithSource> createFlow(
         @RequestBody(description = "The flow source code") @Body String flow) throws ConstraintViolationException {
         return HttpResponse.ok(doCreate(parseFlowSource(flow)));
@@ -473,6 +476,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Flows" }, summary = "Update a flow") // force deprecated = false otherwise it is marked as deprecated, dont know why
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = FlowWithSource.class)) })
+    @RequirePermission(Permission.FLOWS_EDIT)
     public HttpResponse<FlowWithSource> updateFlow(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id,
@@ -593,6 +597,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Flows" }, summary = "Delete a flow")
     @ApiResponse(responseCode = "204", description = "On success")
+    @RequirePermission(Permission.FLOWS_DELETE)
     public HttpResponse<Void> deleteFlow(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id) {

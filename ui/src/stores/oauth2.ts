@@ -1,5 +1,16 @@
 import {defineStore} from "pinia";
 import OAuth2Manager, {type OAuth2Config} from "../utils/oauth2";
+import {useAxios} from "../utils/axios";
+
+interface UserInfo {
+    authenticated: boolean;
+    username?: string;
+    email?: string;
+    name?: string;
+    roles?: string[];
+    permissions?: string[];
+    isAdmin?: boolean;
+}
 
 interface State {
     manager: OAuth2Manager | null;
@@ -7,6 +18,7 @@ interface State {
     accessToken: string | null;
     isInitialized: boolean;
     isLoading: boolean;
+    userInfo: UserInfo | null;
 }
 
 export const useOAuth2Store = defineStore("oauth2", {
@@ -16,6 +28,7 @@ export const useOAuth2Store = defineStore("oauth2", {
         accessToken: null,
         isInitialized: false,
         isLoading: false,
+        userInfo: null,
     }),
 
     getters: {
@@ -29,6 +42,27 @@ export const useOAuth2Store = defineStore("oauth2", {
 
         getManager: (state) => {
             return state.manager;
+        },
+        
+        /**
+         * Check if user has a specific role
+         */
+        hasRole: (state) => (role: string) => {
+            return state.userInfo?.roles?.includes(role.toLowerCase()) ?? false;
+        },
+        
+        /**
+         * Check if user has a specific permission
+         */
+        hasPermission: (state) => (permission: string) => {
+            return state.userInfo?.permissions?.includes(permission) ?? false;
+        },
+        
+        /**
+         * Check if user is admin
+         */
+        isAdmin: (state) => {
+            return state.userInfo?.isAdmin ?? false;
         },
     },
 
@@ -81,6 +115,8 @@ export const useOAuth2Store = defineStore("oauth2", {
 
                 if (this.isAuthenticated) {
                     this.accessToken = this.manager.getAccessToken();
+                    // Fetch user info if already authenticated
+                    this.fetchUserInfo();
                 }
             } catch (error) {
                 console.error("Failed to initialize OAuth2 store:", error);
@@ -111,8 +147,29 @@ export const useOAuth2Store = defineStore("oauth2", {
                 await this.manager.handleCallback(code, state);
                 this.isAuthenticated = true;
                 this.accessToken = this.manager.getAccessToken();
+                
+                // Fetch user info after successful authentication
+                await this.fetchUserInfo();
             } finally {
                 this.isLoading = false;
+            }
+        },
+        
+        /**
+         * Fetch current user info from backend
+         */
+        async fetchUserInfo() {
+            try {
+                if (!this.isAuthenticated || !this.accessToken) {
+                    return;
+                }
+                const axios = useAxios();
+                const response = await axios.get("/api/v1/user/me");
+                this.userInfo = response.data;
+                console.log("User info loaded:", this.userInfo);
+            } catch (error) {
+                console.error("Failed to fetch user info:", error);
+                this.userInfo = null;
             }
         },
 
@@ -126,6 +183,7 @@ export const useOAuth2Store = defineStore("oauth2", {
 
             this.isAuthenticated = false;
             this.accessToken = null;
+            this.userInfo = null;
             this.manager.logout();
         },
 

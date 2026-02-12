@@ -83,7 +83,8 @@ public class AuthenticationFilter implements HttpServerFilter {
                         // Validate OAuth2 token
                         var userInfo = oauth2Service.get().validateToken(bearerToken.get());
                         if (userInfo.isPresent()) {
-                            // Token is valid, proceed with request
+                            // Token is valid, store user info in request for authorization
+                            request.setAttribute("userInfo", userInfo.get());
                             return chain.proceed(request);
                         } else {
                             // Invalid OAuth2 token
