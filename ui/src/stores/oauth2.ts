@@ -99,6 +99,7 @@ export const useOAuth2Store = defineStore("oauth2", {
                 const oauth2Config: OAuth2Config = {
                     clientId: config.oauth2ClientId,
                     redirectUri: `${window.location.origin}/ui/oauth2-callback`,
+                    postLogoutRedirectUri: `${window.location.origin}/ui/login`,
                     authorizationEndpoint: config.oauth2AuthEndpoint,
                     tokenEndpoint: config.oauth2TokenEndpoint,
                     userInfoEndpoint: config.oauth2UserInfoEndpoint,
@@ -176,15 +177,26 @@ export const useOAuth2Store = defineStore("oauth2", {
         /**
          * Logout and redirect to provider logout endpoint
          */
-        logout() {
-            if (!this.manager) {
-                throw new Error("OAuth2 not initialized");
-            }
+        async logout(): Promise<void> {
+            try {
+                if (!this.manager) {
+                    // nothing to do, resolve
+                    this.isAuthenticated = false;
+                    this.accessToken = null;
+                    this.userInfo = null;
+                    return;
+                }
 
-            this.isAuthenticated = false;
-            this.accessToken = null;
-            this.userInfo = null;
-            this.manager.logout();
+                this.isAuthenticated = false;
+                this.accessToken = null;
+                this.userInfo = null;
+                // manager.logout may redirect the browser; keep it synchronous
+                this.manager.logout();
+            } catch (e) {
+                console.error("Error during logout:", e);
+                // ensure a Promise rejection is possible for callers
+                return Promise.reject(e);
+            }
         },
 
         /**

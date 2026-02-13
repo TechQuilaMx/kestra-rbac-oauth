@@ -7,6 +7,7 @@
 export interface OAuth2Config {
     clientId: string;
     redirectUri: string;
+    postLogoutRedirectUri?: string;
     authorizationEndpoint: string;  // e.g., https://keycloak.com/auth/...auth
     tokenEndpoint: string;           // e.g., https://keycloak.com/auth/.../token
     userInfoEndpoint: string;        // e.g., https://keycloak.com/auth/.../userinfo
@@ -197,7 +198,7 @@ export class OAuth2Manager {
 
         const params = new URLSearchParams({
             client_id: this.config.clientId,
-            post_logout_redirect_uri: this.config.redirectUri,
+            post_logout_redirect_uri: this.config.postLogoutRedirectUri || this.config.redirectUri,
         });
 
         // Redirect to provider logout

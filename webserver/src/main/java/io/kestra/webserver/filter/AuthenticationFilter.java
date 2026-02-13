@@ -108,8 +108,12 @@ public class AuthenticationFilter implements HttpServerFilter {
                 ) {
                     Boolean isFromLoginPage = Optional.ofNullable(request.getHeaders().get("Referer")).map(referer -> referer.split("\\?")[0].endsWith("/login")).orElse(false);
 
+                    // Avoid sending a WWW-Authenticate: Basic header for API calls that expect JSON
+                    // (the browser will show a native credentials prompt when that header is present).
+                    boolean acceptsHtml = Optional.ofNullable(request.getHeaders().get("Accept")).map(a -> a.contains("text/html")).orElse(false);
+
                     return Mono.just(HttpResponse.unauthorized())
-                        .map(response -> isFromLoginPage ? response : response.header("WWW-Authenticate", "Basic"));
+                        .map(response -> (isFromLoginPage || !acceptsHtml) ? response : response.header("WWW-Authenticate", "Basic"));
                 }
 
                 return chain.proceed(request);

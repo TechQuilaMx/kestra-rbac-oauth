@@ -78,11 +78,26 @@ public class OAuth2Service {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> userInfoMap = objectMapper.readValue(response.body(), Map.class);
                 UserInfo rawUserInfo = UserInfo.fromMap(userInfoMap);
-                
+
                 // Extract roles from userinfo claims
                 List<Role> roles = extractRolesFromClaims(rawUserInfo.additionalClaims());
+
+                // Fallback: if userinfo doesn't contain roles, try to decode roles from JWT access token
+                if (roles.isEmpty()) {
+                    Map<String, Object> jwtClaims = decodeJwtClaims(accessToken);
+                    if (!jwtClaims.isEmpty()) {
+                        roles = extractRolesFromClaims(jwtClaims);
+                    }
+                }
+
+                // Default to OPERATOR if still no roles found
+                if (roles.isEmpty()) {
+                    log.warn("No roles found in token claims, defaulting to OPERATOR");
+                    roles = List.of(Role.OPERATOR);
+                }
+
                 log.debug("Extracted roles for user {}: {}", rawUserInfo.getUsername(), roles);
-                
+
                 // Get permissions for the roles
                 Set<Permission> permissions = authorizationConfiguration.getPermissionsForRoles(roles);
                 
@@ -125,6 +140,35 @@ public class OAuth2Service {
         if (rolesObj instanceof List) {
             roles.addAll(parseRoleList((List<?>) rolesObj));
         }
+
+        // Try Keycloak client roles under resource_access.<clientId>.roles
+        Object resourceAccess = claims.get("resource_access");
+        if (resourceAccess instanceof Map) {
+            Map<String, Object> resourceAccessMap = (Map<String, Object>) resourceAccess;
+
+            String clientId = oauth2Configuration.getClientId();
+            if (StringUtils.isNotBlank(clientId)) {
+                Object clientAccess = resourceAccessMap.get(clientId);
+                if (clientAccess instanceof Map) {
+                    Object clientRoles = ((Map<String, Object>) clientAccess).get("roles");
+                    if (clientRoles instanceof List) {
+                        roles.addAll(parseRoleList((List<?>) clientRoles));
+                    }
+                }
+            }
+
+            // Fallback: collect roles from any client if clientId is missing
+            if (roles.isEmpty()) {
+                for (Object clientAccessObj : resourceAccessMap.values()) {
+                    if (clientAccessObj instanceof Map) {
+                        Object clientRoles = ((Map<String, Object>) clientAccessObj).get("roles");
+                        if (clientRoles instanceof List) {
+                            roles.addAll(parseRoleList((List<?>) clientRoles));
+                        }
+                    }
+                }
+            }
+        }
         
         // Try "groups" claim (common in Azure AD, Google Workspace)
         Object groupsObj = claims.get("groups");
@@ -141,13 +185,30 @@ public class OAuth2Service {
             }
         }
         
-        // Default to OPERATOR if no roles found
-        if (roles.isEmpty()) {
-            log.warn("No roles found in token claims, defaulting to OPERATOR");
-            roles.add(Role.OPERATOR);
-        }
-        
         return roles.stream().distinct().collect(Collectors.toList());
+    }
+
+    /**
+     * Decode JWT claims without signature verification (userinfo already validated the token)
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> decodeJwtClaims(String accessToken) {
+        try {
+            if (StringUtils.isBlank(accessToken) || !accessToken.contains(".")) {
+                return Collections.emptyMap();
+            }
+
+            String[] parts = accessToken.split("\\.");
+            if (parts.length < 2) {
+                return Collections.emptyMap();
+            }
+
+            String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
+            return objectMapper.readValue(payload, Map.class);
+        } catch (Exception e) {
+            log.debug("Failed to decode JWT claims", e);
+            return Collections.emptyMap();
+        }
     }
     
     /**
