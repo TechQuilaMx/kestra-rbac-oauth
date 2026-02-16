@@ -62,7 +62,8 @@ initApp(app, routes, null, en).then(({router, piniaStore}) => {
                 // Update isAuthenticated if tokens exist
                 if (oauth2Store.hasTokens && !oauth2Store.isAuthenticated) {
                     oauth2Store.isAuthenticated = true;
-                    oauth2Store.accessToken = oauth2Store.getManager()?.getAccessToken() || null;
+                    // Ensure access token is refreshed if needed and user info is loaded
+                    oauth2Store.getAccessToken().then(() => oauth2Store.fetchUserInfo());
                 }
 
                 // Check welcome flow for dashboard routes

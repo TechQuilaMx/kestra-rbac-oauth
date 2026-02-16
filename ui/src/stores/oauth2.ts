@@ -77,7 +77,7 @@ export const useOAuth2Store = defineStore("oauth2", {
                     // Re-check authentication status in case tokens were saved
                     this.isAuthenticated = this.manager.hasTokens();
                     if (this.isAuthenticated) {
-                        this.accessToken = this.manager.getAccessToken();
+                        this.getAccessToken().then(() => this.fetchUserInfo());
                     }
                     return;
                 }
@@ -115,9 +115,7 @@ export const useOAuth2Store = defineStore("oauth2", {
                 this.isInitialized = true;
 
                 if (this.isAuthenticated) {
-                    this.accessToken = this.manager.getAccessToken();
-                    // Fetch user info if already authenticated
-                    this.fetchUserInfo();
+                    this.getAccessToken().then(() => this.fetchUserInfo());
                 }
             } catch (error) {
                 console.error("Failed to initialize OAuth2 store:", error);
