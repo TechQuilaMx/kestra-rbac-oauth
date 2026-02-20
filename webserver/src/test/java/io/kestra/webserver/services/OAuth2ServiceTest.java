@@ -7,10 +7,10 @@ import io.kestra.webserver.models.auth.Role;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class OAuth2ServiceTest {
 
@@ -96,4 +96,59 @@ class OAuth2ServiceTest {
         method.setAccessible(true);
         return (List<Role>) method.invoke(service, claims);
     }
+
+    @Test
+    void shouldHandleEmptyRolesClaims() throws Exception {
+        OAuth2Service service = buildService("kestra-app");
+
+        Map<String, Object> claims = Map.of(
+            "sub", "user-123",
+            "email", "user@example.com"
+        );
+
+        List<Role> roles = invokeExtractRoles(service, claims);
+        assertThat(roles).isEmpty();
+    }
+
+    @Test
+    void shouldHandleMultipleRoleExtractSources() throws Exception {
+        OAuth2Service service = buildService("kestra-app");
+
+        // Claims with roles from both realm_access and resource_access should deduplicate
+        Map<String, Object> claims = Map.of(
+            "realm_access", Map.of(
+                "roles", List.of("kestra-admin")
+            ),
+            "resource_access", Map.of(
+                "kestra-app", Map.of(
+                    "roles", List.of("kestra-admin")
+                )
+            )
+        );
+
+        List<Role> roles = invokeExtractRoles(service, claims);
+        // Should contain ADMIN only once (deduplicated)
+        assertThat(roles).containsExactly(Role.ADMIN);
+    }
+
+    @Test
+    void shouldDecodeJwtClaimsWithoutSignatureVerification() throws Exception {
+        OAuth2Service service = buildService("kestra-app");
+
+        // A valid JWT structure (header.payload.signature) where payload contains roles
+        // This is a test JWT with payload: {"realm_access":{"roles":["kestra-admin"]}}
+        String testPayload = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("{\"realm_access\":{\"roles\":[\"kestra-admin\"]}}".getBytes());
+        String jwtToken = "eyJhbGciOiJIUzI1NiJ9." + testPayload + ".signature";
+
+        Method method = OAuth2Service.class.getDeclaredMethod("decodeJwtClaims", String.class);
+        method.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> decodedClaims = (Map<String, Object>) method.invoke(service, jwtToken);
+
+        assertThat(decodedClaims).isNotEmpty();
+        assertThat(decodedClaims).containsKey("realm_access");
+    }
 }
+
