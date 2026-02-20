@@ -63,7 +63,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.sso
+          file: ./Dockerfile.rbac
           push: ${{ inputs.push_image }}
           tags: ${{ steps.prep.outputs.tags }}
           labels: |

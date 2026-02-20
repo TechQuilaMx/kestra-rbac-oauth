@@ -553,10 +553,10 @@ logger:
 
 ### Docker Deployment
 
-Use the provided `Dockerfile.sso`:
+Use the provided `Dockerfile.rbac`:
 
 ```bash
-docker build -f Dockerfile.sso -t kestra-sso:latest .
+docker build -f Dockerfile.rbac -t kestra-sso:latest .
 
 docker run -p 8080:8080 \
   -e OAUTH2_ENABLED=true \

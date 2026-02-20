@@ -1,250 +1,266 @@
-<p align="center">
-  <a href="https://www.kestra.io">
-    <img src="https://kestra.io/banner.png"  alt="Kestra workflow orchestrator" />
-  </a>
-</p>
+# Kestra SSO with OAuth2 RBAC
 
-<h1 align="center" style="border-bottom: none">
-    Event-Driven Declarative Orchestration Platform
-</h1>
+**Forked from Kestra v1.2.0**
 
-<div align="center">
- <a href="https://github.com/kestra-io/kestra/releases"><img src="https://img.shields.io/github/tag-pre/kestra-io/kestra.svg?color=blueviolet" alt="Last Version" /></a>
-  <a href="https://github.com/kestra-io/kestra/blob/develop/LICENSE"><img src="https://img.shields.io/github/license/kestra-io/kestra?color=blueviolet" alt="License" /></a>
-  <a href="https://github.com/kestra-io/kestra/stargazers"><img src="https://img.shields.io/github/stars/kestra-io/kestra?color=blueviolet&logo=github" alt="Github star" /></a> <br>
-<a href="https://kestra.io"><img src="https://img.shields.io/badge/Website-kestra.io-192A4E?color=blueviolet" alt="Kestra infinitely scalable orchestration and scheduling platform"></a>
-<a href="https://kestra.io/slack"><img src="https://img.shields.io/badge/Slack-Join%20Community-blueviolet?logo=slack" alt="Slack"></a>
-</div>
+This is an enhanced version of the open-source Kestra orchestration platform with OAuth2 authentication and Role-Based Access Control (RBAC) capabilities.
 
-<br />
+## Overview
 
-<p align="center">
-  <a href="https://twitter.com/kestra_io" style="margin: 0 10px;">
-        <img height="25" src="https://kestra.io/twitter.svg" alt="twitter" width="35" height="25" /></a>
-  <a href="https://www.linkedin.com/company/kestra/" style="margin: 0 10px;">
-        <img height="25" src="https://kestra.io/linkedin.svg" alt="linkedin" width="35" height="25" /></a> 
-  <a href="https://www.youtube.com/@kestra-io" style="margin: 0 10px;">
-        <img height="25" src="https://kestra.io/youtube.svg" alt="youtube" width="35" height="25" /></a>
-</p>
+This fork adds enterprise-grade authentication and authorization to Kestra through OAuth2 and role-based access control, enabling secure multi-user deployments with fine-grained permission management.
 
-<p align="center">
-  <a href="https://trendshift.io/repositories/2714" target="_blank">
-    <img src="https://trendshift.io/api/badge/repositories/2714" alt="kestra-io%2Fkestra | Trendshift" width="250" height="55"/>
-  </a>
-  <a href="https://www.producthunt.com/posts/kestra?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_souce=badge-kestra" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/top-post-badge.svg?post_id=612077&theme=light&period=daily&t=1740737506162" alt="Kestra - All&#0045;in&#0045;one&#0032;automation&#0032;&#0038;&#0032;orchestration&#0032;platform | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
-</p>
+## New Features
 
-<p align="center">
-    <a href="https://go.kestra.io/video/product-overview" target="_blank">
-        <img src="https://kestra.io/startvideo.png" alt="Get started in 3 minutes with Kestra" width="640px" />
-    </a>
-</p>
-<p align="center" style="color:grey;"><i>Click on the image to learn how to get started with Kestra in 3 minutes.</i></p>
+### 1. OAuth2 Authentication
 
+Complete OAuth2/OIDC integration with support for multiple identity providers:
+- **Keycloak** - Full support with realm roles and client roles
+- **Auth0** - Complete integration
+- **Google Workspace** - Support for Google identity provider
+- **Azure AD** - Support for Azure Active Directory
+- **Any OIDC-compliant provider** - Generic OIDC support with configurable role claim paths
 
-## 🌟 What is Kestra?
+#### Key Features:
+- Token refresh with automatic retry queue for expired tokens
+- JWT fallback decoding when userinfo endpoint lacks roles
+- Multiple role claim extraction strategies
+- Configurable role claim paths for different providers
+- WWW-Authenticate header suppression for JSON API calls (prevents browser native credential dialogs)
 
-Kestra is an open-source, event-driven orchestration platform that makes both **scheduled** and **event-driven** workflows easy. By bringing **Infrastructure as Code** best practices to data, process, and microservice orchestration, you can build reliable [workflows](https://kestra.io/docs/getting-started) directly from the UI in just a few lines of YAML.
+### 2. Role-Based Access Control (RBAC)
 
-**Key Features:**
-- **Everything as Code and from the UI:** keep **workflows as code** with a **Git Version Control** integration, even when building them from the UI.
-- **Event-Driven & Scheduled Workflows:** automate both **scheduled** and **real-time** event-driven workflows via a simple `trigger` definition.
-- **Declarative YAML Interface:** define workflows using a simple configuration in the **built-in code editor**.
-- **Rich Plugin Ecosystem:** hundreds of plugins built in to extract data from any database, cloud storage, or API, and **run scripts in any language**.
-- **Intuitive UI & Code Editor:** build and visualize workflows directly from the UI with syntax highlighting, auto-completion and real-time syntax validation.
-- **Scalable:** designed to handle millions of workflows, with high availability and fault tolerance.
-- **Version Control Friendly:** write your workflows from the built-in code Editor and push them to your preferred Git branch directly from Kestra, enabling best practices with CI/CD pipelines and version control systems.
-- **Structure & Resilience**: tame chaos and bring resilience to your workflows with **namespaces**, **labels**, **subflows**, **retries**, **timeout**, **error handling**, **inputs**, **outputs** that generate artifacts in the UI, **variables**, **conditional branching**, **advanced scheduling**, **event triggers**, **backfills**, **dynamic tasks**, **sequential and parallel tasks**, and skip tasks or triggers when needed by setting the flag `disabled` to `true`.
+Fine-grained permission system with predefined roles:
 
+#### Available Roles:
+- **ADMIN** - Full access to all features
+- **OPERATOR** - Configurable limited access (view-only + execution by default)
 
-🧑‍💻 The YAML definition gets automatically adjusted any time you make changes to a workflow from the UI or via an API call. Therefore, the orchestration logic is **always managed declaratively in code**, even if you modify your workflows in other ways (UI, CI/CD, Terraform, API calls).
+#### Available Permissions (25+):
+- **Flows**: view, create, edit, delete
+- **Executions**: view, create, restart, kill
+- **Templates**: view, create, edit, delete
+- **Namespaces**: view, create, edit, delete
+- **KV Store**: view, create, edit, delete
+- **Secrets**: view, create, edit, delete
+- **Admin**: access, stats, triggers
+- **Settings**: view, edit
 
+### 3. Backend Authorization
 
-<p align="center">
-  <img src="https://kestra.io/adding-tasks.gif" alt="Adding new tasks in the UI">
-</p>
+Annotation-based access control on HTTP endpoints:
+- `@RequireRole(Role.ADMIN)` - Restrict endpoint to specific roles
+- `@RequirePermission(Permission.FLOWS_CREATE)` - Restrict endpoint to specific permissions
+- Support for multiple roles/permissions with OR/AND logic
+- Class-level and method-level annotations
 
----
+All endpoints are enforced at the HTTP filter level with proper 403 Forbidden responses.
 
-## 🚀 Quick Start
+### 4. Frontend Permission Integration
 
-### Launch on AWS (CloudFormation)
+Vue 3 composable and directives for UX-level permission checks:
 
-Deploy Kestra on AWS using our CloudFormation template:
-
-[![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/review?templateURL=https://kestra-deployment-templates.s3.eu-west-3.amazonaws.com/aws/cloudformation/ec2-rds-s3/kestra-oss.yaml&stackName=kestra-oss)
-
-### Launch on Google Cloud (Terraform deployment)
-
-Deploy Kestra on Google Cloud Infrastructure Manager using [our Terraform module](https://github.com/kestra-io/deployment-templates/tree/main/gcp/terraform/infrastructure-manager/vm-sql-gcs).
-
-### Get Started Locally in 5 Minutes
-
-#### Launch Kestra in Docker
-
-Make sure that Docker is running. Then, start Kestra in a single command:
-
-```bash
-docker run --pull=always -it -p 8080:8080 --user=root \
-  --name kestra --restart=always \
-  -v kestra_data:/app/storage \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v /tmp:/tmp \
-  kestra/kestra:latest server local
+#### Composable (`usePermissions`):
+```typescript
+const { hasPermission, isAdmin, canCreateFlows, canEditFlows } = usePermissions();
 ```
 
-If you're on Windows and use PowerShell:
-```powershell
-docker run --pull=always -it -p 8080:8080 --user=root `
-  --name kestra --restart=always `
-  -v "kestra_data:/app/storage" `
-  -v "/var/run/docker.sock:/var/run/docker.sock" `
-  -v "C:/Temp:/tmp" `
-  kestra/kestra:latest server local
-```
+#### Directives:
+- `v-permission="'flows.create'"` - Show element if user has permission
+- `v-admin` - Show element if user is admin
+- `v-permission-all="['flows.edit', 'flows.delete']"` - Show if user has ALL permissions
+- `v-permission-any="['flows.edit', 'flows.delete']"` - Show if user has ANY permission
 
-If you're on Windows and use Command Prompt (CMD):
-```cmd
-docker run --pull=always -it -p 8080:8080 --user=root ^
-  --name kestra --restart=always ^
-  -v "kestra_data:/app/storage" ^
-  -v "/var/run/docker.sock:/var/run/docker.sock" ^
-  -v "C:/Temp:/tmp" ^
-  kestra/kestra:latest server local
-```
+#### User Info Display:
+- User dropdown in UI showing:
+  - User name/username/email
+  - Assigned roles
+  - Logout option
+- Session persistence across page refreshes
 
-If you're on Windows and use WSL (Linux-based environment in Windows):
-```bash
-docker run --pull=always -it -p 8080:8080 --user=root \
-  --name kestra --restart=always \
-  -v kestra_data:/app/storage \
-  -v "/var/run/docker.sock:/var/run/docker.sock" \
-  -v "/mnt/c/Temp:/tmp" \
-  kestra/kestra:latest server local
-```
+### 5. New Endpoints
 
-Check our [Installation Guide](https://kestra.io/docs/installation) for other deployment options (Docker Compose, Podman, Kubernetes, AWS, GCP, Azure, and more).
+- `GET /api/v1/user/me` - Returns current user info, roles, and permissions
+- `POST /api/v1/oauth2/login` - Initiates OAuth2 login flow
+- `GET /api/v1/oauth2/callback` - Handles OAuth2 callback
+- `POST /api/v1/oauth2/logout` - Performs OAuth2 logout
+- `POST /api/v1/oauth2/refresh` - Refreshes access token
 
-Access the Kestra UI at [http://localhost:8080](http://localhost:8080) and start building your first flow!
+## Implementation Details
 
-#### Your First Hello World Flow
+### Backend Components (Java/Micronaut)
 
-Create a new flow with the following content:
+**New Classes:**
+- `OAuth2Configuration.java` - OAuth2 configuration properties
+- `AuthorizationConfiguration.java` - Role-permission mapping configuration
+- `Role.java` - Enum of available roles
+- `Permission.java` - Enum of available permissions
+- `UserInfo.java` - User information with roles and permissions
+- `@RequireRole` - Annotation for role-based access control
+- `@RequirePermission` - Annotation for permission-based access control
+- `AuthorizationFilter.java` - HTTP filter enforcing role/permission requirements
+- `OAuth2Service.java` - Enhanced with role extraction from multiple claim structures
+- `UserController.java` - Endpoint for user information
+
+**Modified Classes:**
+- `AuthenticationFilter.java` - Added Accept header check for WWW-Authenticate suppression
+- `FlowController.java` - Added permission annotations to create/update/delete endpoints
+
+### Frontend Components (Vue 3/TypeScript)
+
+**New Files:**
+- `ui/src/composables/usePermissions.ts` - Permission checking composable
+- `ui/src/directives/permissions.ts` - Permission-based visibility directives
+- `ui/src/components/Auth.vue` - User info dropdown with logout
+
+**Modified Files:**
+- `ui/src/stores/oauth2.ts` - Added user info state and fetching
+- `ui/src/override/stores/auth.ts` - Integrated with OAuth2 RBAC system
+- `ui/src/main.js` - Registered permission directives
+
+### Tests
+
+**New Test Classes:**
+- `OAuth2ServiceTest.java` - 7 unit tests covering:
+  - Role extraction from Keycloak realm_access
+  - Role extraction from Keycloak resource_access (client roles)
+  - Role extraction from generic roles claim
+  - Role extraction from custom claim paths
+  - Empty roles handling
+  - Multiple role sources deduplication
+  - JWT payload decoding without signature verification
+
+**Modified Tests:**
+- `AuthenticationFilterTest.java` - Updated to verify WWW-Authenticate header suppression for JSON API calls
+
+## Configuration
+
+### Backend (application-override.yml)
 
 ```yaml
-id: hello_world
-namespace: dev
-
-tasks:
-  - id: say_hello
-    type: io.kestra.plugin.core.log.Log
-    message: "Hello, World!"
+kestra:
+  server:
+    oauth2:
+      enabled: true
+      provider: keycloak
+      client-id: YOUR_CLIENT_ID
+      client-secret: YOUR_CLIENT_SECRET
+      authorization-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/auth
+      token-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/token
+      user-info-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/userinfo
+      logout-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/logout
+      jwks-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/certs
+      scope: openid profile email
+    authorization:
+      operator-permissions:
+        - flows.view
+        - executions.view
+        - executions.create
+        - templates.view
 ```
 
+### Frontend (.env.development.local)
 
-Run the flow and see the output in the UI!
+```
+VITE_OAUTH2_ENABLED=true
+VITE_OAUTH2_LOGIN_URL=/api/v1/oauth2/login
+VITE_OAUTH2_CALLBACK_URL=/ui/oauth2-callback
+```
 
----
+## Getting Started
 
-## 🧩 Plugin Ecosystem
+### Prerequisites
+- Keycloak (or other OAuth2/OIDC provider) running and configured
+- Java 21+
+- Node.js 22+
 
-Kestra's functionality is extended through a rich [ecosystem of plugins](https://kestra.io/plugins) that empower you to run tasks anywhere and code in any language, including Python, Node.js, R, Go, Shell, and more. Here's how Kestra plugins enhance your workflows:
+### Quick Start
 
-- **Run Anywhere:**
-  - **Local or Remote Execution:** Execute tasks on your local machine, remote servers via SSH, or scale out to serverless containers using [Task Runners](https://kestra.io/docs/task-runners).
-  - **Docker and Kubernetes Support:** Seamlessly run Docker containers within your workflows or launch Kubernetes jobs to handle compute-intensive workloads.
+1. **Set up Identity Provider (Keycloak)**
+   - Create realm and OAuth2 client
+   - Create `kestra-admin` and `kestra-operator` roles
+   - Assign roles to test users
 
-- **Code in Any Language:**
-  - **Scripting Support:** Write scripts in your preferred programming language. Kestra supports Python, Node.js, R, Go, Shell, and others, allowing you to integrate existing codebases and deployment patterns.
-  - **Flexible Automation:** Execute shell commands, run SQL queries against various databases, and make HTTP requests to interact with APIs.
+2. **Configure Backend**
+   ```bash
+   cp cli/src/main/resources/application-override.example.yml \
+      cli/src/main/resources/application-override.yml
+   # Edit with your OAuth2 provider details
+   ```
 
-- **Event-Driven and Real-Time Processing:**
-  - **Real-Time Triggers:** React to events from external systems in real-time, such as file arrivals, new messages in message buses (Kafka, Redis, Pulsar, AMQP, MQTT, NATS, AWS SQS, Google Pub/Sub, Azure Event Hubs), and more.
-  - **Custom Events:** Define custom events to trigger flows based on specific conditions or external signals, enabling highly responsive workflows.
+3. **Start Backend**
+   ```bash
+   ./gradlew runStandalone
+   ```
 
-- **Cloud Integrations:**
-  - **AWS, Google Cloud, Azure:** Integrate with a variety of cloud services to interact with storage solutions, messaging systems, compute resources, and more.
-  - **Big Data Processing:** Run big data processing tasks using tools like Apache Spark or interact with analytics platforms like Google BigQuery.
+4. **Start Frontend**
+   ```bash
+   cd ui && npm run dev
+   ```
 
-- **Monitoring and Notifications:**
-  - **Stay Informed:** Send messages to Slack channels, email notifications, or trigger alerts in PagerDuty to keep your team updated on workflow statuses.
+5. **Test OAuth2 Login**
+   - Open http://localhost:5173
+   - Click "Sign in with OAuth2"
+   - Login with your test user
+   - Verify roles appear in user dropdown
 
-Kestra's plugin ecosystem is continually expanding, allowing you to tailor the platform to your specific needs. Whether you're orchestrating complex data pipelines, automating scripts across multiple environments, or integrating with cloud services, there's likely a plugin to assist. And if not, you can always [build your own plugins](https://kestra.io/docs/plugin-developer-guide/) to extend Kestra's capabilities.
+## Security Features
 
-🧑‍💻 **Note:** This is just a glimpse of what Kestra plugins can do. Explore the full list on our [Plugins Page](https://kestra.io/plugins).
+- **Token Validation**: All tokens validated against JWKS endpoint
+- **Backend Enforcement**: All authorization checks enforced at HTTP filter level
+- **Frontend UX Only**: Frontend permission checks are for UX improvements only, not security boundaries
+- **Session Management**: Secure token storage in sessionStorage with automatic refresh
+- **Stateless**: All user info comes from OAuth2 token (no session state)
+- **Defense in Depth**: Multiple validation layers (authentication → authorization → endpoint logic)
 
----
+## Changes from Original Kestra
 
-## 📚 Key Concepts
+| Feature | Status | Description |
+|---------|--------|-------------|
+| OAuth2 Authentication | ✅ Added | Full OAuth2/OIDC support with token refresh |
+| Role-Based Access Control | ✅ Added | ADMIN and OPERATOR roles with 25+ permissions |
+| Permission Annotations | ✅ Added | `@RequireRole` and `@RequirePermission` on endpoints |
+| Authorization Filter | ✅ Added | HTTP filter enforcing role/permission requirements |
+| User Info Endpoint | ✅ Added | `/api/v1/user/me` returns user roles and permissions |
+| Permission Composable | ✅ Added | Vue composable for frontend permission checks |
+| Permission Directives | ✅ Added | `v-permission`, `v-admin` directives for UX |
+| User Dropdown | ✅ Added | Displays user info and logout option |
+| Multi-Provider Support | ✅ Added | Support for Keycloak, Auth0, Google, Azure AD, generic OIDC |
+| Token Refresh | ✅ Added | Automatic token refresh with request queueing |
+| JWT Fallback | ✅ Added | JWT payload parsing when userinfo lacks roles |
+| BasicAuth | ✅ Preserved | Still supported when OAuth2 disabled |
 
-- **Flows:** the core unit in Kestra, representing a workflow composed of tasks.
-- **Tasks:** individual units of work, such as running a script, moving data, or calling an API.
-- **Namespaces:** logical grouping of flows for organization and isolation.
-- **Triggers:** schedule or events that initiate the execution of flows.
-- **Inputs & Variables:** parameters and dynamic data passed into flows and tasks.
+## Testing
 
----
+### Run All Tests
+```bash
+./gradlew test
+```
 
-## 🎨 Build Workflows Visually
+### Run OAuth2 Tests Only
+```bash
+./gradlew :webserver:test --tests OAuth2ServiceTest
+```
 
-Kestra provides an intuitive UI that allows you to interactively build and visualize your workflows:
+### Run UI Tests
+```bash
+cd ui && npm run test
+```
 
-- **Drag-and-Drop Interface:** add and rearrange tasks from the Topology Editor.
-- **Real-Time Validation:** instant feedback on your workflow's syntax and structure to catch errors early.
-- **Auto-Completion:** smart suggestions as you type to write flow code quickly and without syntax errors.
-- **Live Topology View:** see your workflow as a Directed Acyclic Graph (DAG) that updates in real-time.
+## Documentation
 
----
+For detailed information on specific features:
+- **OAuth2 Setup**: See `BACKEND_OAUTH2_IMPLEMENTATION.md`
+- **RBAC Architecture**: See code comments in `OAuth2Service.java`, `AuthorizationFilter.java`
+- **Frontend Usage**: See `usePermissions()` composable and permission directives
 
+## Support and Contribution
 
-## 🔧 Extensible and Developer-Friendly
+This is a community fork. For issues specific to this OAuth2/RBAC implementation:
+- Check existing code for implementation patterns
+- Review test cases for expected behavior
+- Enable debug logging in `AuthorizationFilter` and `OAuth2Service`
 
-### Plugin Development
+For issues with the original Kestra platform, visit: https://github.com/kestra-io/kestra
 
-Create custom plugins to extend Kestra's capabilities. Check out our [Plugin Developer Guide](https://kestra.io/docs/plugin-developer-guide/) to get started.
+## License
 
-### Infrastructure as Code
-
-- **Version Control:** store your flows in Git repositories.
-- **CI/CD Integration:** automate deployment of flows using CI/CD pipelines.
-- **Terraform Provider:** manage Kestra resources with the [official Terraform provider](https://kestra.io/docs/terraform/).
-
----
-
-## 🌐 Join the Community
-
-Stay connected and get support:
-
-- **Slack:** Join our [Slack community](https://kestra.io/slack) to ask questions and share ideas.
-- **LinkedIn:** Follow us on [LinkedIn](https://www.linkedin.com/company/kestra/) — next to Slack and GitHub, this is our main channel to share updates and product announcements.
-- **YouTube:** Subscribe to our [YouTube channel](https://www.youtube.com/@kestra-io) for educational video content. We publish new videos every week!
-- **X:** Follow us on [X](https://x.com/kestra_io) if you're still active there.
-
----
-
-## 🤝 Contributing
-
-We welcome contributions of all kinds!
-
-- **Report Issues:** Found a bug or have a feature request? Open an [issue on GitHub](https://github.com/kestra-io/kestra/issues).
-- **Contribute Code:** Check out our [Contributor Guide](https://kestra.io/docs/contribute-to-kestra) for initial guidelines, and explore our [good first issues](https://go.kestra.io/contributing) for beginner-friendly tasks to tackle first.
-- **Develop Plugins:** Build and share plugins using our [Plugin Developer Guide](https://kestra.io/docs/plugin-developer-guide/).
-- **Contribute to our Docs:** Contribute edits or updates to keep our [documentation](https://github.com/kestra-io/docs) top-notch.
-
----
-
-## 📄 License
-
-Kestra is licensed under the Apache 2.0 License © [Kestra Technologies](https://kestra.io).
-
----
-
-## ⭐️ Stay Updated
-
-Give our repository a star to stay informed about the latest features and updates!
-
-[![Star the Repo](https://kestra.io/star.gif)](https://github.com/kestra-io/kestra)
-
----
-
-Thank you for considering Kestra for your workflow orchestration needs. We can't wait to see what you'll build!
+Same as original Kestra project (Apache 2.0)
