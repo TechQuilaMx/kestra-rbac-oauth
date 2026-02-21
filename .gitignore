@@ -17,7 +17,8 @@ prettierrc.js
 .attach*
 **/*.class
 **/bin/*
-.sso/
+\.sso/
+cli/src/main/resources/application-*.yml
 
 ### Configurations
 docker-compose.override.yml
