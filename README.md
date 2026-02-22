@@ -202,6 +202,246 @@ VITE_OAUTH2_CALLBACK_URL=/ui/oauth2-callback
    - Login with your test user
    - Verify roles appear in user dropdown
 
+## Docker Deployment with Configuration Overrides
+
+Once you've built the Docker image, you can easily deploy it with custom configuration. The container supports multiple methods for providing configuration overrides.
+
+### Option 1: Mount Configuration File (Recommended)
+
+Create a configuration file and mount it into the container:
+
+```bash
+# Create your configuration file
+cat > ./kestra-config.yml << 'EOF'
+kestra:
+  storage:
+    type: minio
+    minio:
+      endpoint: http://minio:9000
+      access-key: minioadmin
+      secret-key: minioadmin
+      bucket: kestra
+  repository:
+    type: postgres
+  queue:
+    type: postgres
+  server:
+    oauth2:
+      enabled: true
+      client-id: kestra-app
+      client-secret: YOUR_CLIENT_SECRET
+      token-endpoint: http://keycloak:8085/realms/master/protocol/openid-connect/token
+      user-info-endpoint: http://keycloak:8085/realms/master/protocol/openid-connect/userinfo
+
+datasources:
+  postgres:
+    url: jdbc:postgresql://postgres:5432/kestra
+    driverClassName: org.postgresql.Driver
+    username: kestra
+    password: YOUR_PASSWORD
+EOF
+
+# Run container with mounted configuration
+docker run -p 8080:8080 \
+  -v $(pwd)/kestra-config.yml:/app/kestra/application-override.yml:ro \
+  ghcr.io/YOUR_USERNAME/kestra-sso:latest \
+  server standalone
+```
+
+### Option 2: Environment Variables
+
+Pass sensitive data via environment variables (recommended for secrets):
+
+```bash
+docker run -p 8080:8080 \
+  -e KESTRA_STORAGE_TYPE=minio \
+  -e KESTRA_STORAGE_MINIO_ENDPOINT=http://minio:9000 \
+  -e KESTRA_STORAGE_MINIO_ACCESS_KEY=minioadmin \
+  -e KESTRA_STORAGE_MINIO_SECRET_KEY=minioadmin \
+  -e KESTRA_STORAGE_MINIO_BUCKET=kestra \
+  -e KESTRA_REPOSITORY_TYPE=postgres \
+  -e KESTRA_QUEUE_TYPE=postgres \
+  -e KESTRA_DATASOURCES_POSTGRES_URL=jdbc:postgresql://postgres:5432/kestra \
+  -e KESTRA_DATASOURCES_POSTGRES_USERNAME=kestra \
+  -e KESTRA_DATASOURCES_POSTGRES_PASSWORD=YOUR_PASSWORD \
+  -e KESTRA_SERVER_OAUTH2_ENABLED=true \
+  -e KESTRA_SERVER_OAUTH2_CLIENT_ID=kestra-app \
+  -e KESTRA_SERVER_OAUTH2_CLIENT_SECRET=YOUR_CLIENT_SECRET \
+  ghcr.io/YOUR_USERNAME/kestra-sso:latest \
+  server standalone
+```
+
+### Option 3: Docker Compose (Best for Multi-Service Setup)
+
+Create a `docker-compose.yml` for complete stack deployment:
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: your_secure_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+  kestra:
+    image: ghcr.io/YOUR_USERNAME/kestra-sso:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - minio
+    environment:
+      KESTRA_CONFIGURATION: |
+        kestra:
+          storage:
+            type: minio
+            minio:
+              endpoint: http://minio:9000
+              access-key: minioadmin
+              secret-key: minioadmin
+              bucket: kestra
+          repository:
+            type: postgres
+          queue:
+            type: postgres
+          server:
+            oauth2:
+              enabled: true
+              client-id: kestra-app
+              client-secret: ${OAUTH2_CLIENT_SECRET}
+              token-endpoint: http://keycloak:8085/realms/master/protocol/openid-connect/token
+              user-info-endpoint: http://keycloak:8085/realms/master/protocol/openid-connect/userinfo
+        
+        datasources:
+          postgres:
+            url: jdbc:postgresql://postgres:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: kestra
+            password: ${DB_PASSWORD}
+    volumes:
+      - ./kestra-config.yml:/app/kestra/application-override.yml:ro
+    command: server standalone
+
+volumes:
+  postgres_data:
+  minio_data:
+```
+
+Deploy with environment variables:
+```bash
+OAUTH2_CLIENT_SECRET=your_secret DB_PASSWORD=your_password docker-compose up -d
+```
+
+### Option 4: Inline Configuration (KESTRA_CONFIGURATION)
+
+Pass entire configuration as single environment variable:
+
+```bash
+docker run -p 8080:8080 \
+  -e KESTRA_CONFIGURATION="
+kestra:
+  storage:
+    type: minio
+    minio:
+      endpoint: http://minio:9000
+      access-key: minioadmin
+      secret-key: minioadmin
+      bucket: kestra
+  repository:
+    type: postgres
+  queue:
+    type: postgres
+  server:
+    oauth2:
+      enabled: true
+      client-id: kestra-app
+      client-secret: YOUR_CLIENT_SECRET
+datasources:
+  postgres:
+    url: jdbc:postgresql://postgres:5432/kestra
+    driverClassName: org.postgresql.Driver
+    username: kestra
+    password: YOUR_PASSWORD
+" \
+  ghcr.io/YOUR_USERNAME/kestra-sso:latest \
+  server standalone
+```
+
+### Configuration Priority
+
+The container resolves configuration in this order (first found wins):
+1. Mounted file: `/app/kestra/application-override.yml`
+2. Environment variable: `KESTRA_CONFIGURATION`
+3. Individual env vars: `KESTRA_*` (e.g., `KESTRA_STORAGE_TYPE`)
+4. Built-in defaults: `/app/kestra/application.yml`
+
+### Best Practices for Docker Deployment
+
+1. **Use mounted config file** for structured configuration (storage, database settings)
+2. **Use environment variables** for sensitive data (passwords, API keys, secrets)
+3. **Combine both approaches** for optimal security and flexibility:
+   ```bash
+   docker run -p 8080:8080 \
+     -v $(pwd)/kestra-config.yml:/app/kestra/application-override.yml:ro \
+     -e KESTRA_DATASOURCES_POSTGRES_PASSWORD="${DB_PASSWORD}" \
+     -e KESTRA_SERVER_OAUTH2_CLIENT_SECRET="${OAUTH2_SECRET}" \
+     -e KESTRA_STORAGE_MINIO_SECRET_KEY="${MINIO_SECRET}" \
+     ghcr.io/YOUR_USERNAME/kestra-sso:latest \
+     server standalone
+   ```
+
+4. **Use `.env` file** with Docker Compose:
+   ```bash
+   # .env file
+   DB_PASSWORD=secure_db_password
+   OAUTH2_CLIENT_SECRET=keycloak_client_secret
+   MINIO_SECRET=minio_secret_key
+   
+   # Deploy
+   docker-compose up -d
+   ```
+
+5. **Use Docker secrets** for production (Kubernetes/Docker Swarm):
+   ```yaml
+   services:
+     kestra:
+       environment:
+         KESTRA_DATASOURCES_POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+   secrets:
+     db_password:
+       file: ./secrets/db_password.txt
+   ```
+
+### Configuration File Location
+
+The container expects configuration at: `/app/kestra/application-override.yml`
+
+Mount your local config file to this path:
+```bash
+-v /path/to/your/config.yml:/app/kestra/application-override.yml:ro
+```
+
+The `:ro` flag makes it read-only for additional security.
+
 ## Security Features
 
 - **Token Validation**: All tokens validated against JWKS endpoint
