@@ -1,0 +1,127 @@
+version: '3.8'
+
+volumes:
+  postgres-data:
+    driver: local
+  kestra-data:
+    driver: local
+
+networks:
+  kestra-network:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: kestra-postgres
+    networks:
+      - kestra-network
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: k3str4
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  kestra:
+    # Use your custom built image
+    image: ghcr.io/YOUR_USERNAME/kestra-sso:latest
+    # Or build from source: 
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.rbac
+    container_name: kestra
+    networks:
+      - kestra-network
+    user: "root"
+    stop_grace_period: 6m
+    volumes:
+      - kestra-data:/tmp/kestra/storage
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/kestra-wd:/tmp/kestra-wd
+    environment:
+      # Use KESTRA_CONFIGURATION for inline config (matches application-override.yml)
+      KESTRA_CONFIGURATION: |
+        kestra:
+          repository:
+            type: postgres
+          storage:
+            type: local
+            local:
+              base-path: "/tmp/kestra/storage"
+          queue:
+            type: postgres
+          tasks:
+            tmp-dir:
+              path: /tmp/kestra-wd/tmp
+          anonymous-usage-report:
+            enabled: false
+          server:
+            oauth2:
+              enabled: true
+              provider: keycloak
+              client-id: kestra-app
+              client-secret: ${OAUTH2_CLIENT_SECRET:-TO_BE_DEFINED}
+              realm: master
+              authorization-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/auth
+              token-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/token
+              user-info-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/userinfo
+              logout-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/logout
+              jwks-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/certs
+              scope: openid profile email
+              issuer: http://localhost:8085/realms/master
+              audience: kestra-app
+              enable-introspection: false
+              open-urls:
+                - /api/v1/oauth2
+            authorization:
+              operator-permissions:
+                - flows.view
+                - executions.view
+                - executions.create
+                - templates.view
+                - namespaces.view
+                - kv.view
+                - settings.view
+        
+        datasources:
+          postgres:
+            url: jdbc:postgresql://postgres:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: kestra
+            password: k3str4
+        
+        flyway:
+          datasources:
+            postgres:
+              enabled: true
+              locations:
+                - classpath:migrations/postgres
+              ignore-migration-patterns: "*:missing,*:future"
+              out-of-order: true
+        
+        micronaut:
+          server:
+            cors:
+              enabled: true
+              configurations:
+                all:
+                  allowedOrigins:
+                    - http://localhost:5173
+
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: server standalone
+    restart: unless-stopped
