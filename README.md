@@ -206,7 +206,267 @@ VITE_OAUTH2_CALLBACK_URL=/ui/oauth2-callback
 
 Once you've built the Docker image, you can easily deploy it with custom configuration. The container supports multiple methods for providing configuration overrides.
 
-### Option 1: Mount Configuration File (Recommended)
+### Service Configuration Guide
+
+When deploying Kestra in Docker, you need to understand how to reference different services (Keycloak, PostgreSQL) depending on whether they're running in Docker or on your host machine.
+
+#### Scenario 1: All Services in Docker Compose (Recommended for Development)
+
+When all services run in the same docker-compose stack, use service names for internal communication:
+
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    # ... config ...
+  
+  keycloak:
+    image: keycloak:latest
+    container_name: keycloak
+    # ... config ...
+  
+  kestra:
+    image: kestra:1.2.0-rbac
+    networks:
+      - kestra-network
+    environment:
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://postgres:5432/kestra  # Use service name
+        kestra:
+          server:
+            oauth2:
+              # Browser accesses via host
+              authorization-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/auth
+              logout-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/logout
+              # Kestra container accesses via service name
+              token-endpoint: http://keycloak:8080/realms/master/protocol/openid-connect/token
+              user-info-endpoint: http://keycloak:8080/realms/master/protocol/openid-connect/userinfo
+              jwks-endpoint: http://keycloak:8080/realms/master/protocol/openid-connect/certs
+              issuer: http://localhost:8085/realms/master
+
+networks:
+  kestra-network:
+    driver: bridge
+```
+
+**Key Points:**
+- Services use internal DNS names (e.g., `postgres:5432`, `keycloak:8080`)
+- Keycloak internal port is 8080 (not external 8085)
+- Browser-facing endpoints use `localhost` with external ports
+- All services must be on the same Docker network
+
+#### Scenario 2: Kestra in Docker, Other Services on Host (Linux Bridge Network Issue)
+
+On **Linux**, containers on the default `bridge` network cannot use DNS to reference other containers or host services. You must use IP addresses.
+
+**For Keycloak running on host:**
+
+```bash
+# 1. Get your host machine's IP accessible from Docker
+HOST_IP=$(ip route show | grep -i default | awk '{print $3}')
+# Or hardcode if known (e.g., 192.168.1.100 for WiFi)
+
+# 2. In docker-compose, add extra_hosts to make host accessible
+services:
+  kestra:
+    image: kestra:1.2.0-rbac
+    network_mode: bridge  # Use default bridge network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Maps to host gateway IP
+    environment:
+      KESTRA_CONFIGURATION: |
+        kestra:
+          server:
+            oauth2:
+              authorization-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/auth
+              token-endpoint: http://host.docker.internal:8085/realms/master/protocol/openid-connect/token
+              user-info-endpoint: http://host.docker.internal:8085/realms/master/protocol/openid-connect/userinfo
+              jwks-endpoint: http://host.docker.internal:8085/realms/master/protocol/openid-connect/certs
+              issuer: http://localhost:8085/realms/master
+```
+
+**For PostgreSQL running on host:**
+
+```yaml
+datasources:
+  postgres:
+    url: jdbc:postgresql://host.docker.internal:5432/kestra
+    username: kestra
+    password: YOUR_PASSWORD
+```
+
+**Key Points:**
+- Use `host.docker.internal` to reach host services from Docker
+- External ports apply (8085, 5432) since they're on the host
+- On Linux, `host.docker.internal` must be added via `extra_hosts`
+- On Mac/Windows Docker Desktop, `host.docker.internal` works automatically
+
+#### Scenario 3: Mixed - Some Services in Docker, Some on Host
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres-docker
+    network_mode: bridge
+    # Running in Docker on default bridge network
+  
+  kestra:
+    image: kestra:1.2.0-rbac
+    network_mode: bridge
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            # PostgreSQL is also in Docker on bridge network
+            url: jdbc:postgresql://postgres-docker:5432/kestra
+        kestra:
+          server:
+            oauth2:
+              # Keycloak is on the host
+              authorization-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/auth
+              logout-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/logout
+              token-endpoint: http://host.docker.internal:8085/realms/master/protocol/openid-connect/token
+              user-info-endpoint: http://host.docker.internal:8085/realms/master/protocol/openid-connect/userinfo
+              jwks-endpoint: http://host.docker.internal:8085/realms/master/protocol/openid-connect/certs
+              issuer: http://localhost:8085/realms/master
+```
+
+**Key Points:**
+- Docker containers on same bridge network use service names or container names
+- Host services are reached via `host.docker.internal`
+- Browser always uses `localhost` with external ports
+
+#### Troubleshooting Service Connectivity
+
+**For Keycloak connectivity issues:**
+
+```bash
+# 1. Test from Kestra container if it can reach Keycloak
+sudo docker exec kestra curl -v http://172.17.0.3:8080/realms/master
+
+# 2. Verify Keycloak container IP
+sudo docker inspect keycloak --format='{{.NetworkSettings.Networks.bridge.IPAddress}}'
+
+# 3. Check if it's listening on port 8080 internally
+sudo docker exec keycloak netstat -tlnp | grep 8080
+```
+
+**For PostgreSQL connectivity issues:**
+
+```bash
+# 1. Verify PostgreSQL is accessible
+sudo docker exec kestra psql -h 172.17.0.4 -U kestra -d kestra -c "SELECT 1"
+
+# 2. Get PostgreSQL container IP
+sudo docker inspect kestra-postgres --format='{{.NetworkSettings.Networks.bridge.IPAddress}}'
+```
+
+**For issuer mismatch errors:**
+
+The OAuth2 issuer must match what's in the JWT token. If you get:
+```
+Invalid token issuer. Expected 'http://...'
+```
+
+Then:
+- Determine which URL issued the token (usually from browser redirect)
+- Set `issuer` config to match exactly
+- Browser-facing endpoints can use `localhost:8085`
+- Backend endpoints can use internal container IPs
+- But `issuer` should match the token's issuer claim
+
+#### Complete Working Example (Existing Services)
+
+This is the exact configuration that works with:
+- Keycloak running on host at `localhost:8085`
+- PostgreSQL running on host at `localhost:5432` (exposed as 5433 in docker-compose)
+- Kestra running in Docker on default bridge network
+
+```yaml
+# docker-compose-rbac.yml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: kestra-postgres
+    network_mode: bridge
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: k3str4
+    ports:
+      - "5433:5432"
+
+  kestra:
+    image: kestra:1.2.0-rbac
+    container_name: kestra
+    network_mode: bridge
+    volumes:
+      - ./cli/src/main/resources/application-override.yml:/app/confs/application-override.yml:ro
+    environment:
+      MICRONAUT_ENVIRONMENTS: "local,override"
+      MICRONAUT_CONFIG_FILES: "/app/confs/application-override.yml"
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    command: server standalone
+```
+
+```yaml
+# application-override.yml
+kestra:
+  repository:
+    type: postgres
+  storage:
+    type: local
+  queue:
+    type: postgres
+  server:
+    oauth2:
+      enabled: true
+      provider: keycloak
+      client-id: kestra-app
+      client-secret: YOUR_CLIENT_SECRET
+      realm: master
+      # Browser endpoints - use localhost with external ports
+      authorization-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/auth
+      logout-endpoint: http://localhost:8085/realms/master/protocol/openid-connect/logout
+      # Backend endpoints - use container IPs with internal ports
+      token-endpoint: http://172.17.0.3:8080/realms/master/protocol/openid-connect/token
+      user-info-endpoint: http://172.17.0.3:8080/realms/master/protocol/openid-connect/userinfo
+      jwks-endpoint: http://172.17.0.3:8080/realms/master/protocol/openid-connect/certs
+      issuer: http://localhost:8085/realms/master
+      scope: openid profile email
+      audience: kestra-app
+
+datasources:
+  postgres:
+    # PostgreSQL on default bridge at IP 172.17.0.4
+    url: jdbc:postgresql://172.17.0.4:5432/kestra
+    driverClassName: org.postgresql.Driver
+    username: kestra
+    password: k3str4
+
+micronaut:
+  server:
+    cors:
+      enabled: true
+      configurations:
+        all:
+          allowedOrigins:
+            - http://localhost:8080
+```
+
+## Option 1: Mount Configuration File (Recommended)
 
 Create a configuration file and mount it into the container:
 
