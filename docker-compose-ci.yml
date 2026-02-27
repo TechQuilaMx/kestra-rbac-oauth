@@ -1,0 +1,39 @@
+services:
+  mysql:
+    image: mysql
+    environment:
+      MYSQL_DATABASE: kestra_unit
+      MYSQL_USER: kestra
+      MYSQL_PASSWORD: k3str4
+      MYSQL_ROOT_PASSWORD: "p4ssw0rd"
+    entrypoint: |
+      sh -c "
+        echo \"CREATE DATABASE IF NOT EXISTS kestra_unit_webserver;GRANT ALL PRIVILEGES ON kestra_unit_webserver.* TO 'kestra'@'%' WITH GRANT OPTION;\" > /docker-entrypoint-initdb.d/init.sql;
+        /usr/local/bin/docker-entrypoint.sh --log-bin-trust-function-creators=1 --innodb_ft_min_token_size=1 --ft_min_word_len=1 --sort-buffer-size=10485760
+      "
+    ports:
+      - 3306:3306
+    restart: on-failure
+
+  postgres:
+    image: postgres:14.13
+    environment:
+      POSTGRES_DB: kestra_unit
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: k3str4
+    ports:
+      - 5432:5432
+    # enable pg_state_statements to have statistics on query executions
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all
+    restart: on-failure
+
+#  jaeger-all-in-one:
+#    image: jaegertracing/all-in-one:latest
+#    ports:
+#      - "16686:16686" # Jaeger UI
+#      - "14268:14268" # Receive legacy OpenTracing traces, optional
+#      - "4317:4317"   # OTLP gRPC receiver
+#      - "4318:4318"   # OTLP HTTP receiver
+#      - "14250:14250" # Receive from external otel-collector, optional
+#    environment:
+#      - COLLECTOR_OTLP_ENABLED=true

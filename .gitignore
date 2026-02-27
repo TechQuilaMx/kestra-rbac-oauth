@@ -1,0 +1,64 @@
+### Java
+Thumbs.db
+.DS_Store
+.gradle
+build/
+target/
+out/
+.idea
+.vscode
+prettierrc.js
+*.iml
+*.ipr
+*.iws
+.project
+.settings
+.classpath
+.attach*
+**/*.class
+**/bin/*
+\.sso/
+cli/src/main/resources/application-*.yml
+
+### Configurations
+docker-compose.override.yml
+cli/src/main/resources/application-*.yml
+/local
+
+### Javascript
+node
+node_modules
+yarn-error.log
+yarn.lock
+ui/node_modules
+ui/.env.local
+ui/.env.*.local
+webserver/src/main/resources/ui
+webserver/src/main/resources/views
+ui/coverage
+ui/stats.html
+ui/.frontend-gradle-plugin
+ui/test-report.junit.xml
+*storybook.log
+storybook-static
+
+### Docker
+/.env
+docker-compose*.overide.yml
+docker/app/plugins/*.jar
+docker/app/kestra
+docker/app/confs/*.yml
+docker/app/secrets/*.yml
+
+### Build
+core/src/main/resources/gradle.properties
+.plugins.override
+
+# H2 Database
+/data
+
+# Allure Reports
+**/allure-results/*
+
+/jmh-benchmarks/src/main/resources/gradle.properties
+*package-lock.json

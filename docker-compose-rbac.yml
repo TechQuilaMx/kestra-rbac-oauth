@@ -1,0 +1,60 @@
+version: '3.8'
+
+volumes:
+  postgres-data:
+    driver: local
+  kestra-data:
+    driver: local
+
+networks:
+  kestra-network:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: kestra-postgres
+    network_mode: bridge
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: k3str4
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  kestra:
+    # Use your custom built image
+    image: kestra:1.2.0-rbac
+    # Or build from source: 
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.rbac
+    container_name: kestra
+    network_mode: bridge
+    user: "root"
+    stop_grace_period: 6m
+    volumes:
+      - kestra-data:/tmp/kestra/storage
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/kestra-wd:/tmp/kestra-wd
+      - ./cli/src/main/resources/application-override.yml:/app/confs/application-override.yml:ro
+    environment:
+      MICRONAUT_ENVIRONMENTS: "local,override"
+      MICRONAUT_CONFIG_FILES: "/app/confs/application-override.yml"
+
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: server standalone
+    restart: unless-stopped

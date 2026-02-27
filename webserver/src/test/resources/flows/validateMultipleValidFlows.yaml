@@ -1,0 +1,27 @@
+id: "first_flow"
+namespace: "system"
+revision: 1
+tasks:
+  - id: task_one
+    type: io.kestra.plugin.core.log.Log
+    message: "strange---string"
+  - id: deprecated_task
+    type: io.kestra.core.plugins.test.DeprecatedTask
+    additionalProperty: "value"
+listeners:
+  - tasks:
+      - id: log
+        type: io.kestra.plugin.core.log.Log
+        message: logging
+
+---
+
+id: "second_flow"
+namespace: "validation"
+tasks:
+  - id: task-two
+    type: io.kestra.plugin.core.debug.Echo
+    format: strangestring---
+  - id: task-three
+    type: io.kestra.plugin.core.debug.Echo
+    format: ---strangestring
