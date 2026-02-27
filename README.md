@@ -202,6 +202,175 @@ VITE_OAUTH2_CALLBACK_URL=/ui/oauth2-callback
    - Login with your test user
    - Verify roles appear in user dropdown
 
+## Kestra Plugins
+
+Kestra supports a rich ecosystem of plugins for extending functionality. This fork includes tooling to easily build Docker images with your desired plugins pre-installed.
+
+### Available Plugins
+
+All available Kestra plugins are listed in the [.plugins](.plugins) file. The file contains 100+ plugins including:
+
+- **Cloud Providers**: AWS, GCP, Azure
+- **Databases**: PostgreSQL, MySQL, MongoDB, Cassandra, Neo4j, Redis
+- **Data Tools**: dbt, Airbyte, Fivetran, Spark, Databricks
+- **Storage**: MinIO, S3, GCS, Azure Storage
+- **Messaging**: Kafka, MQTT, AMQP, Pulsar, NATS
+- **Scripts**: Python, Node.js, Shell, PowerShell, R, Go, Deno, and more
+- **AI/ML**: OpenAI, Anthropic, Hugging Face, Ollama, Mistral
+- **Monitoring**: Elasticsearch, Prometheus, Grafana
+- **Version Control**: Git, GitHub, GitLab
+- **Orchestration**: Kubernetes, Docker, Terraform, Ansible
+
+### Customizing Plugin Installation
+
+Edit the [.plugins](.plugins) file to control which plugins are installed:
+
+```bash
+# This plugin will be installed
+plugin-aws:io.kestra.plugin:plugin-aws:LATEST
+
+# This plugin will be skipped (commented out)
+#plugin-gcp:io.kestra.plugin:plugin-gcp:LATEST
+```
+
+**Format:** `Repository:GroupId:ArtifactId:Version`
+- Uncommented lines = plugins to install
+- Lines starting with `#` = skipped
+- Use `LATEST` for the most recent version
+
+### Building Docker Images with Plugins
+
+#### Local Builds with Make
+
+**Build with all uncommented plugins (recommended):**
+```bash
+make build-docker-rbac
+```
+
+This will:
+- Parse the `.plugins` file
+- Install all uncommented plugins during build
+- Tag image as `kestra:1.2.0-rbac` and `kestra:latest-rbac`
+- Takes longer but includes everything you need
+
+**Build without plugins (faster for testing):**
+```bash
+make build-docker-rbac-no-plugins
+```
+
+This will:
+- Skip plugin installation
+- Much faster build time (~5-10 minutes vs 30+ minutes)
+- Good for testing configuration changes
+
+#### CI/CD Builds with GitHub Actions
+
+The GitHub Actions workflow supports plugin installation via the `install_plugins` flag:
+
+**Build with plugins:**
+```bash
+gh workflow run build-and-push.yaml \
+  -f branch=main \
+  -f tag=latest \
+  -f push_image=true \
+  -f install_plugins=true
+```
+
+**Build without plugins:**
+```bash
+gh workflow run build-and-push.yaml \
+  -f branch=main \
+  -f tag=latest \
+  -f push_image=true \
+  -f install_plugins=false
+```
+
+### Plugin Installation at Runtime
+
+You can also install plugins in a running container:
+
+```bash
+# Install a single plugin
+docker exec kestra /app/kestra plugins install io.kestra.plugin:plugin-aws:LATEST
+
+# Install multiple plugins
+docker exec kestra /app/kestra plugins install \
+  io.kestra.plugin:plugin-aws:LATEST \
+  io.kestra.plugin:plugin-gcp:LATEST \
+  io.kestra.plugin:plugin-azure:LATEST
+```
+
+**Note:** Runtime installation requires container restart to load plugins.
+
+### Recommended Plugin Sets
+
+**Minimal (Core Only):**
+Comment out all plugins for fastest builds. Good for:
+- Testing OAuth2/RBAC features
+- Development environments
+- CI/CD pipelines
+
+**Data Engineering:**
+```bash
+# Databases
+plugin-jdbc:io.kestra.plugin:plugin-jdbc-postgres:LATEST
+plugin-jdbc:io.kestra.plugin:plugin-jdbc-mysql:LATEST
+plugin-mongodb:io.kestra.plugin:plugin-mongodb:LATEST
+
+# Data Tools
+plugin-dbt:io.kestra.plugin:plugin-dbt:LATEST
+plugin-spark:io.kestra.plugin:plugin-spark:LATEST
+
+# Cloud Storage
+plugin-aws:io.kestra.plugin:plugin-aws:LATEST
+storage-s3:io.kestra.storage:storage-s3:LATEST
+```
+
+**Cloud Native:**
+```bash
+# Cloud Providers
+plugin-aws:io.kestra.plugin:plugin-aws:LATEST
+plugin-gcp:io.kestra.plugin:plugin-gcp:LATEST
+plugin-azure:io.kestra.plugin:plugin-azure:LATEST
+
+# Containers & Orchestration
+plugin-kubernetes:io.kestra.plugin:plugin-kubernetes:LATEST
+plugin-docker:io.kestra.plugin:plugin-docker:LATEST
+plugin-terraform:io.kestra.plugin:plugin-terraform:LATEST
+```
+
+**Full Stack (All Plugins):**
+Uncomment all lines in `.plugins` for complete functionality. Good for:
+- Production deployments
+- Exploration and testing
+- Maximum flexibility
+
+### Build Performance Tips
+
+1. **Use Docker BuildKit**: Enable for faster builds
+   ```bash
+   export DOCKER_BUILDKIT=1
+   make build-docker-rbac
+   ```
+
+2. **Layer Caching**: Plugin installation is cached; rebuilds are faster if plugins haven't changed
+
+3. **Parallel Builds**: On powerful machines, Docker will install plugins in parallel
+
+4. **Selective Plugins**: Only install what you need to reduce build time and image size
+
+### Verifying Installed Plugins
+
+Check which plugins are installed in your image:
+
+```bash
+# List plugins in running container
+docker exec kestra /app/kestra plugins list
+
+# Check plugin directory
+docker exec kestra ls -lh /app/plugins/
+```
+
 ## Docker Deployment with Configuration Overrides
 
 Once you've built the Docker image, you can easily deploy it with custom configuration. The container supports multiple methods for providing configuration overrides.

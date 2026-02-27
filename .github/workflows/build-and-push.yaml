@@ -18,6 +18,11 @@ on:
         required: true
         default: true
         type: boolean
+      install_plugins:
+        description: 'Install Kestra plugins from .plugins file'
+        required: true
+        default: true
+        type: boolean
 
 env:
   REGISTRY: ghcr.io
@@ -58,6 +63,22 @@ jobs:
           echo "tags=${IMAGE}:${TAG}" >> $GITHUB_OUTPUT
           echo "Building image: ${IMAGE}:${TAG}"
 
+      - name: Parse plugins from .plugins file
+        id: plugins
+        if: ${{ inputs.install_plugins }}
+        run: |
+          # Extract all uncommented plugin lines from .plugins file
+          # Format in file: Repository:GroupId:ArtifactId:Version
+          # Extract only: GroupId:ArtifactId:Version (skip first field)
+          PLUGINS=$(grep -v '^#' .plugins | grep -v '^$' | cut -d: -f2- | tr '\n' ' ')
+          echo "plugins=${PLUGINS}" >> $GITHUB_OUTPUT
+          echo "Found plugins: ${PLUGINS}"
+
+      - name: Skip plugin installation
+        if: ${{ !inputs.install_plugins }}
+        run: |
+          echo "⏭️  Skipping plugin installation (install_plugins=false)"
+
       - name: Build and push Docker image
         id: build-and-push  # Added id to reference outputs
         uses: docker/build-push-action@v5
@@ -73,6 +94,7 @@ jobs:
           build-args: |
             APT_PACKAGES=python3 python-is-python3 python3-pip curl jattach
             PYTHON_LIBRARIES=kestra
+            KESTRA_PLUGINS=${{ inputs.install_plugins && steps.plugins.outputs.plugins || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
@@ -92,3 +114,4 @@ jobs:
           echo "📦 Branch: ${{ inputs.branch }}"
           echo "🏷️  Tag: ${{ inputs.tag }}"
           echo "📤 Pushed: ${{ inputs.push_image }}"
+          echo "🔌 Plugins installed: ${{ inputs.install_plugins }}"
