@@ -1,0 +1,111 @@
+<template>
+    <TopNavBar :title="routeInfo.title" />
+    <section class="full-container">
+        <MultiPanelFlowEditorView v-if="flowStore.flow" />
+    </section>
+</template>
+
+<script setup lang="ts">
+    import {computed, onBeforeUnmount} from "vue";
+    import {useRoute, onBeforeRouteLeave} from "vue-router";
+    import {useI18n} from "vue-i18n";
+    import * as YAML_UTILS from "@kestra-io/ui-libs/flow-yaml-utils";
+    import TopNavBar from "../../components/layout/TopNavBar.vue";
+    import MultiPanelFlowEditorView from "./MultiPanelFlowEditorView.vue";
+    import {useBlueprintsStore} from "../../stores/blueprints";
+    import {useCoreStore} from "../../stores/core";
+    import {getRandomID} from "../../../scripts/id";
+    import {useFlowStore} from "../../stores/flow";
+    import {defaultNamespace} from "../../composables/useNamespaces";
+    import {useVueTour} from "../../composables/useVueTour";
+
+    import type {BlueprintType} from "../../stores/blueprints"
+    import {useAuthStore} from "../../override/stores/auth";
+    import permission from "../../models/permission";
+    import action from "../../models/action";
+
+    const route = useRoute();
+    const {t} = useI18n();
+
+    const tour = useVueTour("guidedTour");
+
+    const blueprintsStore = useBlueprintsStore();
+    const coreStore = useCoreStore();
+    const flowStore = useFlowStore();
+    const authStore = useAuthStore();
+
+    const setupFlow = async () => {
+        const blueprintId = route.query.blueprintId as string;
+        const blueprintSource = route.query.blueprintSource as BlueprintType;
+        const blueprintSourceYaml = route.query.blueprintSourceYaml as string;
+        const implicitDefaultNamespace = authStore.user.getNamespacesForAction(
+            permission.FLOW,
+            action.CREATE,
+        )[0];
+        const implicitDefaultNamespaceValid = implicitDefaultNamespace && implicitDefaultNamespace !== "*" ? implicitDefaultNamespace : undefined;
+        let flowYaml = "";
+        const id = getRandomID();
+        const selectedNamespace = (route.query.namespace as string)
+            ?? defaultNamespace()
+            ?? implicitDefaultNamespaceValid
+            ?? "company.team";
+
+        if (route.query.copy && flowStore.flow) {
+            flowYaml = flowStore.flow.source;
+        } else if (blueprintId && blueprintSourceYaml) {
+            flowYaml = blueprintSourceYaml;
+        } else if(blueprintId && blueprintSource === "community"){
+            flowYaml = await blueprintsStore.getBlueprintSource({
+                type: blueprintSource,
+                kind: "flow",
+                id: blueprintId
+            });
+        } else if (blueprintId) {
+            const flowBlueprint = await blueprintsStore.getFlowBlueprint(blueprintId);
+            flowYaml = flowBlueprint.source;
+        } else {
+            flowYaml = `
+id: ${id}
+namespace: ${selectedNamespace}
+
+tasks:
+  - id: hello
+    type: io.kestra.plugin.core.log.Log
+    message: Hello World! 🚀`.trim();
+        }
+
+        flowStore.flow = {
+            id,
+            namespace: selectedNamespace,
+            ...YAML_UTILS.parse(flowYaml),
+            source: flowYaml,
+        };
+
+        flowStore.initYamlSource();
+    };
+
+    const routeInfo = computed(() => {
+        return {
+            title: t("flows")
+        };
+    });
+
+    flowStore.isCreating = true;
+    if (route.query.reset) {
+        localStorage.setItem("tourDoneOrSkip", "");
+        coreStore.guidedProperties = {
+            ...coreStore.guidedProperties,
+            tourStarted: true,
+        };
+        tour.start();
+    }
+    setupFlow();
+
+    onBeforeUnmount(() => {
+        flowStore.flowValidation = undefined;
+    });
+
+    onBeforeRouteLeave(() => {
+        flowStore.flow = undefined;
+    });
+</script>

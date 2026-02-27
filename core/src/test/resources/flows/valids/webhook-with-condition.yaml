@@ -1,0 +1,15 @@
+id: webhook-with-condition
+namespace: io.kestra.tests
+
+tasks:
+  - id: out
+    type: io.kestra.plugin.core.debug.Return
+    format: "{{ trigger | json }}"
+
+triggers:
+  - id: webhook
+    type: io.kestra.plugin.core.trigger.Webhook
+    key: webhookKey
+    conditions:
+      - type: io.kestra.plugin.core.condition.ExpressionCondition
+        expression: "{{trigger.body.hello == 'world'}}"

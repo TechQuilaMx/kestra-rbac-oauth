@@ -1,0 +1,303 @@
+#
+# Makefile used to build and deploy Kestra locally.
+# By default Kestra will be installed under: $HOME/.kestra/current. Set $KESTRA_HOME to override default.
+#
+# Usage:
+# make install
+# make install-plugins
+# make start-standalone-postgres
+#
+# NOTE: This file is intended for development purposes only.
+
+SHELL := /bin/bash
+
+KESTRA_BASEDIR := $(shell echo $${KESTRA_HOME:-$$HOME/.kestra/current})
+KESTRA_WORKER_THREAD := $(shell echo $${KESTRA_WORKER_THREAD:-4})
+VERSION := $(shell awk -F= '/^version=/ {gsub(/-SNAPSHOT/, "", $$2); gsub(/[[:space:]]/, "", $$2); print $$2}' gradle.properties)
+GIT_COMMIT := $(shell git rev-parse --short HEAD)
+GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+DATE := $(shell date --rfc-3339=seconds)
+PLUGIN_GIT_DIR ?= $(pwd)/..
+PLUGIN_JARS_DIR ?= $(pwd)/locals/plugins
+
+DOCKER_IMAGE = kestra/kestra
+DOCKER_PATH = ./
+
+.SILENT:
+
+.PHONY: clean build build-exec test install
+
+all: clean build-exec install
+
+version:
+	echo "${VERSION}"
+
+clean:
+	./gradlew clean
+
+build: clean
+	./gradlew build
+
+buildSkipTests: clean
+	./gradlew build -x test -x integrationTest -x testCodeCoverageReport --refresh-dependencies
+
+test: clean
+	./gradlew test
+
+build-exec:
+	./gradlew -q executableJar --no-daemon --priority=normal
+
+install: build-exec
+	@echo "Installing Kestra in ${KESTRA_BASEDIR}" ; \
+	KESTRA_BASEDIR="${KESTRA_BASEDIR}" ; \
+	mkdir -p "$${KESTRA_BASEDIR}/bin" "$${KESTRA_BASEDIR}/plugins" "$${KESTRA_BASEDIR}/flows" "$${KESTRA_BASEDIR}/logs" ; \
+	echo "Copying executable..." ; \
+	EXECUTABLE_FILE=$$(ls build/executable/kestra-* 2>/dev/null | head -n1) ; \
+	if [ -z "$${EXECUTABLE_FILE}" ]; then \
+		echo "[ERROR] No Kestra executable found in build/executable"; \
+		exit 1; \
+	fi ; \
+	cp "$${EXECUTABLE_FILE}" "$${KESTRA_BASEDIR}/bin/kestra" ; \
+	chmod +x "$${KESTRA_BASEDIR}/bin/kestra" ; \
+	VERSION_INSTALLED=$$("$${KESTRA_BASEDIR}/bin/kestra" --version 2>/dev/null || echo "unknown") ; \
+	echo "Kestra installed successfully (version=$${VERSION_INSTALLED}) 🚀"
+
+# Install plugins for Kestra from the API.
+install-plugins:
+	@echo "Installing plugins for Kestra version ${VERSION}" ; \
+	if [ -z "${VERSION}" ]; then \
+		echo "[ERROR] Kestra version could not be determined."; \
+		exit 1; \
+	fi ; \
+	PLUGINS_PATH="${KESTRA_BASEDIR}/plugins" ; \
+	echo "Fetching plugin list from Kestra API for version ${VERSION}..." ; \
+	RESPONSE=$$(curl -s "https://api.kestra.io/v1/plugins/artifacts/core-compatibility/${VERSION}/latest") ; \
+	if [ -z "$${RESPONSE}" ]; then \
+		echo "[ERROR] Failed to fetch plugin list from API."; \
+		exit 1; \
+	fi ; \
+	echo "Parsing plugin list (excluding EE and secret plugins)..." ; \
+	echo "$${RESPONSE}" | jq -r '.[] | select(.license == "OPEN_SOURCE" and (.groupId != "io.kestra.plugin.ee") and (.groupId != "io.kestra.ee.secret")) | .groupId + ":" + .artifactId + ":" + .version' | while read -r plugin; do \
+		[[ $$plugin =~ ^#.* ]] && continue ; \
+		CURRENT_PLUGIN=$${plugin} ; \
+		echo "Installing $$CURRENT_PLUGIN..." ; \
+		${KESTRA_BASEDIR}/bin/kestra plugins install $$CURRENT_PLUGIN \
+			--plugins ${KESTRA_BASEDIR}/plugins \
+			--repositories=https://central.sonatype.com/repository/maven-snapshots || exit 1 ; \
+	done
+
+# Build docker image from Kestra source.
+build-docker: build-exec
+	cp build/executable/* docker/app/kestra && chmod +x docker/app/kestra
+	echo "${DOCKER_IMAGE}:${VERSION}"
+	docker build \
+		--compress \
+		--rm \
+		-f ./Dockerfile \
+		--build-arg="APT_PACKAGES=python3 python-is-python3 python3-pip curl jattach" \
+		--build-arg="PYTHON_LIBRARIES=kestra" \
+		-t ${DOCKER_IMAGE}:${VERSION} ${DOCKER_PATH} || exit 1 ;
+
+# Build RBAC docker image with plugins from .plugins file
+build-docker-rbac:
+	@echo "🐳 Building Kestra RBAC Docker image with plugins..." ; \
+	KESTRA_PLUGINS=$$(grep -v '^#' .plugins | grep -v '^$$' | cut -d: -f2- | tr '\n' ' ') ; \
+	PLUGIN_COUNT=$$(echo $$KESTRA_PLUGINS | wc -w) ; \
+	echo "✓ Found $$PLUGIN_COUNT plugins to install" ; \
+	echo "Building image: kestra:${VERSION}-rbac" ; \
+	docker build \
+		--compress \
+		--rm \
+		-f ./Dockerfile.rbac \
+		--build-arg="APT_PACKAGES=python3 python-is-python3 python3-pip curl jattach" \
+		--build-arg="PYTHON_LIBRARIES=kestra" \
+		--build-arg="KESTRA_PLUGINS=$$KESTRA_PLUGINS" \
+		-t kestra:${VERSION}-rbac \
+		-t kestra:latest-rbac \
+		${DOCKER_PATH} || exit 1 ; \
+	echo "✅ Build completed successfully!" ; \
+	echo "🐳 Image: kestra:${VERSION}-rbac" ; \
+	echo "🔌 Plugins: $$PLUGIN_COUNT installed"
+
+# Build RBAC docker image without plugins (faster build)
+build-docker-rbac-no-plugins:
+	@echo "🐳 Building Kestra RBAC Docker image without plugins..." ; \
+	echo "⏭️  Skipping plugin installation" ; \
+	echo "Building image: kestra:${VERSION}-rbac" ; \
+	docker build \
+		--compress \
+		--rm \
+		-f ./Dockerfile.rbac \
+		--build-arg="APT_PACKAGES=python3 python-is-python3 python3-pip curl jattach" \
+		--build-arg="PYTHON_LIBRARIES=kestra" \
+		-t kestra:${VERSION}-rbac \
+		-t kestra:latest-rbac \
+		${DOCKER_PATH} || exit 1 ; \
+	echo "✅ Build completed successfully!" ; \
+	echo "🐳 Image: kestra:${VERSION}-rbac"
+
+# Verify whether Kestra is running
+health:
+	PID=$$(ps aux | grep java | grep 'kestra' | grep -v 'grep' | awk '{print $$2}'); \
+	if [ ! -z "$$PID" ]; then \
+	    echo -e "\n⏳ Waiting for Kestra server..."; \
+        KESTRA_URL=http://localhost:8080; \
+        while [ $$(curl -s -L -o /dev/null -w %{http_code} $$KESTRA_URL) != 200 ]; do \
+          echo -e $$(date) "\tKestra server HTTP state: " $$(curl -k -L -s -o /dev/null -w %{http_code} $$KESTRA_URL) " (waiting for 200)"; \
+          sleep 2; \
+        done; \
+		echo "Kestra is running (pid=$$PID): $$KESTRA_URL 🚀"; \
+	fi
+
+
+# Kill Kestra running process
+kill:
+	PID=$$(ps aux | grep java | grep 'kestra' | grep -v 'grep' | awk '{print $$2}'); \
+	if [ ! -z "$$PID" ]; then \
+		echo "Killing Kestra process (pid=$$PID)."; \
+		kill $$PID; \
+	else \
+		echo "No Kestra process to kill."; \
+	fi
+	docker compose -f ./docker-compose-ci.yml down;
+
+# Default configuration for using Kestra with Postgres as backend.
+define KESTRA_POSTGRES_CONFIGURATION =
+micronaut:
+  server:
+    port: 8080
+datasources:
+  postgres:
+    url: jdbc:postgresql://localhost:5432/kestra_unit
+    driverClassName: org.postgresql.Driver
+    username: kestra
+    password: k3str4
+kestra:
+  encryption:
+    secret-key: 3ywuDa/Ec61VHkOX3RlI9gYq7CaD0mv0Pf3DHtAXA6U=
+  repository:
+    type: postgres
+  storage:
+    type: local
+    local:
+      base-path: "/tmp/kestra/storage"
+  queue:
+    type: postgres
+endef
+export KESTRA_POSTGRES_CONFIGURATION
+
+# Build and deploy Kestra in standalone mode (using Postgres backend)
+--private-start-standalone-postgres:
+	docker compose -f ./docker-compose-ci.yml up postgres -d;
+	echo "Waiting for postgres to be running"
+	until [ "`docker inspect -f {{.State.Running}} kestra-postgres-1`"=="true" ]; do \
+		sleep 1; \
+	done; \
+	rm -rf ${KESTRA_BASEDIR}/bin/confs/ && \
+	mkdir -p ${KESTRA_BASEDIR}/bin/confs/ ${KESTRA_BASEDIR}/logs/ && \
+	touch ${KESTRA_BASEDIR}/bin/confs/application.yml
+	echo "Starting Kestra Standalone server"
+	KESTRA_CONFIGURATION=$$KESTRA_POSTGRES_CONFIGURATION ${KESTRA_BASEDIR}/bin/kestra \
+	server standalone \
+	--worker-thread ${KESTRA_WORKER_THREAD} \
+	--plugins "${KESTRA_BASEDIR}/plugins" \
+	--flow-path "${KESTRA_BASEDIR}/flows" 2>${KESTRA_BASEDIR}/logs/err.log 1>${KESTRA_BASEDIR}/logs/out.log &
+
+start-standalone-postgres: kill --private-start-standalone-postgres health
+
+# Build and deploy Kestra in standalone mode (using In-Memory backend)
+--private-start-standalone-local:
+	rm -f "${KESTRA_BASEDIR}/logs/*.log"; \
+	${KESTRA_BASEDIR}/bin/kestra \
+	server local \
+	--worker-thread ${KESTRA_WORKER_THREAD} \
+	--plugins "${KESTRA_BASEDIR}/plugins" \
+	--flow-path "${KESTRA_BASEDIR}/flows" 2>${KESTRA_BASEDIR}/logs/err.log 1>${KESTRA_BASEDIR}/logs/out.log &
+
+start-standalone-local: kill --private-start-standalone-local health
+
+#checkout all plugins
+clone-plugins:
+	@echo "Using PLUGIN_GIT_DIR: $(PLUGIN_GIT_DIR)"
+	@mkdir -p "$(PLUGIN_GIT_DIR)"
+	@echo "Fetching repository list from GitHub..."
+	@REPOS=$$(gh repo list kestra-io -L 1000 --json name | jq -r .[].name | sort | grep "^plugin-"); \
+		for repo in $$REPOS; do \
+	    if [[ $$repo == plugin-* ]]; then \
+	        if [ -d "$(PLUGIN_GIT_DIR)/$$repo" ]; then \
+	            echo "Skipping: $$repo (Already cloned)"; \
+	        else \
+	            echo "Cloning: $$repo using SSH..."; \
+	            git clone "git@github.com:kestra-io/$$repo.git" "$(PLUGIN_GIT_DIR)/$$repo"; \
+	        fi; \
+	    fi; \
+	done
+	@echo "Done!"
+
+# Pull every plugins in main or master branch
+pull-plugins:
+	@echo "🔍 Pulling repositories in '$(PLUGIN_GIT_DIR)'..."
+	@for repo in "$(PLUGIN_GIT_DIR)"/*; do \
+	    if [ -d "$$repo/.git" ]; then \
+	        branch=$$(git -C "$$repo" rev-parse --abbrev-ref HEAD); \
+	        if [[ "$$branch" == "master" || "$$branch" == "main" ]]; then \
+	            echo "🔄 Pulling: $$(basename "$$repo") (branch: $$branch)"; \
+	            git -C "$$repo" pull; \
+	        else \
+	            echo "❌ Skipping: $$(basename "$$repo") (Not on master or main branch, currently on $$branch)"; \
+	        fi; \
+	    fi; \
+	done
+	@echo "✅ Done pulling!"
+
+# Update all plugins jar
+build-plugins:
+	@echo "🔍 Scanning repositories in '$(PLUGIN_GIT_DIR)'..."
+	@MASTER_REPOS=(); \
+	for repo in "$(PLUGIN_GIT_DIR)"/*; do \
+	    if [ -d "$$repo/.git" ]; then \
+	        branch=$$(git -C "$$repo" rev-parse --abbrev-ref HEAD); \
+	        if [[ "$$branch" == "master" || "$$branch" == "main" ]]; then \
+	            MASTER_REPOS+=("$$repo"); \
+	        else \
+	            echo "❌ Skipping: $$(basename "$$repo") (Not on master or main branch)"; \
+	        fi; \
+	    fi; \
+	done; \
+	\
+	# === STEP 2: Update Repos on Master or Main Branch === \
+	echo "⬇️ Updating repositories on master or main branch..."; \
+	for repo in "$${MASTER_REPOS[@]}"; do \
+	    echo "🔄 Updating: $$(basename "$$repo")"; \
+	    git -C "$$repo" pull --rebase; \
+	done; \
+	\
+	# === STEP 3: Build with Gradle === \
+	echo "⚙️ Building repositories with Gradle..."; \
+	for repo in "$${MASTER_REPOS[@]}"; do \
+	    echo "🔨 Building: $$(basename "$$repo")"; \
+	    gradle clean build -x test shadowJar -p "$$repo"; \
+	done; \
+	\
+	# === STEP 4: Copy Latest JARs (Ignoring javadoc & sources) === \
+	echo "📦 Organizing built JARs..."; \
+	mkdir -p "$(PLUGIN_JARS_DIR)"; \
+	for repo in "$${MASTER_REPOS[@]}"; do \
+	    REPO_NAME=$$(basename "$$repo"); \
+	    \
+	    JARS=($$(find "$$repo" -type f -name "plugin-*.jar" ! -name "*-javadoc.jar" ! -name "*-sources.jar")); \
+	    if [ $${#JARS[@]} -eq 0 ]; then \
+	        echo "⚠️ Warning: No valid plugin JARs found for $$REPO_NAME"; \
+	        continue; \
+	    fi; \
+	    \
+	    for jar in "$${JARS[@]}"; do \
+	        JAR_NAME=$$(basename "$$jar"); \
+	        BASE_NAME=$$(echo "$$JAR_NAME" | sed -E 's/(-[0-9]+.*)?\.jar$$//'); \
+	        rm -f "$(PLUGIN_JARS_DIR)/$$BASE_NAME"-[0-9]*.jar; \
+	        cp "$$jar" "$(PLUGIN_JARS_DIR)/"; \
+	        echo "✅ Copied JAR: $$JAR_NAME"; \
+	    done; \
+	done; \
+	\
+	echo "🎉 Done! All master and main branch repos updated, built, and organized."

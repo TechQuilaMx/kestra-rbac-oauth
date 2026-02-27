@@ -1,0 +1,11 @@
+configurations {
+    implementation.extendsFrom(micronaut)
+}
+
+dependencies {
+    testImplementation project(":core")
+    api project(":repository-memory")
+
+
+    testImplementation project(':tests')
+}

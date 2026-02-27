@@ -1,0 +1,101 @@
+jackson:
+  serialization:
+    writeDatesAsTimestamps: false
+    writeDurationsAsTimestamps: false
+  serialization-inclusion: non_null
+
+micronaut:
+  metrics:
+    export:
+      otlp:
+        enabled: false
+
+datasources:
+  h2:
+    url: jdbc:h2:mem:db-${random.uuid};TIME ZONE=UTC;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+    driverClassName: org.h2.Driver
+
+flyway:
+  datasources:
+    h2:
+      enabled: true
+      locations:
+        - classpath:migrations/h2
+      ignore-migration-patterns: "*:missing,*:future"
+      out-of-order: true
+
+kestra:
+  encryption:
+    secret-key: I6EGNzRESu3X3pKZidrqCGOHQFUFC0yK
+  url: https://mysuperhost.com/subpath
+  repository:
+    type: h2
+  queue:
+    type: h2
+  storage:
+    type: local
+    local:
+      base-path: /tmp/unittest
+  queues:
+    min-poll-interval: 10ms
+    max-poll-interval: 100ms
+    poll-switch-interval: 5s
+
+  variables:
+    globals:
+      string: "string"
+      int: 1
+      bool: true
+      nested:
+        int: 2
+
+  server:
+    liveness:
+      enabled: false
+    service:
+      purge:
+        initial-delay: 1h
+        fixed-delay: 1d
+        retention: 30dPeriod
+    termination-grace-period: 5s
+
+  anonymous-usage-report:
+    enabled: false
+    uri: http://localhost:8080/
+
+  unittest: true
+
+  plugins:
+    configurations:
+      - type: io.kestra.plugin.Test0
+        values:
+          prop0: value0
+      - type: io.kestra.plugin.Test1
+        values:
+          prop1: value1
+      - type: io.kestra.plugin.Test2
+        values:
+          prop2: value2
+      - type: io.kestra.plugin.core.trigger.Schedule
+        values:
+          recoverMissedSchedules: ALL
+      - type: io.kestra.core.runners.test.task.Alias
+        values:
+          prop0: value0
+
+    defaults:
+      - type: io.kestra.plugin.core.log
+        values:
+          message: This is a default message
+      - type: io.kestra.core.services.PluginDefaultServiceTest$DefaultTester
+        values:
+          doubleValue: 19
+          arrays:
+            - 2
+          property:
+            here: me
+            lists:
+              - val:
+                  key: test

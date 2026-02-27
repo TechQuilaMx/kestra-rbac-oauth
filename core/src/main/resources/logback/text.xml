@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<included>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.out</target>
+        <immediateFlush>true</immediateFlush>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>DENY</onMatch>
+        </filter>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>WARN</level>
+            <onMatch>DENY</onMatch>
+        </filter>
+        <encoder>
+            <pattern>${pattern}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <immediateFlush>true</immediateFlush>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+        </filter>
+        <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
+            <evaluator class="io.kestra.core.log.KestraLogFilter" />
+            <OnMismatch>NEUTRAL</OnMismatch>
+            <OnMatch>DENY</OnMatch>
+        </filter>
+        <encoder>
+            <pattern>${pattern}</pattern>
+        </encoder>
+    </appender>
+</included>

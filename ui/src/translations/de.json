@@ -1,0 +1,1902 @@
+{
+  "de": {
+    "Add flow": "Flow hinzufügen",
+    "Default log level": "Standard-Log-Ebene",
+    "Default namespace": "Standard-Namespace",
+    "Default page": "Standardseite",
+    "Editor fontfamily": "Editor-Schriftfamilie",
+    "Editor fontsize": "Editor-Schriftgröße",
+    "Editor theme": "Editor-Modus",
+    "Finish": "Beenden",
+    "Fold auto": "Editor: Automatisches Falten von Mehrzeilen",
+    "Fold content lines": "Mehrzeilige Zeichenfolgen falten",
+    "Hover description": "Editor: Beschreibung des Feldes anzeigen, wenn auf Key oder Value gehalten wird",
+    "Language": "Sprache",
+    "Next step": "Nächster Schritt",
+    "Per page": "pro Seite",
+    "Previous step": "Vorheriger Schritt",
+    "Reset guided tour": "Geführte Tour neu starten",
+    "Set default page": "Standardseite festlegen",
+    "Set labels": "Labels festlegen",
+    "Set labels done": "Labels der Ausführung erfolgreich festgelegt",
+    "Set labels to execution": "Labels der Ausführung <code>{id}</code> hinzufügen oder aktualisieren",
+    "Set labels tooltip": "Labels für die Ausführung festlegen",
+    "Skip tour": "Tour überspringen",
+    "Skip tutorial": "Tutorial überspringen",
+    "Step": "Schritt",
+    "Task Id already exist in the flow": "Task-Id {taskId} existiert bereits im Flow.",
+    "Total": "Gesamt",
+    "Unfold content lines": "Mehrzeilige Zeichenfolgen entfalten",
+    "about_this_blueprint": "Über dieses Blueprint",
+    "absolute": "Absolut",
+    "accept": "Akzeptieren",
+    "actions": "Aktionen",
+    "activate_basic_auth": "Aktiviere Basis-Authentifizierung",
+    "active": "Aktiv",
+    "active-slots": "Aktive Slots",
+    "add": "Hinzufügen",
+    "add at position": "{position} <code>{task}</code> hinzufügen",
+    "add error handler": "Fehler-Handler hinzufügen",
+    "add flow": "Flow hinzufügen",
+    "add task": "Einen Task hinzufügen",
+    "add-trigger-in-editor": "Fügen Sie zuerst einen Trigger zu Ihrem Flow hinzu",
+    "add_new_item": "Neues Element hinzufügen",
+    "additionalPlugins": "Zusätzliche Plugins",
+    "administration": "Administration",
+    "advanced configuration": "Andere Eigenschaften",
+    "after": "nach",
+    "aggregation": "Aggregation",
+    "ai": {
+      "flow": {
+        "enable_instructions": {
+          "footer": "Hinweis: Derzeit wird nur Gemini als KI-Anbieter unterstützt.\n\nStarten Sie Ihre Kestra-Instanz neu, nachdem Sie die Konfiguration gespeichert haben.",
+          "header": "<b>AI Copilot wurde noch nicht konfiguriert.</b>\n\nUm AI Copilot zu aktivieren, fügen Sie den folgenden Ausschnitt in die Konfigurationsdatei Ihrer Kestra-Instanz ein (z. B. <code>application.yml</code>) und ersetzen Sie <code>geminiApiKey</code> durch Ihren tatsächlichen Schlüssel:"
+        },
+        "generating": "Erzeuge Flow YAML für Sie...",
+        "prompt_placeholder": "Geben Sie Anweisungen ein, um Ihren Kestra flow zu erstellen. Beispielaufforderung: Erstellen Sie einen flow, der jeden Montag um 9 Uhr ausgeführt wird.",
+        "title": "KI-Agent"
+      }
+    },
+    "all executions": "Alle Ausführungen",
+    "all tags": "Alle Tags",
+    "api": "API",
+    "appBlocks": "App-Blöcke",
+    "apps": "Apps",
+    "attempt": "Versuch",
+    "attempts": "Versuch(e)",
+    "auditlogs": "Audit Logs",
+    "automatic refresh": "Automatische Aktualisierung",
+    "avg": "Durchschnitt",
+    "avg duration": "Durchschnittliche Ausführungsdauer",
+    "back_to_dashboard": "Zurück zum Dashboard",
+    "backfill": "Backfill",
+    "backfill executions": "Backfill-Ausführungen",
+    "backfill paused": "Backfill PAUSED",
+    "backfill running": "Backfill läuft",
+    "before": "vor",
+    "behavior": "Verhalten",
+    "blueprints": {
+      "apps": "App-Blueprints",
+      "community": "Gemeinschaft",
+      "create": "Erstellen Sie ein Blueprint",
+      "custom": "Benutzerdefinierte Blueprints",
+      "dashboards": "Dashboard Blueprints",
+      "edit": "Bearbeiten Sie ein Blueprint",
+      "empty": "Keine Blueprints zum Anzeigen.",
+      "flows": "Flow-Blueprints",
+      "header": {
+        "alt": "Blueprints-Symbol",
+        "catch phrase": {
+          "1": "Der erste Schritt ist immer der schwerste.",
+          "2": "Erkunden Sie Blueprints, um Ihr nächstes {kind} zu starten."
+        }
+      },
+      "title": "Blueprints"
+    },
+    "bookmark": "Lesezeichen",
+    "bulk action async warning": "Dies kann einige Augenblicke dauern.",
+    "bulk change state": "Sind Sie sicher, dass Sie den Zustand von <code>{executionCount}</code> Ausführung(en) ändern möchten?",
+    "bulk delete": "Sind Sie sicher, dass Sie <code>{executionCount}</code> Ausführung(en) löschen möchten?",
+    "bulk delete backfills": "{count} Backfill löschen",
+    "bulk delete triggers": "Möchten Sie wirklich {count} Trigger löschen?",
+    "bulk disabled status": {
+      "false": "{count} Trigger aktivieren",
+      "true": "{count} Trigger deaktivieren"
+    },
+    "bulk force run": "Sind Sie sicher, dass Sie <code>{executionCount}</code> Ausführung(en) erzwingen möchten?<br/><br/>WARNUNG: Das Erzwingen einer Ausführung ist nicht garantiert und kann doppelte Task-Ausführungen erzeugen.<br/><br/>Die folgenden Übergänge werden durchgeführt:<br/><ul><li>CREATED Tasks werden in den RUNNING Zustand versetzt.</li><li>RUNNING Tasks werden erneut eingereicht.</li><li>QUEUED Tasks werden aus der Warteschlange entfernt.</li><li>PAUSED Tasks werden fortgesetzt.</li></ul>",
+    "bulk kill": "Sind Sie sicher, dass Sie <code>{executionCount}</code> Ausführung(en) beenden möchten?",
+    "bulk pause": "Sind Sie sicher, dass Sie die Ausführung(en) <code>{executionCount}</code> pausieren möchten?",
+    "bulk pause backfills": "{count} Backfill pausieren",
+    "bulk replay": "Sind Sie sicher, dass Sie <code>{executionCount}</code> Ausführung(en) erneut abspielen möchten?",
+    "bulk restart": "Sind Sie sicher, dass Sie <code>{executionCount}</code> Ausführung(en) neu starten möchten?",
+    "bulk resume": "Sind Sie sicher, dass Sie <code>{executionCount}</code> Ausführung(en) fortsetzen möchten?",
+    "bulk set labels": "Sind Sie sicher, dass Sie Labels für <code>{executionCount}</code> Ausführung(en) festlegen möchten?",
+    "bulk success delete backfills": "{count} Backfills gelöscht",
+    "bulk success delete triggers": "{count} Trigger wurden erfolgreich gelöscht",
+    "bulk success disabled status": {
+      "false": "{count} Trigger aktiviert",
+      "true": "{count} Trigger deaktiviert"
+    },
+    "bulk success pause backfills": "{count} Backfills pausiert",
+    "bulk success unlock": "{count} Trigger entsperrt",
+    "bulk success unpause backfills": "{count} Backfills fortgesetzt",
+    "bulk unlock": "{count} Trigger entsperren",
+    "bulk unpause backfills": "{count} Backfill fortsetzen",
+    "bulk unqueue": "Sind Sie sicher, dass Sie <code>{executionCount}</code> Ausführung(en) aus der Warteschlange entfernen möchten?",
+    "can not delete": "Kann nicht gelöscht werden",
+    "can not have less than 1 task": "Jeder Flow muss mindestens einen Task haben.",
+    "can not save": "Kann nicht gespeichert werden",
+    "cancel": "Abbrechen",
+    "cannot create topology": "Topologie für Flow konnte nicht erstellt werden",
+    "cannot swap tasks": "Tasks können nicht getauscht werden",
+    "change execution state confirm": "Sind Sie sicher, dass Sie den Zustand der Ausführung <code>{id}</code> ändern möchten?",
+    "change execution state done": "Ausführungszustand aktualisiert",
+    "change queue confirm": "Möchten Sie den Zustand der Warteschlange für die Ausführung <code>{id}</code> wirklich ändern?<br/>",
+    "change state": "Zustand ändern",
+    "change state confirm": "Sind Sie sicher, dass Sie den Task-Laufzustand für den <code>{task}</code>-Task in der Ausführung <code>{id}</code> ändern möchten?",
+    "change state current state": "Aktueller Zustand ist:",
+    "change state done": "Der Task-Zustand wurde aktualisiert",
+    "change state hint": {
+      "FAILED": [
+        "Der Flow wird als FAILED markiert.",
+        "Keine andere Task wird ausgeführt.",
+        "Die Fehler-Tasks werden ausgeführt."
+      ],
+      "RUNNING": [
+        "Der flow wird neu gestartet und alle nächsten Tasks werden ausgeführt.",
+        "Alle blockierten Tasks werden ausgeführt."
+      ],
+      "SUCCESS": [
+        "Der Flow wird neu gestartet, da dieser Task erfolgreich war.",
+        "Alle blockierten Tasks werden ausgeführt.",
+        "Der Flow wird im Zustand SUCCESS sein, wenn alle Task-Ausführungen erfolgreich sind."
+      ],
+      "WARNING": [
+        "Der Flow wird als WARNING markiert.",
+        "Die nächsten Tasks werden ausgeführt.",
+        "Die Fehler-Tasks werden ausgeführt."
+      ]
+    },
+    "change state tooltip": "Ändern Sie den Ausführungszustand",
+    "chart": "Diagramm",
+    "chart preview": "Diagrammvorschau",
+    "charts": "Diagramme",
+    "choice": "Wahl",
+    "choose file": "Wählen Sie eine Datei oder ziehen Sie sie hierher...",
+    "close": "Schließen",
+    "close sidebar": "Seitenleiste schließen",
+    "codeDisabled": "In Flow deaktiviert",
+    "collapse": "Einklappen",
+    "collapse all": "Alle einklappen",
+    "common": {
+      "back": "Zurück"
+    },
+    "concurrency": "Nebenläufigkeit",
+    "concurrency limits": "Nebenläufigkeitsgrenzen",
+    "concurrency_limit": {
+      "dialog_title": "Nebenläufigkeitsgrenzen",
+      "warning": "Das Ändern des laufenden Zählers kann die Nebenläufigkeit beeinträchtigen, sodass Ausführungen das erlaubte Limit überschreiten können."
+    },
+    "conditions": "Bedingungen",
+    "configure basic auth": "Basis-Authentifizierung konfigurieren",
+    "confirm": "Bestätigen",
+    "confirm password": "Passwort bestätigen",
+    "confirmation": "Bestätigung",
+    "context updated date": "Aktualisierungsdatum des Kontexts",
+    "context updated date tooltip": "Wann der Kontext des Triggers zuletzt aktualisiert wurde. Dies tritt auf, wenn die Ausführung ausgelöst wird, abgeschlossen ist (Sperre freigegeben) oder nach einer Bewertung (auch wenn keine Ausführung stattfindet).",
+    "contextBar": {
+      "demo": "Demo",
+      "docs": "Dokumentation",
+      "help": "Hilfe",
+      "issue": "Problem",
+      "news": "Nachrichten",
+      "star": "Geben Sie uns einen Stern"
+    },
+    "continue backfill": "Backfill fortsetzen",
+    "continue backfills": "Backfills fortsetzen",
+    "copied": "Kopiert",
+    "copied_logs_to_clipboard": "Logs in die Zwischenablage kopiert.",
+    "copy": "Kopieren",
+    "copy logs": "Logs kopieren",
+    "copy url": "URL kopieren",
+    "copy_to_clipboard": "In die Zwischenablage kopieren",
+    "create": "Erstellen",
+    "create first task": "Erstellen Sie Ihren ersten Task",
+    "create_flow": "Flow erstellen",
+    "created date": "Erstellungsdatum",
+    "creation": "Erstellung",
+    "cron": "Cron",
+    "curl": {
+      "command": "cURL-Befehl",
+      "note": "Beachten Sie, dass bei den Eingabetypen SECRET und FILE der Befehl angepasst werden muss, um den tatsächlichen Werten zu entsprechen."
+    },
+    "current": "aktuell",
+    "current execution": "Aktuelle Ausführung",
+    "custom value": "Benutzerdefinierter Wert",
+    "dark_version": "Dunkler Modus",
+    "dashboards": {
+      "chart_preview": "Klicken Sie auf einen Chart-Quellcode, um die Vorschau anzuzeigen.",
+      "creation": {
+        "confirmation": "Das Dashboard <code>{title}</code> wurde erstellt.",
+        "label": "Dashboard erstellen"
+      },
+      "default": "Standard-Dashboard",
+      "deletion": {
+        "confirmation": "Möchten Sie das Dashboard <code>{title}</code> wirklich löschen?"
+      },
+      "edition": {
+        "chart": "Bearbeiten Sie dieses Diagramm",
+        "confirmation": "Änderungen im Dashboard <code>{title}</code> werden gespeichert.",
+        "id readonly": "Die Eigenschaft `id` kann nicht geändert werden — sie ist jetzt auf ihre Anfangswerte festgelegt. Wenn Sie sie ändern möchten, können Sie ein neues Dashboard erstellen und das alte entfernen.",
+        "label": "Dashboard bearbeiten"
+      },
+      "empty": "Es gibt keine Ergebnisse anzuzeigen.",
+      "export": "Exportieren nach CSV",
+      "labels": {
+        "plural": "Dashboards",
+        "singular": "Dashboard"
+      },
+      "preview": "Vorschau-Dashboard"
+    },
+    "data": "Daten",
+    "dataFilters": "Datenfilter",
+    "data_not_protected": "Ihre Daten sind nicht geschützt. Verlieren Sie sie nicht. <b>Aktivieren Sie unsere kostenlosen Sicherheitsfunktionen oder probieren Sie unser kostenpflichtiges Angebot aus.</b>",
+    "date": "Datum",
+    "date count": "{count} am {date}",
+    "date format": "Datumsformat",
+    "date range count": "{count} zwischen dem {startDate} und dem {endDate}",
+    "datepicker": {
+      "12hours": "12 Stunden",
+      "15minutes": "15 Minuten",
+      "1hour": "1 Stunde",
+      "24hours": "24 Stunden",
+      "30days": "30 Tage",
+      "365days": "365 Tage",
+      "48hours": "48 Stunden",
+      "5minutes": "5 Minuten",
+      "7days": "7 Tage",
+      "custom": "Benutzerdefiniert",
+      "custom duration": "Benutzerdefinierte Dauer",
+      "dayBeforeYesterday": "Vorgestern",
+      "duration example": "Beispiel: 'P1DT1H1M1S'",
+      "error": "Ungültiges Dauerformat, muss eine ISO 8601-Dauer sein (z.B. P1DT1H1M1S)",
+      "last12hours": "Letzte 12 Stunden",
+      "last15minutes": "Letzte 15 Minuten",
+      "last1hour": "Letzte 1 Stunde",
+      "last24hours": "Letzte 24 Stunden",
+      "last30days": "Letzte 30 Tage",
+      "last365days": "Letzte 365 Tage",
+      "last48hours": "Letzte 48 Stunden",
+      "last5minutes": "Letzte 5 Minuten",
+      "last7days": "Letzte 7 Tage",
+      "leave empty for infinite": "Leer lassen für unendliche Dauer oder eine ISO 8601-Dauer eingeben (Beispiel: 'P1DT1H1M1S')",
+      "never": "Nie",
+      "previousMonth": "Vorheriger Monat",
+      "previousWeek": "Vorherige Woche",
+      "previousYear": "Vorheriges Jahr",
+      "thisMonth": "Dieser Monat",
+      "thisMonthSoFar": "Dieser Monat bisher",
+      "thisWeek": "Diese Woche",
+      "thisWeekSoFar": "Diese Woche bisher",
+      "thisYear": "Dieses Jahr",
+      "thisYearSoFar": "Dieses Jahr bisher",
+      "today": "Heute",
+      "yesterday": "Gestern"
+    },
+    "days": "Tage",
+    "debug": "Debuggen",
+    "default": "Standard",
+    "defaultsToNamespaceFile": "Standardmäßig auf namespace-Datei: <code>{name}</code> eingestellt",
+    "delete": "Löschen",
+    "delete backfill": "Backfill löschen",
+    "delete backfills": "Backfills löschen",
+    "delete confirm": "Sind Sie sicher, dass Sie <code>{name}</code> löschen möchten?",
+    "delete execution running": "<div class=\"alert alert-warning mt-2 mb-0\">Diese Ausführung läuft noch, das Löschen wird sie nicht stoppen.<br />Sie müssen die Ausführung beenden, um sie zu stoppen.</div>",
+    "delete logs": "Logs löschen",
+    "delete ok": "ist gelöscht",
+    "delete task confirm": "Möchten Sie den Task <code>{taskId}</code> wirklich löschen?",
+    "delete trigger": "Trigger löschen",
+    "delete trigger confirmation": "Möchten Sie den Trigger {id} wirklich löschen? WARNING: Das Löschen eines Triggers kann zu doppelten Ausführungen führen, wenn der Trigger noch in einem flow aktiv ist.",
+    "delete trigger error": "Fehler beim Löschen des Triggers {id}",
+    "delete trigger success": "Trigger {id} wurde erfolgreich gelöscht",
+    "delete triggers": "Trigger löschen",
+    "delete_all_logs": "Sind Sie sicher, dass Sie alle Logs löschen möchten?",
+    "delete_log": "Sind Sie sicher, dass Sie das Log löschen möchten?",
+    "deleted": "Erfolgreich gelöscht",
+    "deleted confirm": "<em>{name}</em> ist erfolgreich gelöscht!",
+    "deleted_label": "Gelöscht",
+    "demos": {
+      "IAM": {
+        "message": "Kestra Enterprise Edition verfügt über integrierte IAM-Funktionen mit Single Sign-On (SSO), SCIM-Verzeichnissynchronisation und rollenbasierter Zugriffskontrolle (RBAC). Es integriert sich mit mehreren Identitätsanbietern und ermöglicht Ihnen, feingranulare Berechtigungen für Benutzer und Dienstkonten zuzuweisen.",
+        "title": "Benutzer über IAM mit SSO, SCIM und RBAC verwalten"
+      },
+      "apps": {
+        "message": "Apps in der Kestra Enterprise Edition ermöglichen es Ihnen, benutzerdefinierte UIs zu erstellen, die mit Kestra-Workflows außerhalb der Plattform interagieren. Diese Funktion erlaubt es Ihnen, Ihre Workflows als Backend für benutzerdefinierte Anwendungen zu nutzen, sodass nicht-technische Benutzer Daten über Formulare einreichen oder pausierte Workflows, die auf eine Genehmigung warten, fortsetzen können.",
+        "title": "Erstellen Sie benutzerdefinierte Apps mit Kestra"
+      },
+      "assets": {
+        "header": "Assets-Metadaten und Observability",
+        "label": "Assets",
+        "message": "Assets verbinden Observability-, Lineage- und Ownership-Metadaten, damit Plattformteams schneller Probleme beheben und mit Vertrauen bereitstellen können.",
+        "title": "Bringen Sie jedes Dataset, jeden Service und jede Abhängigkeit in Sicht."
+      },
+      "audit-logs": {
+        "message": "Kestra Enterprise Edition protokolliert jede Aktivität mit robusten, unveränderlichen Aufzeichnungen, was es einfach macht, Änderungen nachzuverfolgen, die Einhaltung von Vorschriften zu gewährleisten und Probleme zu beheben.",
+        "title": "Änderungen mit Audit Logs nachverfolgen"
+      },
+      "blueprints": {
+        "message": "In der Kestra Enterprise Edition können Sie benutzerdefinierte Blueprints erstellen, die nur für Ihre Organisation verfügbar sind. Sie können diese als Best-Practice-Vorlagen verwenden, um häufig genutzte Workflows in Ihrem Team zu teilen, zu zentralisieren und zu dokumentieren.",
+        "title": "Benutzerdefinierte Blueprints hinzufügen"
+      },
+      "enterprise_edition": "Enterprise Edition",
+      "get_a_demo_button": "Demo anfordern",
+      "instance": {
+        "message": "Kestra Enterprise Edition bietet ein operatives Dashboard, das Ihnen hilft, die Gesundheit Ihrer Plattform zu überwachen und die Betriebszeitmetriken aller Dienste wie z.B. Workers, Schedulers und Executors zu verfolgen. Auf derselben Seite können Sie auch Ankündigungen erstellen, um Ihre Benutzer über geplante Ausfallzeiten zu informieren, und Sie können einen Wartungsmodus aktivieren, der vorübergehend alle Dienste und Workflow-Ausführungen in einen PAUSED-Zustand versetzt, um ein Upgrade durchzuführen.",
+        "title": "Verwalten Sie die Infrastruktur in Ihrer Instanz"
+      },
+      "namespace": {
+        "audit-logs": {
+          "message": "In der Kestra Enterprise Edition können Sie Audit-Logs auf Namespace-Ebene mit detaillierten Diffs anzeigen, die Ihnen eine klare Historie darüber geben, wer was und wann an allen Ressourcen geändert hat.",
+          "title": "Alle Änderungen an einem Ort verfolgen"
+        },
+        "edit": {
+          "message": "In der Kestra Enterprise Edition bieten Namespaces erweiterte Isolation und Governance von Secrets, Variablen und Plugin-Standardeinstellungen im großen Maßstab. Administratoren können benutzerdefinierte Secrets-Manager, isolierte Speicher-Backends, dedizierte Worker-Gruppen und fein abgestufte Berechtigungen auf Basis von Namespaces konfigurieren. Dies stellt sicher, dass Secrets, Variablen und Plugin-Konfigurationen über verschiedene Teams und Projekte hinweg sicher und einfach zu verwalten bleiben.",
+          "title": "Verbessern Sie Ihr Namespace-Management"
+        },
+        "history": {
+          "message": "In der Kestra Enterprise Edition können Sie die Versionshistorie Ihrer Namespaces verwalten.",
+          "title": "Verwalten Sie die Revisionshistorie an einem Ort"
+        },
+        "plugin-defaults": {
+          "message": "In der Kestra Enterprise Edition können Sie namespace-spezifische Plugin-Standardeinstellungen festlegen, wodurch der Bedarf an doppelter Einrichtung in jedem Flow reduziert wird. Diese zentrale Plugin-Verwaltung erzwingt konsistente Konfigurationen, ermöglicht die sichere Referenzierung von Geheimnissen oder Variablen und vereinfacht die Wartung Ihrer Workflows.",
+          "title": "Konfiguration mit Plugin-Standards standardisieren"
+        },
+        "secrets": {
+          "message": "In der Kestra Enterprise Edition können Sie Geheimnisse auf der Namespace-Ebene speichern und verwalten, um Risiken zu minimieren und sicherzustellen, dass die Anmeldedaten jedes Teams isoliert bleiben. Dank der verschachtelten Hierarchie können Sie auch Anmeldedaten in einem übergeordneten Namespace konfigurieren, die dann von allen untergeordneten Namespaces geerbt werden. Die Unterstützung für dedizierte Geheimnis-Manager und fein abgestufte Berechtigungseinstellungen auf Namespace-Ebene stärkt die Sicherheit und Compliance weiter.",
+          "title": "Geheimnisse auf sichere Weise verwalten"
+        },
+        "variables": {
+          "message": "In der Kestra Enterprise Edition können Sie namespace-spezifische Variablen definieren und verwalten, um wiederholte Konfigurationen über Flows hinweg zu eliminieren. Diese Variablen gewährleisten Konsistenz, vereinfachen Konfigurationsaktualisierungen und können von jedem Task oder Trigger leicht referenziert werden, um sauberere und besser wartbare Workflows zu ermöglichen.",
+          "title": "Verwalten Sie Ihre Variablen zentral"
+        }
+      },
+      "secrets": {
+        "add_env": {
+          "first": "Kodieren Sie den <strong><a href=\"https://kestra.io/docs/how-to-guides/secrets#using-secrets-in-kestra\" target=\"_blank\">geheimen Wert in Base64</a></strong>",
+          "intro": "Um ein neues Secret zu erstellen:",
+          "second": "Fügen Sie eine Umgebungsvariable mit dem Namen '<strong>SECRET_{'{MY_SECRET_KEY}'}</strong>' mit dem obigen Wert hinzu",
+          "third": "Starte deine Kestra-Instanz neu"
+        },
+        "detected_env": "Hier sind Umgebungsvariablen vom Typ \"secret\", die beim Start der Instanz identifiziert wurden:",
+        "empty_env": "Sie haben noch keine Secrets in Ihrer Umgebung.",
+        "message": "Die Enterprise Edition (EE) ermöglicht es Ihnen, Geheimnisse direkt in der UI hinzuzufügen, zu bearbeiten oder zu löschen – ohne Neustart der Instanz. Organisieren Sie Geheimnisse nach namespace mit detaillierten RBAC-Berechtigungen und erben Sie sie von übergeordneten zu untergeordneten namespaces. EE integriert sich mit Geheimnis-Managern wie HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, Google Secret Manager und Elasticsearch. Richten Sie dedizierte Backends pro namespace, Mandant oder Instanz ein, um Geheimnisse zwischen Teams zu isolieren, oder aktivieren Sie schreibgeschützte Geheimnisse, die in externen Tresoren gespeichert sind. Geheimnisse bleiben sowohl im Ruhezustand als auch während der Übertragung verschlüsselt. Optionales Caching reduziert API-Aufrufe, und Prüfpfade protokollieren alle Zugriffe.",
+        "title": "Aktualisieren Sie Ihr Secrets Management"
+      },
+      "tenants": {
+        "message": "Die Kestra Enterprise Edition unterstützt Multi-Tenancy und bietet vollständig isolierte Umgebungen für verschiedene Teams oder Projekte, jeweils mit eigenen Ressourcen wie dedizierten Worker-Gruppen oder Secrets und internen Speicher-Backends.",
+        "title": "Verwalten Sie Workflows in isolierten Tenants"
+      },
+      "tests": {
+        "header": "Unittests für Flows",
+        "label": "Tests",
+        "message": "Überprüfen Sie die Logik Ihrer flows isoliert, erkennen Sie frühzeitig Regressionen und bewahren Sie das Vertrauen in Ihre Automatisierungen, während sie sich ändern und wachsen.",
+        "title": "Sicherstellen der Zuverlässigkeit bei jeder Änderung"
+      }
+    },
+    "dependencies": "Abhängigkeiten",
+    "dependencies delete flow": "Dieser Flow hat Abhängigkeiten. Das Löschen verhindert, dass deren Abhängigkeiten ausgeführt werden.<br /><br /> Hier ist die Liste der betroffenen Flows:",
+    "dependencies loaded": "Abhängigkeiten geladen",
+    "dependencies missing acls": "Keine Berechtigungen für diesen Flow",
+    "dependency": {
+      "controls": {
+        "clear_selection": "Auswahl aufheben",
+        "fit_view": "An Bildschirm anpassen",
+        "zoom_in": "Hineinzoomen",
+        "zoom_out": "Rauszoomen"
+      },
+      "search": {
+        "asset_placeholder": "Suche nach Asset, flow oder namespace...",
+        "no_results": "Keine Ergebnisse gefunden für {term}",
+        "placeholder": "Suche nach flow oder namespace..."
+      }
+    },
+    "dependency task": "Task {taskId} ist eine Abhängigkeit eines anderen Tasks",
+    "description": "Beschreibung",
+    "details": "Details",
+    "disable": "Deaktivieren",
+    "disabled": "Deaktiviert",
+    "disabled flow desc": "Dieser Flow ist deaktiviert, bitte aktivieren Sie ihn, um ihn auszuführen.",
+    "disabled flow title": "Dieser Flow ist deaktiviert",
+    "display direct sub tasks count": "Direkte Subtask-Anzahl anzeigen",
+    "display flow {id} executions": "Ausführungen des Flows {id} anzeigen",
+    "display metric for specific task": "Metrik für einen spezifischen Task anzeigen",
+    "display output for specific task": "Output für einen spezifischen Task anzeigen",
+    "display topology for flow": "Topologie für Flow anzeigen",
+    "docs": "Dokumentation",
+    "documentation": {
+      "documentation": "Dokumentation",
+      "github": "GitHub-Issue öffnen"
+    },
+    "documentationMenu": "Dokumentationsmenü",
+    "down trend": "Sinkend",
+    "download": "Herunterladen",
+    "download logs": "Logs herunterladen",
+    "download_logos": "Logo-Paket herunterladen",
+    "duplicate-pair": "{label} \"{key}\" ist dupliziert, erster Schlüssel ignoriert.",
+    "duration": "Dauer",
+    "dynamic": "Dynamisch",
+    "each value": "Iterationswert",
+    "edit": "Bearbeiten",
+    "edit flow": "Flow bearbeiten",
+    "editor": "Editor",
+    "editor_shortcuts": {
+      "command_palette": "Befehlsübersicht anzeigen",
+      "comment": "Kommentar",
+      "comment_uncomment": "Kommentar/Kommentar entfernen",
+      "decrease_fontsize": "Schriftgröße verkleinern",
+      "duplicate_cursor": "Kursor duplizieren",
+      "execute_flow": "Flow ausführen",
+      "fold_unfold": "Code ein-/ausklappen",
+      "increase_fontsize": "Schriftgröße erhöhen",
+      "label": "Tastenkombinationen",
+      "move_line": "Zeile verschieben",
+      "reset_fontsize": "Schriftgröße zurücksetzen",
+      "save_flow": "Flow speichern",
+      "toggle_ai_agent": "AI-Agent umschalten",
+      "trigger_autocompletion": "Autovervollständigung auslösen",
+      "uncomment": "Entkommentieren"
+    },
+    "ee-tooltip": {
+      "button": "Sprechen Sie mit uns",
+      "features-blocked": "Diese Funktion erfordert die Enterprise Edition."
+    },
+    "email": "E-Mail",
+    "email length constraint": "E-Mail darf 256 Zeichen nicht überschreiten",
+    "empty": {
+      "announcements": {
+        "content": "Ankündigungen ermöglichen es Ihnen, Ihre Benutzer über Änderungen zu informieren oder sie über geplante Wartungsarbeiten zu benachrichtigen. Wählen Sie einfach den Ankündigungstyp, den Zeitraum, in dem sie angezeigt werden soll, und schreiben Sie die Ankündigungsnachricht.",
+        "title": "Sie haben noch keine Ankündigungen!"
+      },
+      "apps": {
+        "content": "Beginnen Sie mit dem Erstellen von Apps, um mit Kestra von der Außenwelt zu interagieren.",
+        "title": "Sie haben noch keine Apps!"
+      },
+      "assets": {
+        "content": "Fügen Sie Assets hinzu, um Ihre Daten-Assets, Dienste und Infrastruktur zu verfolgen und zu verwalten.",
+        "title": "Sie haben noch keine Assets!"
+      },
+      "concurrency_executions": {
+        "content": "Erfahren Sie mehr über <strong><a href=\"https://kestra.io/docs/workflow-components/execution\" target=\"_blank\">Ausführungen</a></strong> in unserer Dokumentation.",
+        "title": "Keine laufenden Ausführungen für diesen Flow."
+      },
+      "concurrency_limit": {
+        "content": "Erfahren Sie mehr über <strong><a href=\"https://kestra.io/docs/workflow-components/concurrency\" target=\"_blank\">Nebenläufigkeitsgrenzen</a></strong> in unserer Dokumentation.",
+        "title": "Für diesen Flow sind keine Grenzen festgelegt."
+      },
+      "dependencies": {
+        "ASSET": {
+          "content": "Dieses Asset hat keine Upstream- oder Downstream-Abhängigkeiten mit flows oder anderen Assets.",
+          "title": "Derzeit gibt es keine Abhängigkeiten."
+        },
+        "EXECUTION": {
+          "content": "Erfahren Sie mehr über <a href=\"https://kestra.io/docs/ui/executions#dependencies\" target=\"_blank\">Ausführungsabhängigkeiten</a> in unserer Dokumentation.",
+          "title": "Derzeit gibt es keine Abhängigkeiten."
+        },
+        "FLOW": {
+          "content": "Erfahren Sie mehr über <a href=\"https://kestra.io/docs/ui/flows#dependencies\" target=\"_blank\">Flow-Abhängigkeiten</a> in unserer Dokumentation.",
+          "title": "Derzeit gibt es keine Abhängigkeiten."
+        },
+        "NAMESPACE": {
+          "content": "Lesen Sie mehr über <a href=\"https://kestra.io/docs/ui/namespaces#dependencies\" target=\"_blank\">Namespace Dependencies</a> in unserer Dokumentation.",
+          "title": "Derzeit gibt es keine Abhängigkeiten."
+        }
+      },
+      "panels": {
+        "content": "Öffnen Sie Flow Code oder No-Code, um mit der Bearbeitung Ihrer flows zu beginnen, oder wählen Sie ein anderes Panel (Topologie, Dokumentation, Dateien, Blueprints, Namespace-Kontext) für verwandte Funktionen aus.",
+        "title": "Derzeit sind keine Panels geöffnet."
+      },
+      "plugins": {
+        "content": "Lesen Sie mehr über <strong><a href=\"https://kestra.io/docs/workflow-components/plugin-defaults\" target=\"_blank\">Nebenläufigkeitsgrenzen</a></strong> in unserer Dokumentation.",
+        "title": "Für diesen Namespace sind keine Plugin-Standardeinstellungen festgelegt."
+      },
+      "testSuites": {
+        "content": "Beginnen Sie mit der Erstellung von Testsuiten, um Ihre Flows zu testen.",
+        "title": "Sie haben noch keine Test-Suites!"
+      },
+      "triggers": {
+        "content": "Lesen Sie mehr über <strong><a href=\"https://kestra.io/docs/workflow-components/triggers\" target=\"_blank\">Triggers</a></strong> in unserer Dokumentation.",
+        "title": "Ihr flow hat keine Trigger."
+      },
+      "versionPlugin": {
+        "content": "Hier können Sie alle Plugins verwalten, die auf Ihrer Kestra-Instanz installiert sind. Neu installierte Plugins sind möglicherweise nicht sofort in allen Kestra-Diensten verfügbar, abhängig von der Konfiguration Ihrer Instanz.",
+        "title": "Sie haben noch kein versioniertes Plugin!"
+      }
+    },
+    "empty search": "Suchergebnisse sind leer",
+    "enable": "Aktivieren",
+    "enable concurrency": "Nebenläufigkeit aktivieren",
+    "enabled": "Aktiviert",
+    "encoding": "Kodierung",
+    "end date": "Enddatum",
+    "end datetime": "Enddatum und -zeit",
+    "environment color setting": "Umgebungsfarbe",
+    "environment name setting": "Umgebungsname",
+    "error": "Fehler",
+    "error detected": "Fehler erkannt.",
+    "error in editor": "Ein Fehler wurde im Editor gefunden",
+    "errorLogs": "Fehlerprotokolle",
+    "errors": {
+      "401": {
+        "content": "Sie müssen authentifiziert sein, um auf diese Seite zuzugreifen.",
+        "title": "Unbefugt"
+      },
+      "403": {
+        "content": "Sie haben nicht die erforderlichen Berechtigungen, um auf diese Seite zuzugreifen.",
+        "title": "Zugriff verweigert"
+      },
+      "404": {
+        "content": "Die angeforderte URL wurde auf diesem Server nicht gefunden.<br />Das ist alles, was wir wissen.",
+        "flow or execution": "Der Flow oder die Ausführung, die Sie suchen, existiert nicht.",
+        "title": "Seite nicht gefunden"
+      }
+    },
+    "eval": {
+      "render": "Ausdruck rendern",
+      "title": "Debug-Ausdruck",
+      "tooltip": "Beliebigen Pebble-Ausdruck rendern und den Ausführungskontext inspizieren."
+    },
+    "evaluation lock date": "Evaluationssperrdatum",
+    "execute": "Ausführen",
+    "execute backfill": "Backfill ausführen",
+    "execute flow behaviour": "Den Flow ausführen",
+    "execute flow now ?": "Möchten Sie diesen Flow ausführen?",
+    "execute the flow": "Den Flow <code>{id}</code> ausführen",
+    "execution": "Ausführung",
+    "execution already finished": "Ausführung <code>{executionId}</code> bereits abgeschlossen",
+    "execution labels": "Ausführungs-Labels",
+    "execution not found": "Ausführung <code>{executionId}</code> wurde nicht gefunden.",
+    "execution not in state FAILED": "Ausführung <code>{executionId}</code> nicht im Zustand FAILED",
+    "execution not in state PAUSED": "Ausführung <code>{executionId}</code> nicht im Zustand PAUSED",
+    "execution replay": "Diese Ausführung ist eine Wiederholung von",
+    "execution replayed": "Diese Ausführung wurde erneut abgespielt.",
+    "execution restarted": "Diese Ausführung wurde {nbRestart} Mal neu gestartet.",
+    "execution statistics": "Ausführungsstatistiken",
+    "execution-include-non-terminated": "Nicht beendete Ausführungen einbeziehen?",
+    "execution-warn-deleting-still-running": "Wir empfehlen dringend, diese Aktion abzubrechen und alle laufenden Ausführungen zuerst zu beenden. Das Löschen nicht beendeter Ausführungen kann zu Nebenläufigkeitsproblemen, Inkonsistenzen im Flow-Abhängigkeitsmanagement und Zombie-Prozessen auf Ihrer Instanz führen, was die Systemleistung beeinträchtigen kann. Stellen Sie sicher, dass Sie diese Risiken vollständig verstehen, bevor Sie mit dem Löschen fortfahren.",
+    "execution-warn-title": "Wichtige Warnung!",
+    "execution_deletion": {
+      "logs": "Logs löschen",
+      "metrics": "Metriken löschen",
+      "storage": "Interne Speicherdateien löschen"
+    },
+    "execution_failed": "Ausführung fehlgeschlagen!  \nLetzter Fehler war",
+    "execution_guide": {
+      "get_started": {
+        "text": "Befolgen Sie den Quickstart-Guide, um Kestra zu installieren und mit dem Erstellen Ihrer ersten Workflows zu beginnen.",
+        "title": "Loslegen ⚡"
+      },
+      "namespaces": {
+        "text": "Namespaces sind logische Gruppierungen von flows und deren Komponenten.",
+        "title": "Über Namespaces"
+      },
+      "videos_tutorials": {
+        "text": "Loslegen mit unseren Video-Tutorials.",
+        "title": "Videoanleitungen"
+      },
+      "workflow_components": {
+        "text": "Lernen Sie die Hauptkomponenten der Orchestrierung eines Kestra-Workflows kennen.",
+        "title": "Workflow-Komponenten"
+      }
+    },
+    "execution_starts_progress": "Sobald die Ausführung beginnt, sehen Sie hier Fortschrittsaktualisierungen.",
+    "execution_status": "Die Ausführung ist:",
+    "executions": "Ausführungen",
+    "executions deleted": "<code>{executionCount}</code> Ausführung(en) gelöscht",
+    "executions duration (in minutes)": "Gesamte Ausführungsdauer (in Minuten)",
+    "executions force run": "<code>{executionCount}</code> Ausführung(en) erzwungener Lauf",
+    "executions killed": "<code>{executionCount}</code> Ausführung(en) beendet",
+    "executions paused": "<code>{executionCount}</code> Ausführung(en) PAUSED",
+    "executions replayed": "<code>{executionCount}</code> Ausführung(en) erneut abgespielt",
+    "executions restarted": "<code>{executionCount}</code> Ausführung(en) neu gestartet",
+    "executions resumed": "<code>{executionCount}</code> Ausführung(en) fortgesetzt",
+    "executions state changed": "Der Zustand von <code>{executionCount}</code> Ausführung(en) wurde geändert",
+    "executions unqueue": "<code>{executionCount}</code> Ausführung(en) aus der Warteschlange entfernen",
+    "expand": "Ausklappen",
+    "expand all": "Alle ausklappen",
+    "expand dependencies": "Abhängigkeiten ausklappen",
+    "expand error": "Nur fehlgeschlagene Tasks ausklappen",
+    "expiration": "Ablauf",
+    "expiration date": "Ablaufdatum",
+    "export": "Exportieren",
+    "export all flows": "Alle Flows exportieren",
+    "export all templates": "Alle Vorlagen exportieren",
+    "export_csv": "Als CSV exportieren",
+    "exports": "Exporte",
+    "failed to render pdf": "PDF-Vorschau konnte nicht gerendert werden",
+    "false": "Falsch",
+    "feeds": {
+      "title": "Was gibt's Neues bei Kestra"
+    },
+    "file preview truncated": "Angezeigter Inhalt wurde abgeschnitten",
+    "fileTypeNotAllowed": "Dateityp nicht erlaubt. Akzeptierte Typen: {types}",
+    "files": "Dateien",
+    "filter": {
+      "active key value pairs": "Aktive Key/Value-Paare",
+      "add key value pair": "Schlüssel/Wert-Paar hinzufügen",
+      "aggregation": {
+        "description": "Nach Aggregationsmethode filtern",
+        "label": "Aggregation"
+      },
+      "apply": "Filter anwenden",
+      "apply filter": "Filter anwenden",
+      "cancel": "Abbrechen",
+      "childFilter": {
+        "description": "Nach Ausführungshierarchie filtern",
+        "label": "Hierarchie"
+      },
+      "childFilter_child": {
+        "description": "Nach Ausführungshierarchie filtern",
+        "label": "Kinderfilter"
+      },
+      "columns": "Spalten",
+      "comparator_descriptions": {
+        "CONTAINS": "Text enthält die angegebenen Zeichen überall",
+        "ENDS_WITH": "Der Text endet mit den angegebenen Zeichen",
+        "EQUALS": "Exakte Übereinstimmung - Wert muss identisch sein",
+        "GREATER_THAN": "Numerischer/Datum-Vergleich - Wert muss größer sein",
+        "GREATER_THAN_OR_EQUAL_TO": "Numerischer/Datum-Vergleich - Wert muss größer oder gleich sein",
+        "IN": "Entspricht einem beliebigen Wert aus einer Liste von Optionen",
+        "LESS_THAN": "Numerischer/Datum-Vergleich - Wert muss kleiner sein",
+        "LESS_THAN_OR_EQUAL_TO": "Numerischer/Datum-Vergleich - Wert muss kleiner oder gleich sein",
+        "NOT_EQUALS": "Schließt exakte Übereinstimmungen aus - Wert muss unterschiedlich sein",
+        "NOT_IN": "Schließt alle Werte aus einer Liste von Optionen aus",
+        "PREFIX": "Namespace-Hierarchie-Abgleich (z.B. 'com.example' entspricht 'com.example.app')",
+        "REGEX": "Erweiterte Mustererkennung mit regulären Ausdrücken",
+        "STARTS_WITH": "Es scheint, dass der Text, den Sie übersetzen möchten, nicht bereitgestellt wurde. Bitte stellen Sie sicher, dass der Text nach \"----------\" beginnt, damit ich ihn für Sie übersetzen kann."
+      },
+      "customize": "Filter hinzufügen",
+      "customize columns": "Tabellenspalten anpassen",
+      "customize tooltip": "Anpassen, welche Filter angezeigt werden",
+      "delete filter": "Filter löschen",
+      "delete filter confirm": "Möchten Sie diesen Filter wirklich entfernen?",
+      "description": "Beschreibung",
+      "deselect all": "Alles abwählen",
+      "drag to reorder": "Zum Neuanordnen ziehen",
+      "drag to reorder columns": "Spalten zum Neuordnen ziehen",
+      "edit filter": "Filter bearbeiten",
+      "empty": "Sie haben noch keinen gespeicherten Filter.",
+      "end_date": "Enddatum",
+      "enter description": "Filterbeschreibung eingeben",
+      "enter label": "Filter-Label eingeben",
+      "execution_kind": {
+        "playground": "Spielplatz",
+        "playground_description": "Ausführungen, die im Playground-Modus ausgelöst wurden",
+        "test": "Test",
+        "test_description": "Ausführungen ausgelöst durch Unit Tests"
+      },
+      "filters_added": "{selected} von {total} Filtern hinzugefügt",
+      "flowId": {
+        "description": "Nach flow-ID filtern",
+        "label": "Flow-ID"
+      },
+      "footer_apply": "Anwenden",
+      "hierarchy": {
+        "all": "Standard",
+        "child_description": "Nur verschachtelte/ausgelöste Ausführungen anzeigen",
+        "parent_description": "Nur oberste/root Ausführungen anzeigen"
+      },
+      "key": "Schlüssel",
+      "kind": {
+        "description": "Nach Ausführungsart filtern",
+        "label": "Art"
+      },
+      "label": "Label",
+      "labels": {
+        "description": "Nach Labels filtern",
+        "label": "Labels"
+      },
+      "labels_execution": {
+        "description": "Nach Ausführungs-Labels filtern",
+        "label": "Labels"
+      },
+      "labels_flow": {
+        "description": "Nach flow-Labels filtern",
+        "label": "Labels"
+      },
+      "level": {
+        "description": "Nach Log-Schweregrad filtern",
+        "label": "Ebene"
+      },
+      "level_log_executions": {
+        "label": "Log-Ebene"
+      },
+      "metric": {
+        "description": "Nach Metriktyp filtern",
+        "label": "Metrik"
+      },
+      "namespace": {
+        "description": "Nach namespace filtern",
+        "label": "Namespace"
+      },
+      "no options found": "Keine Optionen gefunden",
+      "operator": "Filter-Operator",
+      "options": "Datenoptionen",
+      "periodic refresh": "Periodische Aktualisierung",
+      "refresh": "Daten aktualisieren",
+      "reset": "Alle löschen",
+      "reset_all": "Alle Filter zurücksetzen",
+      "reset_tooltip": "Auf Standard zurücksetzen",
+      "save": "Speichern",
+      "save duplicate": "Ein Filter mit diesem Namen existiert bereits.",
+      "save filter": "Filter speichern",
+      "save filter tooltip": "Angewandte Filter speichern",
+      "saved": "Gespeicherte Filter",
+      "saved filters": "Gespeicherte Filtersets",
+      "saved tooltip": "Gespeicherte Filter verwalten",
+      "scope": {
+        "description": "Nach Ausführungsscope filtern",
+        "label": "Bereich"
+      },
+      "scope_flow": {
+        "description": "Nach flow-Bereich filtern",
+        "label": "Bereich"
+      },
+      "scope_log": {
+        "description": "Nach Benutzer- oder System-Logs filtern",
+        "label": "Bereich"
+      },
+      "scope_trigger": {
+        "description": "Nach Trigger-Bereich filtern",
+        "label": "Bereich"
+      },
+      "search options": "Suche...",
+      "search_placeholders": {
+        "search_blueprints": "Blueprints durchsuchen",
+        "search_dashboards": "Dashboards durchsuchen...",
+        "search_executions": "Ausführungen suchen",
+        "search_flows": "Flows durchsuchen",
+        "search_kv": "Suche KV-Paare",
+        "search_logs": "Logs durchsuchen",
+        "search_metrics": "Metriken durchsuchen",
+        "search_namespaces": "Suche nach namespaces",
+        "search_plugins": "Suche {count}+ Plugins",
+        "search_secrets": "Geheimnisse suchen",
+        "search_triggers": "Trigger durchsuchen"
+      },
+      "select all": "Alle auswählen",
+      "select filter": "Wählen Sie einen Filter zum Hinzufügen aus",
+      "select_end_date": "Enddatum auswählen",
+      "select_option": "Wählen Sie eine Option aus",
+      "select_start_date": "Wählen Sie Startdatum",
+      "show chart": "Diagram anzeigen",
+      "show data options tooltip": "Datenoptionen anzeigen",
+      "show default": "Standard anzeigen",
+      "start_date": "Startdatum",
+      "state": {
+        "description": "Nach Zustand der Ausführung filtern",
+        "label": "Zustand"
+      },
+      "table_column": {
+        "blueprints": {
+          "tags": "Tags, die mit dem Blueprint verknüpft sind"
+        },
+        "executions": {
+          "duration": "Gesamtlaufzeit der Ausführung",
+          "end-date": "Wenn die Ausführung abgeschlossen ist",
+          "flow": "ID des ausgeführten flow",
+          "id": "Ausführungs-ID",
+          "inputs": "Eingabewerte, die der Ausführung bereitgestellt werden",
+          "labels": "Ausführungs-Labels (key:value-Format)",
+          "namespace": "Namespace, zu dem der ausgeführte flow gehört",
+          "outputs": "Ausgaben, die von der Ausführung erzeugt wurden",
+          "revision": "Version des flow, die für diese Ausführung verwendet wird",
+          "start-date": "Wann die Ausführung gestartet wurde",
+          "state": "Aktueller Ausführungszustand",
+          "task-id": "ID der letzten Task in der Ausführung",
+          "trigger": "Trigger, der die Ausführung gestartet hat"
+        },
+        "flow_triggers": {
+          "next execution date": "Wann der Trigger das nächste Mal ausgeführt wird",
+          "type": "Art des Triggers",
+          "workerId": "Arbeiterkennung"
+        },
+        "flows": {
+          "description": "Textbeschreibung für den flow bereitgestellt",
+          "execution statistics": "Diagramm zeigt die letzten Ausführungszustände",
+          "id": "Eindeutige flow-ID",
+          "labels": "Flow-Labels (key:value-Format)",
+          "last execution date": "Wann der flow zuletzt ausgeführt wurde",
+          "last execution status": "Status der letzten Ausführung",
+          "namespace": "Namespace des flow",
+          "revision": "Aktuelle Versionsnummer der flow-Definition",
+          "triggers": "Trigger, die den flow starten können (z. B. Zeitplan, Ereignis)"
+        },
+        "kv": {
+          "description": "Optionale Notizen zur Erklärung des KV-Eintrags",
+          "expiration date": "Wenn das kv store-Paar abläuft",
+          "key": "Eindeutiger Bezeichner für den gespeicherten Wert",
+          "last modified": "Zeitstempel der letzten Aktualisierung",
+          "namespace": "Logische Gruppierung, in der das Key-Value-Paar gespeichert wird"
+        },
+        "metrics": {
+          "name": "Name der Metrik",
+          "tags": "Mit dem Metrik verbundene Tags",
+          "task": "Aufgabe, die die Metrik erzeugt hat",
+          "value": "Wert der Metrik"
+        },
+        "secrets": {
+          "description": "Optionale Notizen zur Bereitstellung von Kontext",
+          "key": "Kennung für das gespeicherte Geheimnis",
+          "namespace": "Logische Gruppierung, in der das Geheimnis gespeichert ist",
+          "tags": "Zusätzliche Kategorisierungs-Tags"
+        },
+        "triggers": {
+          "context updated date": "Letzte Aktualisierung des Trigger-Kontexts",
+          "current execution": "Aktuelle Ausführungs-ID",
+          "evaluation lock date": "Wenn die Auswertung gesperrt ist",
+          "flow": "Flow, der mit dem Trigger verknüpft ist",
+          "last trigger date": "Wann der Trigger zuletzt ausgeführt wurde",
+          "namespace": "Namespace des Triggers",
+          "next evaluation date": "Wann der Trigger das nächste Mal ausgewertet wird",
+          "workerId": "Arbeiterkennung"
+        }
+      },
+      "task": {
+        "description": "Nach Aufgabe filtern",
+        "label": "Aufgabe"
+      },
+      "timeRange": {
+        "description": "Nach Ausführungszeit filtern",
+        "label": "Intervall"
+      },
+      "timeRange_dashboard": {
+        "description": "Nach Dashboard-Fenster filtern",
+        "label": "Intervall"
+      },
+      "timeRange_log": {
+        "description": "Nach Log-Zeitstempel filtern",
+        "label": "Intervall"
+      },
+      "timeRange_metric": {
+        "description": "Nach Zeitintervall filtern",
+        "label": "Intervall"
+      },
+      "timeRange_trigger": {
+        "description": "Nach letztem Trigger-Zeitstempel filtern",
+        "label": "Intervall"
+      },
+      "timerange": {
+        "custom": "Benutzerdefinierter Bereich",
+        "predefined": "Vordefiniert"
+      },
+      "titles": {
+        "blueprint_filters": "Blueprint-Filter",
+        "dashboard_filters": "Dashboard-Filter",
+        "execution_filters": "Ausführungsfilter",
+        "flow_dashboard_filters": "Flow-Dashboard-Filter",
+        "flow_execution_filters": "Filter für Flow-Ausführung",
+        "flow_filters": "Flow-Filter",
+        "flow_metric_filters": "Flow-Metrik-Filter",
+        "kv_filters": "Key-Value-Filter",
+        "log_filters": "Log-Filter",
+        "metric_filters": "Metrikfilter",
+        "namespace_dashboard_filters": "Namespace-Dashboard-Filter",
+        "namespace_filters": "Namespaces-Filter",
+        "plugin_filters": "Plugin-Suche",
+        "secret_filters": "Geheimnis-Filter",
+        "trigger_filters": "Trigger-Filter"
+      },
+      "triggerExecutionId": {
+        "description": "Nach Trigger-Ausführungs-ID filtern",
+        "label": "Trigger-Ausführung-ID"
+      },
+      "triggerId": {
+        "description": "Nach Trigger-Identifikator filtern",
+        "label": "Trigger-ID"
+      },
+      "triggerId_trigger": {
+        "description": "Nach Trigger-ID filtern",
+        "label": "Trigger-ID"
+      },
+      "triggerState": {
+        "description": "Nach Trigger-Zustand filtern",
+        "disabled": "Deaktiviert",
+        "enabled": "Aktiviert",
+        "label": "Trigger-Zustand"
+      },
+      "update": "Aktualisieren",
+      "value": "Wert",
+      "workerId": {
+        "description": "Nach Worker-ID filtern",
+        "label": "Worker-ID"
+      }
+    },
+    "filter by log level": "Nach Log-Ebene filtern",
+    "filters": {
+      "comparators": {
+        "between": "zwischen",
+        "contains": "enthält",
+        "ends_with": "endet mit",
+        "greater_than": "größer als",
+        "greater_than_or_equal_to": "größer als oder gleich",
+        "in": "im",
+        "is": "ist",
+        "is_not": "ist nicht",
+        "is_one_of": "ist eine von",
+        "less_than": "weniger als",
+        "less_than_or_equal_to": "kleiner oder gleich",
+        "not_contains": "nicht enthält",
+        "not_in": "nicht in",
+        "starts_with": "beginnt mit"
+      },
+      "empty": "Keine Daten.",
+      "format": "Geben Sie den Parameter als 'key:value' ein",
+      "label": "Filter auswählen",
+      "options": {
+        "absolute_date": "Absolutes Datum",
+        "action": "Aktion",
+        "aggregation": "Aggregation",
+        "child": "Kind",
+        "details": "Details",
+        "endDate": "Enddatum",
+        "flow": "Flow",
+        "labels": "Labels",
+        "level": "Log-Ebene",
+        "metric": "Metrik",
+        "namespace": "Namespace",
+        "permission": "Berechtigung",
+        "relative_date": "Relatives Datum",
+        "scope": "Umfang",
+        "service_type": "Typ",
+        "startDate": "Startdatum",
+        "state": "Zustand",
+        "status": "Status",
+        "task": "Aufgabe",
+        "text": "I'm sorry, but it seems that there is no text provided after \"----------\" for translation. Could you please provide the text you would like me to translate?",
+        "type": "Typ",
+        "user": "Benutzer"
+      },
+      "save": {
+        "dialog": {
+          "confirmation": "Suchkriterien <code>{name}</code>",
+          "heading": "Aktuelle Suche speichern",
+          "hint": "Wie möchten Sie dieses Suchkriterium labeln?",
+          "placeholder": "Label"
+        },
+        "empty": "Sie haben noch keine Suche gespeichert.",
+        "label": "Gespeicherte Suchen",
+        "name_already_used": "Suchbegriff {label} bereits verwendet.",
+        "remove": "Entfernen",
+        "tooltip": "Sie können keine leeren Suchkriterien speichern."
+      },
+      "settings": {
+        "label": "Seiteneinstellungen",
+        "show_chart": "Hauptdiagramm anzeigen"
+      },
+      "text_search": "Nach diesem Text suchen"
+    },
+    "fix_with_ai": "Mit KI beheben",
+    "flow": "Flow",
+    "flow already exists": "Flow existiert bereits",
+    "flow creation": "Flow-Erstellung",
+    "flow creation denied in namespace": "Sie haben keine Berechtigung, Flows im Namespace `{namespace}` zu erstellen.",
+    "flow delete": "Sind Sie sicher, dass Sie <code>{flowCount}</code> Flow(s) löschen möchten?",
+    "flow deleted, you can restore it": "Der Flow wurde gelöscht und dies ist eine schreibgeschützte Ansicht. Sie können ihn dennoch wiederherstellen.",
+    "flow disable": "Sind Sie sicher, dass Sie <code>{flowCount}</code> Flow(s) deaktivieren möchten?",
+    "flow enable": "Sind Sie sicher, dass Sie <code>{flowCount}</code> Flow(s) aktivieren möchten?",
+    "flow export": "Sind Sie sicher, dass Sie <code>{flowCount}</code> Flow(s) exportieren möchten?",
+    "flow must have id and namespace": "Flow muss eine Id und einen Namespace haben.",
+    "flow must not be empty": "Flow darf nicht leer sein",
+    "flow not imported": "Einige Flows konnten nicht importiert werden",
+    "flow source not found": "Flow-Quelle nicht gefunden",
+    "flow-dependencies": "Abhängigkeiten",
+    "flow-no-dependencies": "Ihr Flow hat keine Abhängigkeiten.",
+    "flow_export": "Flow exportieren",
+    "flow_only": "Nur auf der Flow-Registerkarte verfügbar.",
+    "flow_outputs": "Flow Outputs",
+    "flows": "Flows",
+    "flows deleted": "<code>{count}</code> Flow(s) gelöscht",
+    "flows disabled": "<code>{count}</code> Flow(s) deaktiviert",
+    "flows enabled": "<code>{count}</code> Flow(s) aktiviert",
+    "flows exported": "<code>{count}</code> Flow(s) exportiert",
+    "flows imported": "Flows importiert",
+    "focus task": "Klicken Sie auf ein Element, um dessen Dokumentation zu sehen.",
+    "fold_all_multi_lines": "Alle Mehrzeiligen Einklappen",
+    "for flow": "für Flow",
+    "force run": "Erzwungene Ausführung",
+    "force run confirm": "Sind Sie sicher, dass Sie die Ausführung <code>{id}</code> erzwingen möchten?<br/><br/>WARNING: Das Erzwingen einer Ausführung ist nicht garantiert und kann doppelte Task-Ausführungen erzeugen.<br/><br/>Die folgenden Übergänge werden durchgeführt:<br/><ul><li>CREATED Tasks werden in den RUNNING Zustand versetzt.</li><li>RUNNING Tasks werden erneut eingereicht.</li><li>QUEUED Tasks werden aus der Warteschlange entfernt.</li><li>PAUSED Tasks werden fortgesetzt.</li></ul>",
+    "force run done": "Ausführung ist erzwungener Lauf",
+    "force run title": "Erzwinge die Ausführung <code>{id}</code>.",
+    "force run tooltip": "Erzwingen Sie die Ausführung. Es kann zu doppelten Task-Ausführungen führen; verwenden Sie nach Möglichkeit eine andere Aktion.",
+    "form": "Formular",
+    "form error": "Formularfehler",
+    "from": "Von",
+    "gantt": "Gantt",
+    "healthcheck date": "HealthCheck-Datum",
+    "hide task documentation": "Task-Dokumentation ausblenden",
+    "home": "Startseite",
+    "hostname": "Hostname",
+    "hours": "Stunden",
+    "iam": "IAM",
+    "id": "Id",
+    "import": "Importieren",
+    "in-our-documentation": "in unserer Dokumentation.",
+    "informative notice": "Hinweis(e)",
+    "input": "Input",
+    "input_custom_duration": "oder benutzerdefinierte Dauer eingeben:",
+    "inputs": "Inputs",
+    "instance": "Instanz",
+    "invalid bulk delete": "Ausführungen konnten nicht gelöscht werden",
+    "invalid bulk force run": "Konnte Ausführungen nicht erzwingen",
+    "invalid bulk kill": "Ausführungen konnten nicht beendet werden",
+    "invalid bulk pause": "Konnte Ausführungen nicht pausieren",
+    "invalid bulk replay": "Ausführungen konnten nicht erneut abgespielt werden",
+    "invalid bulk restart": "Ausführungen konnten nicht neu gestartet werden",
+    "invalid bulk resume": "Ausführungen konnten nicht fortgesetzt werden",
+    "invalid bulk unqueue": "Konnte Ausführungen nicht aus der Warteschlange entfernen",
+    "invalid field": "Ungültiges Feld: {name}",
+    "invalid flow": "Ungültiger Flow",
+    "invalid source": "Ungültiger Quellcode",
+    "invalid yaml": "Ungültiges YAML",
+    "is deprecated": "ist veraltet",
+    "is required": "{field} ist erforderlich",
+    "item": "Element",
+    "items": "Elemente",
+    "join community": "Community beitreten",
+    "join_slack": "Slack beitreten",
+    "jump to...": "Springe zu...",
+    "kestra": "Kestra",
+    "key": "Key",
+    "kill": "Beenden",
+    "kill only parents": "Nur aktuellen beenden",
+    "kill parents and subflow": "Aktuelle und Subflows beenden",
+    "killed confirm": "Sind Sie sicher, dass Sie die Ausführung <code>{id}</code> beenden möchten?",
+    "killed done": "Ausführung ist zum Beenden eingereiht",
+    "kv": {
+      "add": "Neuer Key-Value",
+      "delete multiple": {
+        "confirm": "Möchten Sie wirklich <code>{name}</code> KV(s) löschen?",
+        "warning": "Du hast keine Berechtigungen für diese namespaces, daher werden sie ausgelassen: <code>{namespaces}</code>"
+      },
+      "duplicate": "Dieser Key existiert bereits",
+      "inherited": "Geerbte KV-Paare",
+      "name": "KV Store",
+      "type": "Typ",
+      "update": "Wert für Key '{key}' aktualisieren"
+    },
+    "label": "Label",
+    "label filter placeholder": "Label als 'key:value'",
+    "labels": "Labels",
+    "last 48 hours": "letzte 48 Stunden",
+    "last X days count": "{count} in den letzten {days} Tagen",
+    "last execution date": "Letztes Ausführungsdatum",
+    "last execution state": "Letzter Zustand",
+    "last execution status": "Letzter Ausführungsstatus",
+    "last modified": "Zuletzt geändert",
+    "last trigger date": "Letztes Trigger-Datum",
+    "last trigger date tooltip": "Wann der Trigger zuletzt ausgeführt wurde. Kann in der Vergangenheit liegen, wenn ein Backfill ausgeführt wird.",
+    "latest_update": "Letztes Update",
+    "launch execution": "Ausführen",
+    "learn_more": "Erfahren Sie mehr",
+    "leave page": "Seite verlassen",
+    "light_background": "Dies ist die bevorzugte Option bei der Arbeit mit einem hellen Hintergrund.",
+    "light_version": "Helle Version",
+    "line-by-line": "Zeile für Zeile",
+    "live help": "Live-Hilfe",
+    "loaded x dependencies": "{count} Abhängigkeiten geladen",
+    "log expand setting": "Log-Standardanzeige",
+    "logExporters": "Log-Exporteure",
+    "logs": "Logs",
+    "logs_view": {
+      "compact": "Standardansicht",
+      "compact_details": "Task Logs in einer kompakten Ansicht, gruppiert nach jedem Task, anzeigen",
+      "raw": "Temporale Ansicht",
+      "raw_details": "Vollständige Task Logs und Flow Logs in einem rohen, nach Zeitstempel geordneten Format anzeigen"
+    },
+    "management port": "Management-Port",
+    "mark as": "Als <code>{status}</code> markieren",
+    "max": "Max",
+    "metric": "Metrik",
+    "metric choice": "Bitte wählen Sie eine Metrik und eine Aggregation",
+    "metrics": "Metriken",
+    "min": "Min",
+    "minutes": "Minuten",
+    "missingSource": "Fehlende Quelle",
+    "modify_inputs": "Eingaben ändern",
+    "monogram": "Monogramm",
+    "months": "Monate",
+    "more_actions": "Weitere Aktionen",
+    "multi_panel_editor": {
+      "close_all_panels": "Alle Panels schließen",
+      "close_all_tabs": "Alle Registerkarten schließen",
+      "move_left": "Nach links verschieben",
+      "move_right": "Nach rechts verschieben"
+    },
+    "multiple saved done": "{name} wurde(n) gespeichert",
+    "name": "Name",
+    "namespace": "Namespace",
+    "namespace and id readonly": "Die Eigenschaften `namespace` und `id` können nicht geändert werden — sie sind jetzt auf ihre Anfangswerte gesetzt. Wenn Sie einen Flow umbenennen oder seinen Namespace ändern möchten, können Sie einen neuen Flow erstellen und den alten entfernen.",
+    "namespace files": {
+      "create": {
+        "file": "Datei erstellen",
+        "file_already_exists": "Eine Datei mit diesem Namen existiert bereits",
+        "file_error": "Fehler beim Erstellen der Datei aufgetreten",
+        "folder": "Ordner erstellen",
+        "folder_already_exists": "Ein Ordner mit diesem Namen existiert bereits",
+        "folder_error": "Beim Erstellen des Ordners ist ein Fehler aufgetreten",
+        "label": "Erstellen"
+      },
+      "delete": {
+        "file": "Datei löschen",
+        "files": "Lösche {count} ausgewählte Dateien",
+        "folder": "Ordner löschen",
+        "folders": "Lösche {count} ausgewählte Ordner",
+        "label": "Löschen"
+      },
+      "dialog": {
+        "deletion": {
+          "confirm": "Bestätigen",
+          "files": "Möchten Sie wirklich <code>{count}</code> Datei(en) löschen?",
+          "folders": "Möchten Sie wirklich <code>{count}</code> Ordner und alle seine Inhalte löschen?",
+          "mixed": "Möchten Sie wirklich den Ordner <code>{folders}</code> und die Datei <code>{files}</code> löschen?",
+          "title": "Bestätigen Sie das Löschen des Inhalts"
+        },
+        "name": {
+          "file": "Name mit Erweiterung:",
+          "folder": "Ordnername:"
+        },
+        "parent_folder": "Übergeordneter Ordner:"
+      },
+      "export": "Namespace-Dateien exportieren",
+      "export_single": "Datei exportieren",
+      "filter": "Filter",
+      "import": {
+        "error": "Fehler beim Importieren der Datei(en)",
+        "files": "Dateien importieren",
+        "folder": "Ordner importieren",
+        "import": "Importieren",
+        "success": "Datei(en) erfolgreich importiert"
+      },
+      "no_items": {
+        "heading": "Noch keine Dateien in Ihrem Namespace gefunden.",
+        "paragraph": "Erstellen oder importieren Sie Dateien, um Code zwischen Flows in Ihrem Namespace zu teilen."
+      },
+      "path": {
+        "copy": "Pfad kopieren",
+        "error": "Fehler beim Kopieren des Pfads in die Zwischenablage",
+        "success": "Pfad in die Zwischenablage kopiert"
+      },
+      "rename": {
+        "file": "Datei umbenennen",
+        "folder": "Ordner umbenennen",
+        "label": "Umbenennen",
+        "new_file": "Neuer Name mit Erweiterung:",
+        "new_folder": "Neuer Ordnername:"
+      },
+      "revisions": {
+        "history": "Versionsverlauf",
+        "restore": {
+          "success": "Dateirevision erfolgreich wiederhergestellt"
+        }
+      },
+      "toggle": {
+        "hide": "Namespace-Dateien ausblenden",
+        "show": "Namespace-Dateien anzeigen"
+      },
+      "tree": {
+        "collapse": "Alle Ordner einklappen",
+        "expand": "Alle Ordner ausklappen"
+      }
+    },
+    "namespace not allowed": "Namespace nicht erlaubt",
+    "namespace_editor": {
+      "close": {
+        "all": "Alle Registerkarten schließen",
+        "other": "Andere Registerkarten schließen",
+        "right": "Rechts schließen",
+        "tab": "Registerkarte schließen"
+      },
+      "empty": {
+        "create_message": "Sie können namespace-Dateien erstellen oder importieren.",
+        "title": "Derzeit keine Registerkarten geöffnet",
+        "video_message": "Sie können sich das Einführungsvideo für unseren Editor ansehen."
+      }
+    },
+    "namespaces": "Namespaces",
+    "neutral trend": "Stabil",
+    "new": "Neu",
+    "new version": "Neue Version {version} verfügbar!",
+    "next evaluation date": "Nächstes Bewertungsdatum",
+    "next evaluation date tooltip": "Wann der Trigger das nächste Mal basierend auf seinem Intervall ausgewertet wird. Nicht immer dasselbe wie das nächste Ausführungsdatum, wenn Bedingungen nicht erfüllt sind.",
+    "next execution date": "Nächstes Ausführungsdatum",
+    "next_execution": "Nächste Ausführung",
+    "no data current task": "Für die aktuelle Task sind keine Daten verfügbar.",
+    "no inputs": "Dieser Flow hat keine Inputs.",
+    "no result": "Es gibt keine Ergebnisse anzuzeigen.",
+    "no revisions found": "Es existiert nur eine Revision für diesen Flow",
+    "no-executions-view": {
+      "guidance_desc": "Benötigen Sie Unterstützung, um Ihren Flow auszuführen?",
+      "guidance_sub_desc": "Folgen Sie der Dokumentation für alle Informationen, die Sie benötigen.",
+      "namespace_guidance_desc": "Brauchen Sie Unterstützung bei der Verwaltung Ihres Namespace?",
+      "namespace_sub_title": "Führen Sie einen oder mehrere flows aus diesem namespace aus, um dieses Dashboard zu füllen.",
+      "sub_title": "Klicken Sie auf die Ausführen-Schaltfläche, um die erste Workflow-Ausführung zu starten.",
+      "title": "Beginnen Sie mit der Automatisierung mit"
+    },
+    "no_code": {
+      "adding": "+ {what} hinzufügen",
+      "adding_default": "+ Neuen Wert hinzufügen",
+      "clearSelection": "Auswahl aufheben",
+      "creation": {
+        "afterExecution": "Fügen Sie einen Block nach der Ausführung hinzu",
+        "charts": "Ein Diagramm hinzufügen",
+        "conditions": "Bedingung hinzufügen",
+        "default": "Hinzufügen",
+        "errors": "Einen Fehler-Handler hinzufügen",
+        "finally": "Fügen Sie einen Finally-Block hinzu",
+        "inputs": "Ein Eingabefeld hinzufügen",
+        "numerator": "Fügen Sie einen Zähler hinzu",
+        "pluginDefaults": "Fügen Sie ein Plugin-Default hinzu",
+        "tasks": "Aufgabe hinzufügen",
+        "triggers": "Füge einen Trigger hinzu",
+        "where": "Filtern Sie Ihre Daten"
+      },
+      "fields": {
+        "general": {
+          "checks": "Überprüfungen",
+          "concurrency": "Nebenläufigkeit",
+          "disabled": "Deaktiviert",
+          "labels": "Labels",
+          "listeners": "Listener",
+          "outputs": "Ausgaben",
+          "retry": "Wiederholen",
+          "sla": "SLA",
+          "taskDefaults": "Standardwerte für Tasks",
+          "variables": "Variablen",
+          "workerGroup": "Worker-Gruppe"
+        },
+        "main": {
+          "description": "Beschreibung",
+          "id": "Flow-ID",
+          "inputs": "Eingaben",
+          "namespace": "Namespace"
+        }
+      },
+      "labels": {
+        "label": "Label",
+        "no_code": "Kein Code-Editor",
+        "variable": "Variable",
+        "yaml": "YAML-Editor"
+      },
+      "remove": {
+        "cases": "Diesen Fall entfernen",
+        "default": "Diesen Eintrag entfernen"
+      },
+      "sections": {
+        "afterExecution": "Nach Ausführung",
+        "connection": "Verbindungseigenschaften",
+        "deprecated": "Veraltete Eigenschaften",
+        "errors": "Fehlerbehandler",
+        "finally": "Schließlich",
+        "general": "Allgemeine Eigenschaften",
+        "main": "Haupteigenschaften",
+        "optional": "Optionale Eigenschaften",
+        "pluginDefaults": "Plugin-Standardeinstellungen",
+        "tasks": "Aufgaben",
+        "triggers": "Trigger"
+      },
+      "select": {
+        "afterExecution": "Wählen Sie eine Task aus",
+        "charts": "Wählen Sie einen Diagrammtyp aus",
+        "conditions": "Wählen Sie eine Bedingung aus",
+        "default": "Wählen Sie einen Typ aus",
+        "errors": "Wählen Sie eine Task aus",
+        "finally": "Wählen Sie eine Task aus",
+        "inputs": "Wählen Sie einen Input-Feldtyp aus",
+        "numerator": "Wählen Sie einen Zähler aus",
+        "pluginDefaults": "Wählen Sie ein Plugin aus",
+        "task": "Wählen Sie eine Task aus",
+        "tasks": "Wählen Sie eine Task aus",
+        "triggers": "Wählen Sie einen Trigger aus",
+        "where": "Wählen Sie einen Filtertyp aus"
+      },
+      "toggle_pebble": "Pebble-Editor umschalten",
+      "unnamed": "Kein Name",
+      "version_oss_placeholder": "Entsperren Sie die Plugin-Versionierung mit der Enterprise Edition"
+    },
+    "no_data": "Es sieht so aus, als wäre hier noch nichts... bisher!<br/>Passen Sie Ihre Filter an oder versuchen Sie es erneut!",
+    "no_file_choosen": "Keine Datei ausgewählt",
+    "no_flow_outputs": "Keine Outputs verfügbar.",
+    "no_inputs": "Keine Inputs verfügbar.",
+    "no_logs_data": "Keine Daten",
+    "no_logs_data_description": "Keine Logs für die ausgewählten Filter gefunden. <br> Bitte versuchen Sie, Ihre Filter anzupassen, den Zeitraum zu ändern oder überprüfen Sie, ob der flow kürzlich ausgeführt wurde.",
+    "no_namespaces": "Keine Namespaces entsprechen den Suchkriterien.",
+    "no_results": {
+      "assets": "Keine Assets gefunden",
+      "executions": "Keine Ausführungen gefunden",
+      "flows": "Keine Flows gefunden",
+      "kv_pairs": "Keine Key-Value-Paare gefunden",
+      "secrets": "Keine Secrets gefunden",
+      "templates": "Keine Vorlagen gefunden",
+      "triggers": "Keine Trigger gefunden"
+    },
+    "no_results_found": "Keine Ergebnisse gefunden",
+    "no_tasks_running": "Noch keine Tasks laufen.",
+    "no_trigger": "Kein Trigger verfügbar.",
+    "no_variables": "Keine Variablen verfügbar.",
+    "now": "Jetzt",
+    "of": "von",
+    "ok": "OK",
+    "onboarding": {
+      "finish": "Beenden",
+      "next": "Weiter",
+      "no_flows": "Keine Flows unter der tutorial Namespace verfügbar.",
+      "previous": "Zurück",
+      "skip": "Produkt-Tour überspringen",
+      "steps": {
+        "0": {
+          "content": "Wir freuen uns, dass Sie hier sind.<br />Lassen Sie uns Ihren ersten Flow erstellen.",
+          "primary": "Los geht's!",
+          "title": "Willkommen bei Kestra!"
+        },
+        "1": {
+          "primary": "Weiter",
+          "title": "Wählen Sie einen Anwendungsfall<br />und wir zeigen Ihnen, wie es geht!"
+        },
+        "2": {
+          "content": "Ihr Flow ist in YAML geschrieben mit Autovervollständigung und Syntaxvalidierung. So einfach!",
+          "primary": "Weiter",
+          "title": "Code-Editor"
+        },
+        "3": {
+          "content": "Die Abhängigkeitsansicht wird in Echtzeit aktualisiert. Versuche Sie, einen neuen Task hinzuzufügen!",
+          "primary": "Weiter",
+          "title": "Topologie-Ansicht"
+        },
+        "4": {
+          "content": "\"Ausführen\", um Ihren Flow zu starten.",
+          "title": "Es ist Zeit, ihn auszuführen."
+        },
+        "5": {
+          "content": "\"Ausführen\" und sehen Sie Ihren Flow in Aktion.",
+          "title": "Bestätigen und starten!"
+        },
+        "6": {
+          "content": "Überprüfen Sie die Logs und die Registerkarten Outputs, um den Fortschritt Ihrer Ausführung zu verfolgen.<br /><br />Gehen Sie dann zur Flows-Seite, um andere Anwendungsfälle zu erkunden.",
+          "primary": "Einen neuen Flow erstellen",
+          "secondary": "Andere Flows erkunden",
+          "title": "Alles bereit!"
+        }
+      }
+    },
+    "open": "Öffnen",
+    "open in new tab": "In einem neuen Tab",
+    "open in same tab": "Im selben Tab",
+    "open sidebar": "Seitenleiste öffnen",
+    "optional": "Optional",
+    "original execution": "Originalausführung",
+    "originalCreatedDate": "Ursprüngliches Erstellungsdatum",
+    "outdated revision save confirmation": {
+      "confirm": "Möchten Sie es überschreiben?",
+      "create": {
+        "description": "Ein flow mit derselben id existiert bereits in diesem namespace.",
+        "details": "Speichern, um zu überschreiben und eine neue Revision zu erstellen.",
+        "title": "Flow existiert bereits"
+      },
+      "update": {
+        "description": "Die Revision, die Sie bearbeiten, ist veraltet.",
+        "details": "Überprüfen Sie die Registerkarte \"Revisionen\" für weitere Details zur neuesten Version.",
+        "title": "Veraltete Revision"
+      }
+    },
+    "output": "Output",
+    "outputs": "Outputs",
+    "override": {
+      "details": "Der vorherige flow kann über die Registerkarte \"Revisions\" wiederhergestellt werden.",
+      "title": "Sie werden den aktuellen Flow überschreiben"
+    },
+    "overview": "Übersicht",
+    "page": {
+      "next": "Nächste Seite",
+      "previous": "Vorherige Seite"
+    },
+    "parent execution": "Elternausführung",
+    "password": "Passwort",
+    "password empty constraint": "Falscher Benutzername oder Passwort",
+    "password length constraint": "Passwort darf 256 Zeichen nicht überschreiten",
+    "passwords do not match": "Passwörter stimmen nicht überein",
+    "pause": "Pause",
+    "pause backfill": "Backfill pausieren",
+    "pause backfills": "Backfills pausieren",
+    "pause confirm": "Sind Sie sicher, dass Sie die Ausführung <code>{id}</code> pausieren möchten?",
+    "pause done": "Die Ausführung ist PAUSED.",
+    "pause title": "Ausführung <code>{id}</code> pausieren.<br/>Bitte beachten Sie, dass derzeit laufende Tasks weiterhin verarbeitet werden und die Ausführung manuell fortgesetzt werden muss.",
+    "paused": "PAUSED",
+    "playground": {
+      "clear_history": "Verlauf löschen",
+      "confirm_create": "Sie können den Playground nicht ausführen, während Sie einen flow erstellen. Das Starten eines Playground-Laufs wird den flow erstellen.",
+      "history": "Letzte 10 Ausführungen",
+      "play_icon_info": "Sie können auch das Play-Symbol in den No-Code- oder Topologie-Ansichten anklicken.",
+      "run_all_tasks": "Alle Tasks ausführen",
+      "run_task": "Task ausführen",
+      "run_task_and_downstream": "Task & Downstream ausführen",
+      "run_task_info": "Bewegen Sie den Mauszeiger über eine beliebige Task im Flow-Code-Editor und klicken Sie auf die Schaltfläche \"Run task\", um Ihre Task zu testen.",
+      "run_this_task": "Führe diese Task aus",
+      "title": "Spielwiese",
+      "toggle": "Spielplatz",
+      "tooltip_persistence": "Wenn Sie den Playground ausschalten und wieder einschalten, bleiben die Informationen erhalten, solange Sie auf der Seite bleiben."
+    },
+    "pluginDefaults": "Plugin-Standardeinstellungen",
+    "pluginPage": {
+      "alt": "Plugins-Symbol",
+      "search": "Suche in {count}+ Plugins",
+      "title1": "Plugins sind Bausteine für Ihre Workflows.",
+      "title2": "Suchen Sie nach Tasks und Triggern, um Ihren Flow zu erstellen."
+    },
+    "plugins": {
+      "name": "Plugin",
+      "names": "Plugins",
+      "please": "Bitte wählen Sie rechts einen Task aus, um dessen Dokumentation zu sehen",
+      "release": "Versionshinweise"
+    },
+    "port": "Port",
+    "prefill inputs": "Vorausfüllen",
+    "prev_execution": "Vorherige Ausführung",
+    "preview": {
+      "auto-view": "Automatische Ansicht",
+      "force-editor": "Editoransicht erzwingen",
+      "label": "Vorschau",
+      "view": "Anzeigen"
+    },
+    "properties": {
+      "hidden": "In Tabelle versteckt",
+      "hint": "Sichtbare Spalten auswählen",
+      "label": "Eigenschaften",
+      "shown": "In Tabelle angezeigt"
+    },
+    "queued duration": "Warteschlangendauer",
+    "reach us": "Sprechen Sie mit uns",
+    "read-more": "Mehr erfahren über",
+    "readonly property": "Schreibgeschützte Eigenschaft",
+    "recent_executions": "Letzte Ausführungen",
+    "refresh": "Aktualisieren",
+    "reject": "Ablehnen",
+    "relative": "Relativ",
+    "relative end date": "Relatives Enddatum",
+    "relative start date": "Relatives Startdatum",
+    "remove_bookmark": "Sind Sie sicher, dass Sie dieses Lesezeichen entfernen möchten?",
+    "replay": "Wiederholen",
+    "replay confirm": "Sind Sie sicher, dass Sie diese Ausführung <code>{id}</code> wiederholen und eine neue erstellen möchten?",
+    "replay from beginning tooltip": "Eine ähnliche Ausführung von Anfang an erstellen",
+    "replay from task tooltip": "Eine ähnliche Ausführung ab Task <code>{taskId}</code> erstellen",
+    "replay latest revision": "Wiederholen mit neuester Revision",
+    "replay the execution": "Führen Sie die Ausführung <code>{executionId}</code> für den flow <code>{flowId}</code> erneut aus.",
+    "replay with inputs": "Wiedergabe mit Inputs",
+    "replayed": "Ausführung ist wiederholt",
+    "required field": "Erforderliches Feld",
+    "reset": "Neustarten",
+    "restart": "Neustart",
+    "restart change revision": "Sie können die Revision ändern, die für die neue Ausführung verwendet wird.",
+    "restart confirm": "Sind Sie sicher, dass Sie die Ausführung <code>{id}</code> neu starten möchten?",
+    "restart latest revision": "Neueste Revision neu starten",
+    "restart tooltip": "Die Ausführung vom <code>{state}</code> Task neu starten",
+    "restart trigger": {
+      "button": "Trigger neu starten",
+      "tooltip": "Den Trigger neu starten"
+    },
+    "restarted": "Ausführung ist neu gestartet",
+    "restore": "Wiederherstellen",
+    "restore confirm": "Sind Sie sicher, dass Sie die Revision <code>{revision}</code> wiederherstellen möchten?",
+    "restore revision": "Sind Sie sicher, dass Sie die Revision <code>{revision}</code> wiederherstellen möchten?",
+    "resume": "Fortsetzen",
+    "resumed confirm": "Sind Sie sicher, dass Sie die Ausführung <code>{id}</code> fortsetzen möchten?",
+    "resumed done": "Ausführung ist fortgesetzt",
+    "resumed title": "Ausführung <code>{id}</code> fortsetzen",
+    "reuse_original_inputs": "Ursprüngliche Inputs wiederverwenden",
+    "revision": "Revision",
+    "revisions": "Revisionen",
+    "row count": "Zeilenanzahl",
+    "run task in playground": "Task im Playground ausführen",
+    "runners": "Läufer",
+    "running duration": "Laufzeitdauer",
+    "save": "Speichern",
+    "save draft": {
+      "message": "Entwurf gespeichert",
+      "retrieval": {
+        "creation": "Flow-Entwurf wurde gespeichert, möchten Sie den Flow weiter bearbeiten?",
+        "existing": "Ein <code>{flowFullName}</code> Flow-Entwurf wurde gespeichert, möchten Sie den Flow weiter bearbeiten?"
+      }
+    },
+    "save task": "Task speichern",
+    "saved": "Erfolgreich gespeichert",
+    "saved done": "<em>{name}</em> ist erfolgreich gespeichert",
+    "scheduleDate": "Geplantes Datum",
+    "scope_filter": {
+      "all": "Alle {label}",
+      "system": "System {label}",
+      "system_description": "Systemwartung {label}",
+      "user": "Benutzer {label}",
+      "user_description": "Regulärer Benutzer initiierte {label}"
+    },
+    "search": "Suche",
+    "search blueprint": "Blueprints durchsuchen",
+    "search filters": {
+      "filter name": "Filtername",
+      "filters": "Filter",
+      "manage": "Suchfilter verwalten",
+      "manage desc": "Gespeicherte Suchfilter verwalten",
+      "save filter": "Filter speichern",
+      "saved": "Gespeicherte Filter"
+    },
+    "search term in message": "Suchbegriff in Nachricht",
+    "search_docs": "Suche",
+    "searching": "Suche läuft...",
+    "seconds": "Sekunden",
+    "secret": {
+      "add": "Neues Geheimnis",
+      "inherited": "Geerbte Secrets",
+      "isReadOnly": "Geheimnis ist schreibgeschützt",
+      "names": "Secrets",
+      "update": "Aktualisiere Secret '{name}'"
+    },
+    "security_advice": {
+      "content": "Aktivieren Sie die Basisauthentifizierung, um Ihre Instanz zu schützen.",
+      "enable": "Authentifizierung aktivieren",
+      "switch_text": "Nicht mehr anzeigen",
+      "title": "Schützen Sie Ihre Instanz"
+    },
+    "see dependencies": "Abhängigkeiten anzeigen",
+    "see full revision": "Vollständige Revision anzeigen",
+    "see_all_states": "Alle Zustände anzeigen",
+    "seeing old revision": "Sie sehen eine alte Revision: {revision}",
+    "select": "Wählen Sie Ihren {{section}} aus",
+    "select datetime": "Datum auswählen",
+    "selected": "Ausgewählt",
+    "selection": {
+      "all": "Alle auswählen ({count})",
+      "selected": "<strong>{count}</strong> ausgewählt"
+    },
+    "sequential": "Sequenziell",
+    "server type": "Servertyp",
+    "services": "Dienste",
+    "set_extra_labels": "Zusätzliche Labels festlegen",
+    "settings": {
+      "blocks": {
+        "configuration": {
+          "fields": {
+            "auto_refresh_interval": "Automatisches Aktualisierungsintervall",
+            "default_namespace": "Standard-Namespace",
+            "editor_type": "Standard-Editor-Typ",
+            "execute_default_tab": "Standard-Ausführungs-Registerkarte",
+            "execute_flow": "Flow ausführen",
+            "flow_default_tab": "Standard-Flow-Registerkarte",
+            "language": "Sprache",
+            "log_display": "Standard-Log-Anzeige",
+            "log_level": "Standard-Log-Ebene",
+            "multi_panel_editor": "Multi-Panel-Editor",
+            "playground": "Spielplatz"
+          },
+          "label": "Hauptkonfiguration"
+        },
+        "export": {
+          "fields": {
+            "flows": "Alle Flows exportieren",
+            "templates": "Alle Vorlagen exportieren"
+          },
+          "label": "Exportieren"
+        },
+        "localization": {
+          "fields": {
+            "date_format": "Datumsformat",
+            "time_zone": "Zeitzone"
+          },
+          "label": "Sprache und Region",
+          "note": "Beachten Sie, dass diese Einstellung für die Anzeige von Datums- und Uhrzeiteigenschaften in der Benutzeroberfläche verwendet wird. Um Ihre Flows in einer anderen Zeitzone als UTC zu konfigurieren, stellen Sie sicher, dass Sie die Zeitzoneneigenschaft im Schedule-Trigger in Ihrem Flow-Code oder in Ihren Plugin-Standardeinstellungen festlegen."
+        },
+        "reset_section_to_defaults": "Stellen Sie die Standardwerte dieses Abschnitts wieder her",
+        "save": {
+          "discard": "Verwerfen",
+          "label": "Präferenzen speichern",
+          "unsaved_title": "Nicht gespeicherte Änderungen",
+          "unsaved_warning": "Sie haben ungespeicherte Änderungen. Möchten Sie diese speichern, bevor Sie die Seite verlassen?"
+        },
+        "theme": {
+          "fields": {
+            "chart_color_scheme": {
+              "classic": "Klassisch",
+              "kestra": "Kestra",
+              "label": "Diagramm-Farbschema"
+            },
+            "editor_folding_stratgy": "Automatisch Code im Editor zusammenklappen",
+            "editor_font_family": "Editor-Schriftfamilie",
+            "editor_font_size": "Editor-Schriftgröße",
+            "editor_hover_description": "Fahren Sie mit der Maus über die Eigenschaft, um die Beschreibung zu sehen",
+            "environment_color": "Umgebungsfarbe",
+            "environment_name": "Umgebungsname",
+            "environment_name_tooltip": "Dieser Umgebungsname wird aus der Konfiguration festgelegt, kann jedoch geändert werden.",
+            "logs_font_size": "Logs Schriftgröße",
+            "theme": "Modus"
+          },
+          "label": "Modus-Einstellungen"
+        }
+      },
+      "label": "Einstellungen"
+    },
+    "setup": {
+      "config": {
+        "basicauth": "Einfache Authentifizierung",
+        "queue": "Warteschlange",
+        "repository": "Datenbank",
+        "storage": "Interner Speicher"
+      },
+      "confirm": {
+        "config_title": "Bestätigen Sie, dass die Konfiguration gültig ist",
+        "confirm": "Bestätigen",
+        "not_valid": "Nein, es ist nicht gültig.",
+        "valid": "Ja, es ist gültig"
+      },
+      "form": {
+        "email": "E-Mail",
+        "firstName": "Vorname",
+        "lastName": "Nachname",
+        "password": "Passwort",
+        "password_requirements": "Das Passwort muss mindestens 8 Zeichen lang sein und mindestens 1 Großbuchstaben und 1 Zahl enthalten."
+      },
+      "login": "Anmelden",
+      "logout": "Abmelden",
+      "steps": {
+        "complete": "Kestra UI starten",
+        "config": "Konfiguration validieren",
+        "survey": "Erzählen Sie uns mehr",
+        "user": "Erstellen Sie Ihr Konto"
+      },
+      "subtitles": {
+        "complete": "Einrichtung erfolgreich abgeschlossen!",
+        "config": "Hier sind die Details Ihrer Konfiguration",
+        "survey": "Helfen Sie uns, die Kestra Open Source Edition zu verbessern",
+        "user": "Richten Sie Ihre Instanz ein, indem Sie ein Konto erstellen"
+      },
+      "success": {
+        "subtitle": "Alles bereit!",
+        "title": "Herzlichen Glückwunsch!"
+      },
+      "survey": {
+        "company_11_50": "11-50",
+        "company_1_10": "1-10",
+        "company_250_plus": "250+",
+        "company_50_250": "50-250",
+        "company_personal": "Persönliche Nutzung",
+        "company_size": "Wie groß ist Ihr Unternehmen?",
+        "continue": "Fortfahren",
+        "newsletter": "Abonnieren Sie den Kestra-Newsletter – bleiben Sie auf dem Laufenden über die <br> neuesten Funktionen und Änderungen.",
+        "skip": "Überspringen",
+        "use_case": "Was ist Ihr primärer Anwendungsfall?",
+        "use_case_business": "Geschäftsprozesse",
+        "use_case_data": "Daten-Workflows",
+        "use_case_infrastructure": "Infrastrukturautomatisierung",
+        "use_case_ml": "ML/AI-Pipelines",
+        "use_case_other": "Andere"
+      },
+      "titles": {
+        "survey": "Erzählen Sie uns mehr",
+        "user": "Konto erstellen"
+      },
+      "troubleshooting": "Passwort vergessen?",
+      "validation": {
+        "config_message": "Stellen Sie sicher, dass Sie Ihre Konfiguration aktualisieren, um diese Fehlermeldung zu beheben.",
+        "email_invalid": "Ungültige E-Mail-Adresse",
+        "email_required": "E-Mail ist erforderlich",
+        "email_temporary_not_allowed": "Temporäre oder Einweg-E-Mail-Adressen sind nicht erlaubt",
+        "firstName_required": "Vorname erforderlich",
+        "incorrect_creds": "Ungültiger Benutzername oder Passwort. Stellen Sie sicher, dass Ihre Anmeldedaten korrekt sind.",
+        "lastName_required": "Nachname erforderlich",
+        "password_invalid": "Ungültiges Passwort"
+      }
+    },
+    "show": "Anzeigen",
+    "show chart": "Diagramm anzeigen",
+    "show description": "Beschreibung anzeigen",
+    "show documentation": "Dokumentation anzeigen",
+    "show task condition": "Bedingung des Tasks anzeigen",
+    "show task documentation": "Task-Dokumentation anzeigen",
+    "show task documentation in editor": "Task-Dokumentation im Editor anzeigen",
+    "show task logs": "Task Logs anzeigen",
+    "show task outputs": "Task-Outputs anzeigen",
+    "show task source": "Task-Quelle anzeigen",
+    "showLess": "Es scheint, dass der Text, den Sie übersetzen möchten, nicht bereitgestellt wurde. Bitte geben Sie den Text nach der Linie \"----------\" ein, damit ich Ihnen bei der Übersetzung ins Deutsche helfen kann.",
+    "showMore": "Mehr anzeigen",
+    "side-by-side": "nebeneinander",
+    "slack support": "Fragen Sie via Slack",
+    "something_went_wrong": {
+      "loading_execution": "Beim Laden der Ausführung ist etwas schiefgelaufen."
+    },
+    "source": "Quelle",
+    "source and blueprints": "Quelle und Blueprints",
+    "source and doc": "Quelle und Dokumentation",
+    "source and topology": "Quelle und Topologie",
+    "source only": "Nur Quelle",
+    "source search": "Quellensuche",
+    "specific task": "Spezifischer Task",
+    "start date": "Startdatum",
+    "start datetime": "Startdatum und -zeit",
+    "started date": "Startdatum",
+    "state": "Zustand",
+    "state_history": "Zustandshistorie",
+    "stats": "Statistiken",
+    "steps": "Schritte",
+    "stream": "Stream",
+    "sub flow": "Subflow",
+    "submit": "Einreichen",
+    "success": "Erfolg",
+    "sum": "Summe",
+    "switch-view": "Ansicht wechseln",
+    "system overview": "Systemübersicht",
+    "system_namespace": "Behalten Sie Ihre Plattform mit Systemflows im Blick.",
+    "system_namespace_description": "Automatisieren Sie Wartungsaufgaben, von Fehlerwarnungen bis hin zu automatisierten Bereinigungen.",
+    "tags": "Tags",
+    "task": "Task",
+    "task failed": "Task fehlgeschlagen",
+    "task id": "Task-ID",
+    "task id already exists": "Task-Id existiert bereits",
+    "task is running": "Task läuft",
+    "task logs": "Task Logs",
+    "task run id": "TaskRun-ID",
+    "task sent a warning": "Task hat eine Warnung gesendet",
+    "task was skipped": "Task wurde übersprungen",
+    "task was successful": "Task war erfolgreich",
+    "taskDefaults": "Task-Standards",
+    "taskRunners": "Task Runners",
+    "task_id_exists": "Task-ID existiert bereits",
+    "task_id_message": "Task-ID ${existingTask} existiert bereits im Flow.",
+    "taskid column details": "Letzter Task, der ausgeführt wird, und seine Anzahl der Versuche.",
+    "tasks": "Tasks",
+    "template": "Vorlage",
+    "template creation": "Vorlagenerstellung",
+    "template delete": "Sind Sie sicher, dass Sie <code>{templateCount}</code> Vorlage(n) löschen möchten?",
+    "template export": "Sind Sie sicher, dass Sie <code>{templateCount}</code> Vorlage(n) exportieren möchten?",
+    "templates": "Vorlagen",
+    "templates deleted": "<code>{count}</code> Vorlage(n) gelöscht",
+    "templates deprecated": "Vorlagen sind veraltet. Bitte verwenden Sie stattdessen Subflows. Siehe den <a href=\"https://kestra.io/docs/migration-guide/0.11.0/templates\" target=\"_blank\">Migrationsabschnitt</a>, der erklärt, wie Sie von Vorlagen zu Subflows migrieren können.",
+    "templates exported": "Vorlagen exportiert",
+    "tenant": {
+      "name": "Mandant",
+      "names": "Mandanten"
+    },
+    "tenantId": "Mandanten-ID",
+    "test-badge-text": "Test",
+    "test-badge-tooltip": "Diese Ausführung wurde durch einen Test erstellt",
+    "theme": "Modus",
+    "this_task_has": "Diese Task hat",
+    "timezone": "Zeitzone",
+    "title": "Titel",
+    "to": "Bis",
+    "to toggle": "umschalten",
+    "toggle fullscreen": "Vollbild umschalten",
+    "toggle output": "Outputs umschalten",
+    "toggle output display": "Outputanzeige umschalten",
+    "toggle periodic refresh each x seconds": "Periodische Aktualisierung alle {interval} Sekunden umschalten",
+    "toggle_word_wrap": "Zeilenumbruch umschalten",
+    "topology": "Topologie",
+    "topology-graph": {
+      "graph-orientation": "Graph-Ausrichtung",
+      "invalid": "Graph-Fehler",
+      "invalid_description": "Beim Laden des Graphen ist ein Fehler aufgetreten. Bitte überprüfen Sie den Quellcode auf Fehler.",
+      "zoom-fit": "Anpassen",
+      "zoom-in": "Vergrößern",
+      "zoom-out": "Verkleinern",
+      "zoom-reset": "Zoom zurücksetzen"
+    },
+    "total_duration": "Gesamtdauer",
+    "total_executions": "Gesamte Ausführungen",
+    "trigger": "Trigger",
+    "trigger details": "Trigger-Details",
+    "trigger disabled": "Trigger ist in der Flow-Quelle deaktiviert",
+    "trigger execution id": "Trigger-Ausführungs-Id",
+    "trigger filter": {
+      "options": {
+        "ALL": "Alle Ausführungen",
+        "CHILD": "Kinder-Ausführungen",
+        "MAIN": "Eltern-Ausführungen"
+      },
+      "title": "Kinder-Ausführungen filtern"
+    },
+    "trigger refresh": "Aktualisierung auslösen",
+    "triggerId": "Trigger-ID",
+    "trigger_check_warning": "Die Verwendung von Trigger-Variablen funktioniert nicht bei manueller Flow-Ausführung. Fügen Sie den `??`-Koaleszenz-Operator hinzu, um das Problem zu lösen. Verwenden Sie zum Beispiel anstelle von `trigger.date` den Ausdruck `trigger.date ?? execution.startDate`.",
+    "trigger_id_exists": "Trigger-ID existiert bereits",
+    "trigger_id_message": "Trigger-ID ${existingTrigger} existiert bereits im Flow.",
+    "trigger_states": "Zustände",
+    "triggered": "Ausführungstrigger",
+    "triggered done": "Ausführung <em>{name}</em> ist erfolgreich ausgelöst",
+    "triggerflow disabled": "Trigger ist in der Flow-Definition deaktiviert",
+    "triggers": "Trigger",
+    "triggers_state": {
+      "options": {
+        "disabled": "Deaktiviert",
+        "enabled": "Aktiviert"
+      },
+      "state": "Zustand"
+    },
+    "true": "Wahr",
+    "type": "Typ",
+    "unable to generate graph": "Ein Problem ist beim Generieren des Graphen aufgetreten, wodurch die Topologie nicht angezeigt werden kann.",
+    "undefined": "Nicht definiert",
+    "unlock": "Entsperren",
+    "unlock trigger": {
+      "button": "Trigger entsperren",
+      "confirmation": "Sind Sie sicher, dass Sie den Trigger entsperren möchten?",
+      "success": "Trigger ist entsperrt",
+      "tooltip": {
+        "evaluation": "Der Trigger wird derzeit ausgewertet",
+        "execution": "Es läuft eine Ausführung für diesen Trigger"
+      },
+      "warning": "Dies könnte zu gleichzeitigen Ausführungen für denselben Trigger führen und sollte als letzte Option betrachtet werden."
+    },
+    "unqueue": "Aus Warteschlange entfernen",
+    "unqueue as": "Aus der Warteschlange entfernen als <code>{status}</code>",
+    "unqueue confirm": "Sind Sie sicher, dass Sie die Ausführung <code>{id}</code> aus der Warteschlange entfernen möchten?",
+    "unqueue done": "Ausführung ist nicht in der Warteschlange",
+    "unqueue title": "Ausführung <code>{id}</code> aus der Warteschlange entfernen.<br/>Bitte beachten Sie, dass dies das Nebenläufigkeitslimit des Flows nicht berücksichtigt, sodass mehr Ausführungen laufen könnten als das erlaubte Limit.",
+    "unqueue title multiple": "Sind Sie sicher, dass Sie <code>{count}</code> Ausführungen aus der Warteschlange entfernen möchten?<br/><br/>Beachten Sie, dass dies das Nebenläufigkeitslimit des flow nicht beachtet, sodass mehr Ausführungen laufen könnten als das erlaubte Limit.",
+    "unsaved changed ?": "Sie haben ungespeicherte Änderungen, möchten Sie diese Seite verlassen?",
+    "unsaved changes": "Nicht gespeicherte Änderungen",
+    "unsaved changes warning": "Sie haben ungespeicherte Änderungen. Wenn Sie diese Seite verlassen, gehen Ihre Änderungen verloren.",
+    "up trend": "Steigend",
+    "update": "Aktualisieren",
+    "update aborted": "Aktualisierung abgebrochen",
+    "update ok": "ist aktualisiert",
+    "updated date": "Aktualisierungsdatum",
+    "usage": "Verwendung",
+    "use": "Verwenden",
+    "use_dark_background": "Verwenden Sie diese Version, wenn Sie auf einem dunklen Hintergrund arbeiten, um sicherzustellen, dass unser Name lesbar bleibt.",
+    "validate": "Validieren",
+    "value": "Value",
+    "variables": "Variablen",
+    "version": "Version",
+    "warning": "Warnung",
+    "warning detected": "Warnungen erkannt",
+    "warning flow with triggers": "Dieser Flow enthält Trigger und eine manuelle Ausführung wird fehlschlagen, wenn dieser Flow von Trigger-Ausdrücken abhängt.",
+    "watch": "Beobachten",
+    "watch_video": "Video ansehen",
+    "webhook": {
+      "curl_command": "Webhook-cURL-Befehl",
+      "curl_note": "Verwenden Sie diesen cURL-Befehl, um den flow über Webhook mit benutzerdefiniertem JSON-Payload zu triggern.",
+      "no_triggers": "Dieser flow hat keine aktivierten Webhook-Triggers.",
+      "payload": "Webhook-Payload (JSON)"
+    },
+    "webhook link copied": "Webhook-Link kopiert.",
+    "weeks": "Wochen",
+    "welcome": {
+      "help": {
+        "text": "Stellen Sie jede Frage in unserer Slack-Community. Wenn Sie feststecken, sind wir hier, um Ihnen zu helfen. ✋",
+        "title": "Brauchen Sie Hilfe?"
+      },
+      "tour": {
+        "text": "Wählen Sie Ihren Anwendungsfall und folgen Sie einer Schritt-für-Schritt-Anleitung, um die Funktionen und Möglichkeiten von Kestra kennenzulernen. ❤️",
+        "title": "Produkt-Tour starten"
+      },
+      "tutorial": {
+        "text": "* <a href=\"https://kestra.io/tutorial-videos/all\" target=\"_blank\">Video-Tutorials</a>  \n* <a href=\"https://kestra.io/docs\" target=\"_blank\">Dokumentation</a>  \n* <a href=\"https://kestra.io/blueprints\" target=\"_blank\">Blueprints</a>",
+        "title": "Tutorial"
+      }
+    },
+    "welcome aboard": "🚀 Willkommen bei Kestra!",
+    "welcome aboard content": "Nutzen Sie unsere geführte Tour, um Ihren ersten Flow zu erstellen, und schauen Sie sich Blueprints an, um weitere Beispiele zu finden.",
+    "welcome button create": "Produkt-Tour starten",
+    "welcome display require": "Führen Sie Ihren <strong>ersten Flow</strong> aus, um loszulegen",
+    "welcome_page": {
+      "guide": "Benötigen Sie Unterstützung, um Ihren ersten flow auszuführen?",
+      "start": "Lassen Sie uns Ihren ersten Workflow zum Laufen bringen.",
+      "wel_text": "Willkommen!",
+      "welcome": "Willkommen bei Kestra"
+    },
+    "wordmark_colors": "Die Farben des Wortzeichens passen sich dem Hintergrund an, während das Icon auf einem dunklen Hintergrund ohne Hintergrund bleibt.",
+    "worker group": "Worker-Gruppe",
+    "worker group fallback": "Arbeitsgruppe Fallback",
+    "worker group key": "Worker-Gruppe Schlüssel",
+    "worker information": "Worker-Informationen",
+    "workerId": "Worker Id",
+    "workers": "Workers",
+    "wrong labels": "Leerer Key oder Value ist in Labels nicht erlaubt",
+    "years": "Jahre"
+  }
+}
