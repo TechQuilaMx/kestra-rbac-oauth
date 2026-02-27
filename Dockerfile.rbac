@@ -12,9 +12,9 @@ RUN apt-get update && \
 WORKDIR /build
 
 # Copy Gradle wrapper and properties first for better caching
-COPY gradlew gradlew.bat gradle.properties settings.gradle build.gradle ./
+COPY --chmod=755 gradlew ./
+COPY gradlew.bat gradle.properties settings.gradle build.gradle ./
 COPY gradle ./gradle
-RUN chmod +x ./gradlew
 
 # Copy docker-entrypoint.sh
 COPY --chown=kestra:kestra --chmod=755 docker/app/docker-entrypoint.sh /docker-entrypoint.sh
