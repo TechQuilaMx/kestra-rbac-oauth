@@ -12,7 +12,8 @@ RUN apt-get update && \
 WORKDIR /build
 
 # Copy Gradle wrapper and properties first for better caching
-COPY gradlew gradlew.bat gradle.properties settings.gradle build.gradle ./
+COPY --chmod=755 gradlew ./
+COPY gradlew.bat gradle.properties settings.gradle build.gradle ./
 COPY gradle ./gradle
 
 # Copy docker-entrypoint.sh
@@ -23,6 +24,9 @@ RUN ./gradlew dependencies --no-daemon || true
 
 # Copy all source code
 COPY . .
+
+# Restore gradlew permissions after COPY . . overwrites it
+RUN chmod +x ./gradlew
 
 # Build the executable JAR (includes UI build)
 RUN ./gradlew executableJar --no-daemon --info
