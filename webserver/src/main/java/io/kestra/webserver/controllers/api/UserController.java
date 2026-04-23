@@ -1,5 +1,7 @@
 package io.kestra.webserver.controllers.api;
 
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.models.auth.UserInfo;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
 public class UserController {
     
     @Get("/me")
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = {"Users"}, summary = "Get current user information")
     public HttpResponse<?> getCurrentUser(HttpRequest<?> request) {
         // Get user info from request (set by AuthenticationFilter)

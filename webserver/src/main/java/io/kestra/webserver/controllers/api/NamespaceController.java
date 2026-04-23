@@ -7,6 +7,8 @@ import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.topologies.FlowTopologyService;
 import io.kestra.core.utils.NamespaceUtils;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.models.api.ApiAutocomplete;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.AutocompleteUtils;
@@ -99,6 +101,7 @@ public class NamespaceController<N extends Namespace> {
 
     @Post(uri = "/autocomplete")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     @Operation(tags = {"Namespaces"}, summary = "List namespaces for autocomplete", description = "Returns a list of namespaces for use in autocomplete fields, optionally allowing to filter by query and ids. Used especially for binding creation.")
     public List<String> autocompleteNamespaces(@NotNull @Body ApiAutocomplete autocomplete) throws HttpStatusException {
         return this.getNamespaces(
@@ -113,6 +116,7 @@ public class NamespaceController<N extends Namespace> {
 
     @Get(uri = "{id}")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     @Operation(tags = {"Namespaces"}, summary = "Get a namespace")
     public N getNamespace(
         @Parameter(description = "The namespace id") @PathVariable String id
@@ -122,6 +126,7 @@ public class NamespaceController<N extends Namespace> {
 
     @Get(uri = "/search")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     @Operation(tags = {"Namespaces"}, summary = "Search for namespaces")
     public PagedResults<N> searchNamespaces(
         @Parameter(description = "A string filter") @Nullable @QueryValue(value = "q") String query,
@@ -140,6 +145,7 @@ public class NamespaceController<N extends Namespace> {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/dependencies")
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     @Operation(tags = {"Flows"}, summary = "Get flow dependencies")
     public FlowTopologyGraph getFlowDependenciesFromNamespace(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,

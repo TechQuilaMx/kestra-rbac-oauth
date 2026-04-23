@@ -8,7 +8,9 @@ import io.kestra.core.models.validations.ValidateConstraintViolation;
 import io.kestra.core.repositories.TemplateRepositoryInterface;
 import io.kestra.core.serializers.YamlParser;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.controllers.domain.IdWithNamespace;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.BulkResponse;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.PageableUtils;
@@ -59,6 +61,7 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/{id}")
+    @RequirePermission(Permission.TEMPLATES_VIEW)
     @Operation(tags = {"Templates"}, summary = "Get a template")
     public Template index(
         @Parameter(description = "The template namespace") @PathVariable String namespace,
@@ -71,6 +74,7 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/search")
+    @RequirePermission(Permission.TEMPLATES_VIEW)
     @Operation(tags = {"Templates"}, summary = "Search for templates")
     public PagedResults<Template> find(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
@@ -85,6 +89,7 @@ public class TemplateController {
     @ExecuteOn(TaskExecutors.IO)
     @Post
     @Operation(tags = {"Templates"}, summary = "Create a template")
+    @RequirePermission(Permission.TEMPLATES_CREATE)
     public HttpResponse<Template> create(
         @Parameter(description = "The template") @Valid @Body Template template
     ) throws ConstraintViolationException {
@@ -105,6 +110,7 @@ public class TemplateController {
     @ExecuteOn(TaskExecutors.IO)
     @Put(uri = "{namespace}/{id}")
     @Operation(tags = {"Templates"}, summary = "Update a template")
+    @RequirePermission(Permission.TEMPLATES_EDIT)
     public HttpResponse<Template> update(
         @Parameter(description = "The template namespace") @PathVariable String namespace,
         @Parameter(description = "The template id") @PathVariable String id,
@@ -124,6 +130,7 @@ public class TemplateController {
     @Delete(uri = "{namespace}/{id}")
     @Operation(tags = {"Templates"}, summary = "Delete a template")
     @ApiResponse(responseCode = "204", description = "On success")
+    @RequirePermission(Permission.TEMPLATES_DELETE)
     public HttpResponse<Void> delete(
         @Parameter(description = "The template namespace") @PathVariable String namespace,
         @Parameter(description = "The template id") @PathVariable String id
@@ -139,6 +146,7 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "distinct-namespaces")
+    @RequirePermission(Permission.TEMPLATES_VIEW)
     @Operation(tags = {"Templates"}, summary = "List all distinct namespaces")
     public List<String> listDistinctNamespace() {
         return templateRepository.findDistinctNamespace(tenantService.resolveTenant());
@@ -153,6 +161,7 @@ public class TemplateController {
         description = "All Template will be created / updated for this namespace.\n" +
             "Template already created but not in `templates` will be deleted if the query delete is `true`"
     )
+    @RequirePermission(Permission.TEMPLATES_EDIT)
     public List<Template> updateNamespace(
         @Parameter(description = "The template namespace") @PathVariable String namespace,
         @Parameter(description = "A list of templates") @Body @Valid List<Template> templates,
@@ -239,6 +248,7 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "validate", consumes = MediaType.APPLICATION_YAML)
+    @RequirePermission(Permission.TEMPLATES_VIEW)
     @Operation(tags = {"Templates"}, summary = "Validate a list of templates")
     public List<ValidateConstraintViolation> validateTemplates(
         @Parameter(description= "A list of templates") @Body String templates
@@ -266,6 +276,7 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/export/by-query", produces = MediaType.APPLICATION_OCTET_STREAM)
+    @RequirePermission(Permission.TEMPLATES_VIEW)
     @Operation(
         tags = {"Templates"},
         summary = "Export templates as a ZIP archive of yaml sources."
@@ -281,6 +292,7 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/export/by-ids", produces = MediaType.APPLICATION_OCTET_STREAM)
+    @RequirePermission(Permission.TEMPLATES_VIEW)
     @Operation(
         tags = {"Templates"},
         summary = "Export templates as a ZIP archive of yaml sources."
@@ -301,6 +313,7 @@ public class TemplateController {
         tags = {"Templates"},
         summary = "Delete templates returned by the query parameters."
     )
+    @RequirePermission(Permission.TEMPLATES_DELETE)
     public HttpResponse<BulkResponse> deleteByQuery(
         @Parameter(description = "A string filter") @Nullable @QueryValue(value = "q") String query,
         @Parameter(description = "A namespace filter prefix") @Nullable @QueryValue String namespace
@@ -320,6 +333,7 @@ public class TemplateController {
         tags = {"Templates"},
         summary = "Delete templates by their IDs."
     )
+    @RequirePermission(Permission.TEMPLATES_DELETE)
     public HttpResponse<BulkResponse> deleteByIds(
         @Parameter(description = "A list of tuple flow ID and namespace as flow identifiers") @Body List<IdWithNamespace> ids
     ) {
@@ -355,6 +369,7 @@ public class TemplateController {
         summary = "Import templates as a ZIP archive of yaml sources or a multi-objects YAML file."
     )
     @ApiResponse(responseCode = "204", description = "On success")
+    @RequirePermission(Permission.TEMPLATES_CREATE)
     public HttpResponse<Void> importTemplates(@Parameter(description = "The file to import, can be a ZIP archive or a multi-objects YAML file") @Part CompletedFileUpload fileUpload) throws IOException {
         String fileName = fileUpload.getFilename().toLowerCase();
         if (fileName.endsWith(".yaml") || fileName.endsWith(".yml")) {

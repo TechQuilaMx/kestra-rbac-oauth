@@ -4,6 +4,8 @@ import io.kestra.core.repositories.ArrayListTotal;
 import io.kestra.core.runners.ConcurrencyLimit;
 import io.kestra.core.services.ConcurrencyLimitService;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.PagedResults;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Body;
@@ -25,6 +27,7 @@ public class ConcurrencyLimitController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/search")
+    @RequirePermission(Permission.SETTINGS_EDIT)
     @Operation(tags = {"Flows"}, summary = "Search for flow concurrency limits")
     public PagedResults<ConcurrencyLimit> searchConcurrencyLimits() {
         var results = concurrencyLimitService.find(tenantService.resolveTenant());
@@ -33,6 +36,7 @@ public class ConcurrencyLimitController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Put("/{namespace}/{flowId}")
+    @RequirePermission(Permission.SETTINGS_EDIT)
     @Operation(tags = {"Flows"}, summary = "Update a flow concurrency limit")
     public HttpResponse<ConcurrencyLimit> updateConcurrencyLimit(@Body ConcurrencyLimit concurrencyLimit) {
         var existing = concurrencyLimitService.findById(concurrencyLimit.getTenantId(), concurrencyLimit.getNamespace(), concurrencyLimit.getFlowId());

@@ -26,6 +26,7 @@ public class AuthorizationConfiguration {
         "executions.view",
         "executions.create",
         "templates.view",
+        "dashboards.view",
         "namespaces.view",
         "kv.view",
         "settings.view"
