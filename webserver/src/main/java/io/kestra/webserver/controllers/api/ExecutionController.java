@@ -38,7 +38,9 @@ import io.kestra.core.utils.ListUtils;
 import io.kestra.core.utils.Logs;
 import io.kestra.plugin.core.flow.Pause;
 import io.kestra.plugin.core.trigger.Webhook;
+import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.converters.QueryFilterFormat;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.BulkErrorResponse;
 import io.kestra.webserver.responses.BulkResponse;
 import io.kestra.webserver.responses.PagedResults;
@@ -212,6 +214,7 @@ public class ExecutionController {
     private ObjectMapper objectMapper;
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/search")
     @Operation(tags = {"Executions"}, summary = "Search for executions")
     public PagedResults<Execution> searchExecutions(
@@ -273,6 +276,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/{executionId}/graph")
     @Operation(tags = {"Executions"}, summary = "Generate a graph for an execution")
     public FlowGraph getExecutionFlowGraph(
@@ -299,6 +303,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/eval/{taskRunId}", consumes = MediaType.TEXT_PLAIN)
     @Operation(tags = {"Executions"}, summary = "Evaluate a variable expression for this taskrun")
     public EvalResult evalTaskRunExpression(
@@ -351,6 +356,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/{executionId}")
     @Operation(tags = {"Executions"}, summary = "Get an execution")
     public Execution getExecution(
@@ -361,6 +367,7 @@ public class ExecutionController {
             .orElse(null);
     }
 
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Delete(uri = "/{executionId}")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = {"Executions"}, summary = "Delete an execution")
@@ -380,6 +387,7 @@ public class ExecutionController {
         }
     }
 
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Delete(uri = "/by-ids")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = {"Executions"}, summary = "Delete a list of executions")
@@ -425,6 +433,7 @@ public class ExecutionController {
         return HttpResponse.ok(BulkResponse.builder().count(executions.size()).build());
     }
 
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Delete(uri = "/by-query")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = {"Executions"}, summary = "Delete executions filter by query parameters")
@@ -475,6 +484,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get
     @Operation(tags = {"Executions"}, summary = "Search for executions for a flow")
     public PagedResults<Execution> searchExecutionsByFlowId(
@@ -490,6 +500,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/webhook/{namespace}/{id}/{key}")
     @Operation(tags = {"Executions"}, summary = "Trigger a new execution by POST webhook trigger")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = WebhookResponse.class))})
@@ -504,6 +515,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/webhook/{namespace}/{id}/{key}")
     @Operation(tags = {"Executions"}, summary = "Trigger a new execution by GET webhook trigger")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = WebhookResponse.class))})
@@ -518,6 +530,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Put(uri = "/webhook/{namespace}/{id}/{key}")
     @Operation(tags = {"Executions"}, summary = "Trigger a new execution by PUT webhook trigger")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = WebhookResponse.class))})
@@ -672,6 +685,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/trigger/{namespace}/{id}", consumes = MediaType.MULTIPART_FORM_DATA)
     @Operation(tags = {"Executions"}, summary = "Trigger a new execution for a flow")
     @ApiResponse(responseCode = "409", description = "if the flow is disabled")
@@ -689,6 +703,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{namespace}/{id}/validate", consumes = MediaType.MULTIPART_FORM_DATA)
     @Operation(tags = {"Executions"}, summary = "Validate the creation of a new execution for a flow")
     @ApiResponse(responseCode = "409", description = "if the flow is disabled")
@@ -713,6 +728,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{namespace}/{id}", consumes = MediaType.MULTIPART_FORM_DATA)
     @Operation(
         tags = {"Executions"},
@@ -934,6 +950,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/{executionId}/file", produces = MediaType.APPLICATION_OCTET_STREAM)
     @Operation(tags = {"Executions"}, summary = "Download file for an execution")
     public HttpResponse<StreamedFile> downloadFileFromExecution(
@@ -971,6 +988,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/{executionId}/file/metas")
     @Operation(tags = {"Executions"}, summary = "Get file meta information for an execution")
     public HttpResponse<FileMetas> getFileMetadatasFromExecution(
@@ -1005,6 +1023,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/restart")
     @Operation(tags = {"Executions"}, summary = "Restart a new execution from an old one")
     public Execution restartExecution(
@@ -1025,6 +1044,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/restart/by-ids")
     @Operation(tags = {"Executions"}, summary = "Restart a list of executions")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = BulkResponse.class))})
@@ -1076,6 +1096,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/restart/by-query")
     @Operation(tags = {"Executions"}, summary = "Restart executions filter by query parameters")
     public HttpResponse<?> restartExecutionsByQuery(
@@ -1119,6 +1140,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/replay")
     @Operation(tags = {"Executions"}, summary = "Create a new execution from an old one and start it from a specified task run id")
     public Execution replayExecution(
@@ -1138,6 +1160,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/replay-with-inputs", consumes = MediaType.MULTIPART_FORM_DATA)
     @Operation(
         tags = {"Executions"},
@@ -1218,6 +1241,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/state")
     @Operation(tags = {"Executions"}, summary = "Change state for a taskrun in an execution")
     public Execution updateTaskRunState(
@@ -1250,6 +1274,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/change-status")
     @Operation(tags = {"Executions"}, summary = "Change the state of an execution")
     public Execution updateExecutionStatus(
@@ -1278,6 +1303,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/change-status/by-ids")
     @Operation(tags = {"Executions"}, summary = "Change executions state by id")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = BulkResponse.class))})
@@ -1336,6 +1362,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/change-status/by-query")
     @Operation(tags = {"Executions"}, summary = "Change executions state by query parameters")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = BulkResponse.class))})
@@ -1383,6 +1410,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Delete(uri = "/{executionId}/kill{?isOnKillCascade}", produces = MediaType.TEXT_JSON)
     @Operation(tags = {"Executions"}, summary = "Kill an execution")
     @ApiResponse(responseCode = "202", description = "Execution kill was requested successfully")
@@ -1423,6 +1451,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Delete(uri = "/kill/by-ids")
     @Operation(tags = {"Executions"}, summary = "Kill a list of executions")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = BulkResponse.class))})
@@ -1488,6 +1517,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/resume/validate", consumes = MediaType.MULTIPART_FORM_DATA)
     @Operation(tags = {"Executions"}, summary = "Validate inputs to resume a paused execution.")
     @ApiResponse(responseCode = "204", description = "On success")
@@ -1507,6 +1537,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/resume", consumes = MediaType.MULTIPART_FORM_DATA)
     @Operation(tags = {"Executions"}, summary = "Resume a paused execution.",
         extensions = @Extension(
@@ -1547,6 +1578,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/resume-from-breakpoint")
     @Operation(tags = {"Executions"}, summary = "Resume an execution from a breakpoint (in the 'BREAKPOINT' state).")
     @ApiResponse(responseCode = "204", description = "On success")
@@ -1580,6 +1612,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/resume/by-ids")
     @Operation(tags = {"Executions"}, summary = "Resume a list of paused executions")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = BulkResponse.class))})
@@ -1642,6 +1675,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/resume/by-query")
     @Operation(tags = {"Executions"}, summary = "Resume executions filter by query parameters")
     public HttpResponse<?> resumeExecutionsByQuery(
@@ -1686,6 +1720,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/pause")
     @Operation(tags = {"Executions"}, summary = "Pause a running execution.")
     @ApiResponse(responseCode = "204", description = "On success")
@@ -1700,6 +1735,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/pause/by-ids")
     @Operation(tags = {"Executions"}, summary = "Pause a list of running executions")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = BulkResponse.class))})
@@ -1751,6 +1787,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/pause/by-query")
     @Operation(tags = {"Executions"}, summary = "Pause executions filter by query parameters")
     public HttpResponse<?> pauseExecutionsByQuery(
@@ -1795,6 +1832,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Delete(uri = "/kill/by-query")
     @Operation(tags = {"Executions"}, summary = "Kill executions filter by query parameters")
     public HttpResponse<?> killExecutionsByQuery(
@@ -1839,6 +1877,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/replay/by-query")
     @Operation(tags = {"Executions"}, summary = "Create new executions from old ones filter by query parameters. Keep the flow revision")
     public HttpResponse<?> replayExecutionsByQuery(
@@ -1885,6 +1924,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/replay/by-ids")
     @Operation(tags = {"Executions"}, summary = "Create new executions from old ones. Keep the flow revision")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = BulkResponse.class))})
@@ -1932,6 +1972,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/{executionId}/follow", produces = MediaType.TEXT_EVENT_STREAM)
     @Operation(
         tags = {"Executions"},
@@ -2005,6 +2046,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/{executionId}/file/preview")
     @Operation(tags = {"Executions"}, summary = "Get file preview for an execution")
     public HttpResponse<?> previewFileFromExecution(
@@ -2053,6 +2095,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/labels")
     @Operation(tags = {"Executions"}, summary = "Add or update labels of a terminated execution")
     @ApiResponse(responseCode = "404", description = "If the execution cannot be found")
@@ -2104,6 +2147,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/labels/by-ids")
     @Operation(tags = {"Executions"}, summary = "Set labels on a list of executions")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = BulkResponse.class))})
@@ -2157,6 +2201,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/labels/by-query")
     @Operation(tags = {"Executions"}, summary = "Set label on executions filter by query parameters")
     public HttpResponse<?> setLabelsOnTerminatedExecutionsByQuery(
@@ -2203,6 +2248,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/unqueue")
     @Operation(tags = {"Executions"}, summary = "Unqueue an execution")
     public Execution unqueueExecution(
@@ -2222,6 +2268,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/unqueue/by-ids")
     @Operation(tags = {"Executions"}, summary = "Unqueue a list of executions")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = BulkResponse.class))})
@@ -2274,6 +2321,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/unqueue/by-query")
     @Operation(tags = {"Executions"}, summary = "Unqueue executions filter by query parameters")
     public HttpResponse<?> unqueueExecutionsByQuery(
@@ -2319,6 +2367,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/{executionId}/force-run")
     @Operation(tags = {"Executions"}, summary = "Force run an execution")
     public Execution forceRunExecution(
@@ -2337,6 +2386,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/force-run/by-ids")
     @Operation(tags = {"Executions"}, summary = "Force run a list of executions")
     @ApiResponse(responseCode = "200", description = "On success", content = {@Content(schema = @Schema(implementation = BulkResponse.class))})
@@ -2396,6 +2446,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/force-run/by-query")
     @Operation(tags = {"Executions"}, summary = "Force run executions filter by query parameters")
     public HttpResponse<?> forceRunExecutionsByQuery(
@@ -2449,6 +2500,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/{executionId}/flow")
     @Operation(tags = {"Executions"}, summary = "Get flow information's for an execution")
     public FlowForExecution getFlowFromExecutionById(
@@ -2460,6 +2512,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/flows/{namespace}/{flowId}")
     @Operation(tags = {"Executions"}, summary = "Get flow information's for an execution")
     public FlowForExecution getFlowFromExecution(
@@ -2472,6 +2525,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/namespaces")
     @Operation(tags = {"Executions"}, summary = "Get all namespaces that have executable flows")
     public List<String> listExecutableDistinctNamespaces() {
@@ -2479,6 +2533,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/namespaces/{namespace}/flows")
     @Operation(tags = {"Executions"}, summary = "Get all flow ids for a namespace. Data returned are FlowForExecution containing minimal information about a Flow for when you are allowed to executing but not reading.")
     public List<FlowForExecution> listFlowExecutionsByNamespace(
@@ -2488,6 +2543,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/{executionId}/follow-dependencies", produces = MediaType.TEXT_EVENT_STREAM)
     @Operation(
         tags = {"Executions"},
@@ -2580,6 +2636,7 @@ public class ExecutionController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Post(uri = "/latest")
     @Operation(tags = {"Executions"}, summary = "Get the latest execution for given flows")
     public List<LastExecutionResponse> getLatestExecutions(
@@ -2591,6 +2648,7 @@ public class ExecutionController {
         ).stream().map(LastExecutionResponse::ofExecution).toList();
     }
 
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Get(uri = "/export/by-query/csv", produces = MediaType.TEXT_CSV)
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = {"Executions"}, summary = "Export all executions as a streamed CSV file")

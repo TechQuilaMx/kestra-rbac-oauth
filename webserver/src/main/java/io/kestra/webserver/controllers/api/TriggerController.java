@@ -16,7 +16,9 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.services.ConditionService;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.converters.QueryFilterFormat;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.BulkResponse;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.CSVUtils;
@@ -81,6 +83,7 @@ public class TriggerController {
     private ObjectMapper objectMapper;
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Get(uri = "/search")
     @Operation(tags = {"Triggers"}, summary = "Search for triggers")
     public PagedResults<Triggers> searchTriggers(
@@ -154,6 +157,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/{namespace}/{flowId}/{triggerId}/unlock")
     @Operation(tags = {"Triggers"}, summary = "Unlock a trigger")
     public HttpResponse<Trigger> unlockTrigger(
@@ -184,6 +188,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/unlock/by-triggers")
     @Operation(tags = {"Triggers"}, summary = "Unlock given triggers")
     public MutableHttpResponse<?> unlockTriggersByIds(
@@ -205,6 +210,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/unlock/by-query")
     @Operation(tags = {"Triggers"}, summary = "Unlock triggers by query parameters")
     public MutableHttpResponse<?> unlockTriggersByQuery(
@@ -248,6 +254,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Get(uri = "/{namespace}/{flowId}")
     @Operation(tags = {"Triggers"}, summary = "Get all triggers for a flow")
     public PagedResults<Trigger> searchTriggersForFlow(
@@ -269,6 +276,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Put
     @Operation(tags = {"Triggers"}, summary = "Update a trigger")
     public HttpResponse<Trigger> updateTrigger(
@@ -307,6 +315,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/{namespace}/{flowId}/{triggerId}/restart")
     @Operation(tags = {"Triggers"}, summary = "Restart a trigger")
     public HttpResponse<?> restartTrigger(
@@ -348,6 +357,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Put(uri = "/backfill/pause")
     @Operation(tags = {"Triggers"}, summary = "Pause a backfill")
     public HttpResponse<Trigger> pauseBackfill(
@@ -358,6 +368,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/backfill/pause/by-triggers")
     @Operation(tags = {"Triggers"}, summary = "Pause backfill for given triggers")
     public MutableHttpResponse<?> pauseBackfillByIds(
@@ -369,6 +380,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/backfill/pause/by-query")
     @Operation(tags = {"Triggers"}, summary = "Pause backfill for given triggers")
     public MutableHttpResponse<?> pauseBackfillByQuery(
@@ -388,6 +400,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Put(uri = "/backfill/unpause")
     @Operation(tags = {"Triggers"}, summary = "Unpause a backfill")
     public HttpResponse<Trigger> unpauseBackfill(
@@ -397,6 +410,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/backfill/unpause/by-triggers")
     @Operation(tags = {"Triggers"}, summary = "Unpause backfill for given triggers")
     public MutableHttpResponse<?> unpauseBackfillByIds(
@@ -408,6 +422,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/backfill/unpause/by-query")
     @Operation(tags = {"Triggers"}, summary = "Unpause backfill for given triggers")
     public MutableHttpResponse<?> unpauseBackfillByQuery(
@@ -441,6 +456,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/backfill/delete")
     @Operation(tags = {"Triggers"}, summary = "Delete a backfill")
     public HttpResponse<Trigger> deleteBackfill(
@@ -465,6 +481,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/backfill/delete/by-triggers")
     @Operation(tags = {"Triggers"}, summary = "Delete backfill for given triggers")
     public MutableHttpResponse<?> deleteBackfillByIds(
@@ -477,6 +494,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/backfill/delete/by-query")
     @Operation(tags = {"Triggers"}, summary = "Delete backfill for given triggers")
     public MutableHttpResponse<?> deleteBackfillByQuery(
@@ -510,6 +528,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Delete(uri = "/{namespace}/{flowId}/{triggerId}")
     @Operation(tags = {"Triggers"}, summary = "Delete a trigger")
     public MutableHttpResponse<?> deleteTrigger(
@@ -535,6 +554,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Delete(uri = "/delete/by-triggers")
     @Operation(tags = {"Triggers"}, summary = "Delete given triggers")
     public MutableHttpResponse<?> deleteTriggersByIds(
@@ -562,6 +582,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Delete(uri = "/delete/by-query")
     @Operation(tags = {"Triggers"}, summary = "Delete triggers by query parameters")
     public MutableHttpResponse<?> deleteTriggersByQuery(
@@ -584,6 +605,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/set-disabled/by-triggers")
     @Operation(tags = {"Triggers"}, summary = "Disable/enable given triggers")
     public MutableHttpResponse<?> disabledTriggersByIds(
@@ -595,6 +617,7 @@ public class TriggerController {
     }
 
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Post(uri = "/set-disabled/by-query")
     @Operation(tags = {"Triggers"}, summary = "Disable/enable triggers by query parameters")
     public MutableHttpResponse<?> disabledTriggersByQuery(
@@ -632,6 +655,7 @@ public class TriggerController {
         return HttpResponse.ok(BulkResponse.builder().count(count).build());
     }
 
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     @Get(uri = "/export/by-query/csv", produces = MediaType.TEXT_CSV)
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = {"Triggers"}, summary = "Export all triggers as a streamed CSV file")

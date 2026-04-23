@@ -4,7 +4,9 @@ import io.kestra.core.models.QueryFilter;
 import io.kestra.core.repositories.ArrayListTotal;
 import io.kestra.core.secret.SecretService;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.converters.QueryFilterFormat;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.models.api.secret.ApiSecretListResponse;
 import io.kestra.webserver.models.api.secret.ApiSecretMeta;
 import io.kestra.webserver.utils.PageableUtils;
@@ -42,6 +44,7 @@ public class SecretController<META extends ApiSecretMeta> {
 
     @Get
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SECRETS_VIEW)
     @Operation(tags = {"Secrets"}, summary = "Search secrets of all namespaces")
     public HttpResponse<ApiSecretListResponse<META>> listSecrets(
         @Parameter(description = "The current page") @QueryValue(value = "page", defaultValue = "1") int page,

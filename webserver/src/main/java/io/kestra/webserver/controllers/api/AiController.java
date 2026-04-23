@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import io.kestra.core.exceptions.AiException;
 import io.kestra.core.models.flows.Flow;
 import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.models.ai.FlowGenerationPrompt;
 import io.kestra.webserver.services.ai.AiServiceInterface;
 import io.kestra.webserver.services.ai.FlowAiCopilot;
@@ -33,6 +35,7 @@ public class AiController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/generate/flow", produces = "application/yaml")
+    @RequirePermission(Permission.FLOWS_CREATE)
     @Operation(tags = {"AI"}, summary = "Generate or regenerate a flow based on a prompt")
     public String generateFlow(
         @RequestBody(description = "Prompt and context required for flow generation") @Body FlowGenerationPrompt flowGenerationPrompt,

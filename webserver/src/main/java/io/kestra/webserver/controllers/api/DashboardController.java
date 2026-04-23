@@ -19,6 +19,8 @@ import io.kestra.core.tenant.TenantService;
 import io.kestra.plugin.core.dashboard.chart.Markdown;
 import io.kestra.plugin.core.dashboard.chart.Table;
 import io.kestra.plugin.core.dashboard.chart.mardown.sources.FlowDescription;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.models.ChartFiltersOverrides;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.CSVUtils;
@@ -75,6 +77,7 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get
+    @RequirePermission(Permission.DASHBOARDS_VIEW)
     @Operation(tags = {"Dashboards"}, summary = "Search for dashboards")
     public PagedResults<Dashboard> searchDashboards(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
@@ -87,6 +90,7 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{id}")
+    @RequirePermission(Permission.DASHBOARDS_VIEW)
     @Operation(tags = {"Dashboards"}, summary = "Get a dashboard")
     public Dashboard getDashboard(
         @Parameter(description = "The dashboard id") @PathVariable String id
@@ -101,6 +105,7 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(consumes = MediaType.APPLICATION_YAML)
+    @RequirePermission(Permission.DASHBOARDS_CREATE)
     @Operation(tags = {"Dashboards"}, summary = "Create a dashboard from yaml source")
     public HttpResponse<Dashboard> createDashboard(
         @RequestBody(description = "The dashboard definition as YAML") @Body String dashboard
@@ -128,6 +133,7 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "validate", consumes = MediaType.APPLICATION_YAML)
+    @RequirePermission(Permission.DASHBOARDS_CREATE)
     @Operation(tags = {"Dashboards"}, summary = "Validate dashboard from yaml source")
     public ValidateConstraintViolation validateDashboard(
         @RequestBody(description = "The dashboard definition as YAML") @Body String dashboard
@@ -154,6 +160,7 @@ public class DashboardController {
 
     @Put(uri = "{id}", consumes = MediaType.APPLICATION_YAML)
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.DASHBOARDS_EDIT)
     @Operation(tags = {"Dashboards"}, summary = "Update a dashboard")
     public HttpResponse<Dashboard> updateDashboard(
         @Parameter(description = "The dashboard id") @PathVariable String id,
@@ -190,6 +197,7 @@ public class DashboardController {
 
     @Delete(uri = "{id}")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.DASHBOARDS_DELETE)
     @Operation(tags = {"Dashboards"}, summary = "Delete a dashboard")
     public HttpResponse<Void> deleteDashboard(
         @Parameter(description = "The dashboard id") @PathVariable String id
@@ -203,6 +211,7 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "{id}/charts/{chartId}")
+    @RequirePermission(Permission.DASHBOARDS_VIEW)
     @Operation(tags = {"Dashboards"}, summary = "Generate a dashboard chart data")
     public PagedResults<Map<String, Object>> getDashboardChartData(
         @Parameter(description = "The dashboard id") @PathVariable String id,
@@ -257,6 +266,7 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "charts/preview")
+    @RequirePermission(Permission.DASHBOARDS_VIEW)
     @Operation(tags = {"Dashboards"}, summary = "Preview a chart data")
     public PagedResults<Map<String, Object>> previewChart(
         @Parameter(description = "The chart") @Body @Valid PreviewRequest previewRequest
@@ -342,6 +352,7 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "validate/chart", consumes = MediaType.APPLICATION_YAML)
+    @RequirePermission(Permission.DASHBOARDS_EDIT)
     @Operation(tags = {"Dashboards"}, summary = "Validate a chart from yaml source")
     public ValidateConstraintViolation validateChart(
         @RequestBody(description = "The chart definition as YAML") @Body String chart
@@ -368,6 +379,7 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "{id}/charts/{chartId}/export/to-csv", produces = MediaType.APPLICATION_OCTET_STREAM)
+    @RequirePermission(Permission.DASHBOARDS_VIEW)
     @Operation(tags = {"Dashboards"}, summary = "Export a dashboard chart data to CSV")
     public HttpResponse<byte[]> exportDashboardChartDataToCSV(
         @Parameter(description = "The dashboard id") @PathVariable String id,
@@ -393,6 +405,7 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "charts/export/to-csv", produces = MediaType.APPLICATION_OCTET_STREAM)
+    @RequirePermission(Permission.DASHBOARDS_VIEW)
     @Operation(tags = {"Dashboards"}, summary = "Export a table chart data to CSV")
     public HttpResponse<byte[]> exportChartToCsv(
         @Parameter(description = "The chart") @Body @Valid PreviewRequest previewRequest
