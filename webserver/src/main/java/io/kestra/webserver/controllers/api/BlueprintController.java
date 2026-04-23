@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.kestra.core.utils.Enums;
 import io.kestra.core.utils.VersionProvider;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.PagedResults;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Nullable;
@@ -45,6 +47,7 @@ public class BlueprintController {
     @SuppressWarnings("unchecked")
     @ExecuteOn(TaskExecutors.IO)
     @Get("/{kind}")
+    @RequirePermission(Permission.FLOWS_VIEW)
     @Operation(tags = {"Blueprints"}, summary = "List all blueprints")
     public PagedResults<ApiBlueprintItem> searchBlueprints(
         @Parameter(description = "A string filter") @Nullable @QueryValue(value = "q") Optional<String> q,
@@ -60,6 +63,7 @@ public class BlueprintController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(value = "/{kind}/{id}/source", produces = "application/yaml")
+    @RequirePermission(Permission.FLOWS_VIEW)
     @Operation(tags = {"Blueprints"}, summary = "Get a blueprint flow")
     public String getBlueprintSource(
         @Parameter(description = "The blueprint id") String id,
@@ -71,6 +75,7 @@ public class BlueprintController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(value = "/{kind}/{id}/graph")
+    @RequirePermission(Permission.FLOWS_VIEW)
     @Operation(tags = {"Blueprints"}, summary = "Get a blueprint graph")
     public Map<String, Object> getBlueprintGraph(
         @Parameter(description = "The blueprint id") String id,
@@ -82,6 +87,7 @@ public class BlueprintController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(value = "/{kind}/{id}")
+    @RequirePermission(Permission.FLOWS_VIEW)
     @Operation(tags = {"Blueprints"}, summary = "Get a blueprint")
     public ApiBlueprintItemWithSource getBlueprint(
         @Parameter(description = "The blueprint id") String id,
@@ -94,6 +100,7 @@ public class BlueprintController {
     @SuppressWarnings("unchecked")
     @ExecuteOn(TaskExecutors.IO)
     @Get("/{kind}/tags")
+    @RequirePermission(Permission.FLOWS_VIEW)
     @Operation(tags = {"Blueprint Tags"}, summary = "List blueprint tags matching the filter")
     public List<ApiBlueprintTagItem> listBlueprintTags(
         @Parameter(description = "The blueprint kind") Kind kind,

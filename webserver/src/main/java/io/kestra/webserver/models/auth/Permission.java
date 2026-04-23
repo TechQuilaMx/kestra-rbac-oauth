@@ -39,6 +39,12 @@ public enum Permission {
     SECRETS_CREATE("secrets.create"),
     SECRETS_EDIT("secrets.edit"),
     SECRETS_DELETE("secrets.delete"),
+
+    // Dashboard permissions
+    DASHBOARDS_VIEW("dashboards.view"),
+    DASHBOARDS_CREATE("dashboards.create"),
+    DASHBOARDS_EDIT("dashboards.edit"),
+    DASHBOARDS_DELETE("dashboards.delete"),
     
     // Admin permissions
     ADMIN_ACCESS("admin.access"),

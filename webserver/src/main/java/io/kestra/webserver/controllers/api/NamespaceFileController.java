@@ -9,6 +9,8 @@ import io.kestra.core.repositories.NamespaceFileMetadataRepositoryInterface;
 import io.kestra.core.services.FlowService;
 import io.kestra.core.storages.*;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.Pageable;
 import io.micronaut.http.HttpHeaders;
@@ -66,6 +68,7 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files/search")
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     @Operation(tags = {"Files"}, summary = "Find files which path contain the given string in their URI")
     public List<String> searchNamespaceFiles(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
@@ -76,6 +79,7 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files", produces = MediaType.APPLICATION_OCTET_STREAM)
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     @Operation(tags = {"Files"}, summary = "Get namespace file content")
     public HttpResponse<StreamedFile> getFileContent(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
@@ -96,6 +100,7 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files/stats")
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     @Operation(tags = {"Files"}, summary = "Get namespace file stats such as size, creation & modification dates and type")
     public FileAttributes getFileMetadatas(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
@@ -122,6 +127,7 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files/revisions")
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     @Operation(tags = {"Files"}, summary = "Get namespace file revisions")
     public List<NamespaceFileRevision> getFileRevisions(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
@@ -152,6 +158,7 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files/directory")
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     @Operation(tags = {"Files"}, summary = "List directory content")
     public List<FileAttributes> listNamespaceDirectoryFiles(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
@@ -180,6 +187,7 @@ public class NamespaceFileController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "{namespace}/files/directory")
     @Operation(tags = {"Files"}, summary = "Create a directory")
+    @RequirePermission(Permission.NAMESPACES_CREATE)
     public void createNamespaceDirectory(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path
@@ -197,6 +205,7 @@ public class NamespaceFileController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "{namespace}/files", consumes = MediaType.MULTIPART_FORM_DATA)
     @Operation(tags = {"Files"}, summary = "Create a file")
+    @RequirePermission(Permission.NAMESPACES_CREATE)
     public void createNamespaceFile(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @Parameter(description = "The internal storage uri") @QueryValue String path,
@@ -260,6 +269,7 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files/export", produces = MediaType.APPLICATION_OCTET_STREAM)
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     @Operation(tags = {"Files"}, summary = "Export namespace files as a ZIP")
     public HttpResponse<byte[]> exportNamespaceFiles(
         @Parameter(description = "The namespace id") @PathVariable String namespace
@@ -301,6 +311,7 @@ public class NamespaceFileController {
     @ExecuteOn(TaskExecutors.IO)
     @Put(uri = "{namespace}/files")
     @Operation(tags = {"Files"}, summary = "Move a file or directory")
+    @RequirePermission(Permission.NAMESPACES_EDIT)
     public void moveFileDirectory(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @Parameter(description = "The internal storage uri to move from") @QueryValue URI from,
@@ -322,6 +333,7 @@ public class NamespaceFileController {
     @ExecuteOn(TaskExecutors.IO)
     @Delete(uri = "{namespace}/files")
     @Operation(tags = {"Files"}, summary = "Delete a file or directory")
+    @RequirePermission(Permission.NAMESPACES_DELETE)
     public void deleteFileDirectory(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @Parameter(description = "The internal storage uri of the file / directory to delete") @QueryValue String path

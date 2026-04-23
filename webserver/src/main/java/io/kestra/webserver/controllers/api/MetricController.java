@@ -6,6 +6,8 @@ import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.MetricRepositoryInterface;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.PageableUtils;
 import io.micronaut.context.annotation.Requires;
@@ -45,6 +47,7 @@ public class MetricController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{executionId}")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Operation(tags = {"Metrics"}, summary = "Get metrics for a specific execution")
     public PagedResults<MetricEntry> searchByExecution(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
@@ -66,6 +69,7 @@ public class MetricController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/names/{namespace}/{flowId}")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Operation(tags = {"Metrics"}, summary = "Get metrics names for a specific flow")
     public List<String> listFlowMetrics(
         @Parameter(description = "The namespace") @PathVariable String namespace,
@@ -76,6 +80,7 @@ public class MetricController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/names/{namespace}/{flowId}/{taskId}")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Operation(tags = {"Metrics"}, summary = "Get metrics names for a specific task in a flow")
     public List<String> listTaskMetrics(
         @Parameter(description = "The namespace") @PathVariable String namespace,
@@ -87,6 +92,7 @@ public class MetricController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/tasks/{namespace}/{flowId}")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Operation(tags = {"Metrics"}, summary = "Get tasks id that have metrics for a specific flow, include deleted or renamed tasks")
     public List<String> listTasksWithMetrics(
         @Parameter(description = "The namespace") @PathVariable String namespace,
@@ -97,6 +103,7 @@ public class MetricController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/aggregates/{namespace}/{flowId}/{metric}")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Operation(tags = {"Metrics"}, summary = "Get metrics aggregations for a specific flow")
     public MetricAggregations aggregateMetricsFromFlow(
         @Parameter(description = "The namespace") @PathVariable String namespace,
@@ -122,6 +129,7 @@ public class MetricController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/aggregates/{namespace}/{flowId}/{taskId}/{metric}")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     @Operation(tags = {"Metrics"}, summary = "Get metrics aggregations for a specific flow")
     public MetricAggregations aggregateMetricsFromTask(
         @Parameter(description = "The namespace") @PathVariable String namespace,

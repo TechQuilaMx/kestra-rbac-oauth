@@ -11,7 +11,9 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.storages.kv.*;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.NamespaceUtils;
+import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.converters.QueryFilterFormat;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.PageableUtils;
 import io.micronaut.core.annotation.Introspected;
@@ -54,6 +56,7 @@ public class KVController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get("/kv")
+    @RequirePermission(Permission.KV_VIEW)
     @Operation(tags = {"KV"}, summary = "List all keys")
     public PagedResults<KVEntry> listAllKeys(
         @Parameter(description = "The current page") @QueryValue(value = "page", defaultValue = "1") int page,
@@ -66,6 +69,7 @@ public class KVController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get("/namespaces/{namespace}/kv")
+    @RequirePermission(Permission.KV_VIEW)
     @Operation(tags = {"KV"}, summary = "List all keys for a namespace")
     @Deprecated
     public List<KVEntry> listKeys(
@@ -76,6 +80,7 @@ public class KVController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get("/namespaces/{namespace}/kv/inheritance")
+    @RequirePermission(Permission.KV_VIEW)
     @Operation(tags = {"KV"}, summary = "List all keys for inherited namespaces")
     public List<KVEntry> listKeysWithInheritence(
         @Parameter(description = "The namespace id") @PathVariable String namespace
@@ -106,6 +111,7 @@ public class KVController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/namespaces/{namespace}/kv/{key}")
+    @RequirePermission(Permission.KV_VIEW)
     @Operation(tags = {"KV"}, summary = "Get value for a key")
     public TypedValue getKeyValue(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
@@ -124,6 +130,7 @@ public class KVController {
     @ExecuteOn(TaskExecutors.IO)
     @Put(uri = "/namespaces/{namespace}/kv/{key}", consumes = {MediaType.TEXT_PLAIN})
     @Operation(tags = {"KV"}, summary = "Puts a key-value pair in store")
+    @RequirePermission({Permission.KV_CREATE, Permission.KV_EDIT})
     public void setKeyValue(
         HttpHeaders httpHeaders,
         @Parameter(description = "The namespace id") @PathVariable String namespace,
@@ -145,6 +152,7 @@ public class KVController {
     @ExecuteOn(TaskExecutors.IO)
     @Delete(uri = "/namespaces/{namespace}/kv/{key}")
     @Operation(tags = {"KV"}, summary = "Delete a key-value pair")
+    @RequirePermission(Permission.KV_DELETE)
     public boolean deleteKeyValue(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @Parameter(description = "The key") @PathVariable String key
@@ -155,6 +163,7 @@ public class KVController {
     @ExecuteOn(TaskExecutors.IO)
     @Delete("/namespaces/{namespace}/kv")
     @Operation(tags = {"KV"}, summary = "Bulk-delete multiple key/value pairs from the given namespace.")
+    @RequirePermission(Permission.KV_DELETE)
     public HttpResponse<ApiDeleteBulkResponse> deleteKeyValues(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @RequestBody(description = "The keys") @Body ApiDeleteBulkRequest request

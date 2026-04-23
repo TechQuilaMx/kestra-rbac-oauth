@@ -14,7 +14,9 @@ import io.kestra.core.services.InstanceService;
 import io.kestra.core.utils.EditionProvider;
 import io.kestra.core.utils.NamespaceUtils;
 import io.kestra.core.utils.VersionProvider;
+import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.configurations.OAuth2Configuration;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.services.BasicAuthCredentials;
 import io.kestra.webserver.services.BasicAuthService;
 import io.kestra.webserver.services.OAuth2Service;
@@ -118,6 +120,7 @@ private String chartDefaultDuration;
 
     @Get("/configs")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = {"Misc"}, summary = "Retrieve the instance configuration.", description = "Global endpoint available to all users.")
     public Configuration getConfiguration() throws JsonProcessingException { // JsonProcessingException might be thrown in EE
         Configuration.ConfigurationBuilder<?, ?> builder = Configuration
@@ -176,6 +179,7 @@ private String chartDefaultDuration;
 
     @Get("/{tenant}/usages/all")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = {"Misc"}, summary = "Retrieve instance usage information")
     public ApiUsage getUsages() {
         ZonedDateTime now = ZonedDateTime.now();
@@ -189,6 +193,7 @@ private String chartDefaultDuration;
     @Post(uri = "/{tenant}/basicAuth")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = {"Misc"}, summary = "Configure basic authentication for the instance.", description = "Sets up basic authentication credentials.")
+    @RequirePermission(Permission.SETTINGS_EDIT)
     public HttpResponse<Void> createBasicAuth(
         @RequestBody @Body BasicAuthCredentials basicAuthCredentials
     ) {
@@ -202,6 +207,7 @@ private String chartDefaultDuration;
 
     @Get("/basicAuthValidationErrors")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = {"Misc"}, summary = "Retrieve the instance configuration.", description = "Global endpoint available to all users.")
     public List<String> getBasicAuthConfigErrors() {
         return basicAuthService
