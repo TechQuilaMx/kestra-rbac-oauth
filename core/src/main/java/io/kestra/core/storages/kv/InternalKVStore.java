@@ -9,9 +9,7 @@ import io.kestra.core.repositories.KvMetadataRepositoryInterface;
 import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.storages.StorageObject;
-import io.kestra.core.utils.ListUtils;
 import io.micronaut.data.model.Pageable;
-import io.micronaut.data.model.Sort;
 import jakarta.annotation.Nullable;
 import lombok.extern.slf4j.Slf4j;
 
@@ -22,10 +20,11 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
-import java.util.function.Function;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.kestra.core.utils.Rethrow.throwFunction;
@@ -48,8 +47,8 @@ public class InternalKVStore implements KVStore {
      * Creates a new {@link InternalKVStore} instance.
      *
      * @param namespace The namespace
-     * @param tenant    The tenant.
-     * @param storage   The storage.
+     * @param tenant The tenant.
+     * @param storage The storage.
      */
     public InternalKVStore(@Nullable final String tenant, @Nullable final String namespace, final StorageInterface storage, final KvMetadataRepositoryInterface kvMetadataRepository) {
         this.namespace = namespace;
@@ -74,25 +73,62 @@ public class InternalKVStore implements KVStore {
         KVStore.validateKey(key);
 
         if (!overwrite && exists(key)) {
-            throw new KVStoreException(String.format(
-                "Cannot set value for key '%s'. Key already exists and `overwrite` is set to `false`.", key));
+            throw new KVStoreException(
+                String.format(
+                    "Cannot set value for key '%s'. Key already exists and `overwrite` is set to `false`.", key
+                )
+            );
         }
 
         Object actualValue = value.value();
         byte[] serialized = actualValue instanceof Duration ? actualValue.toString().getBytes(StandardCharsets.UTF_8) : JacksonMapper.ofIon().writeValueAsBytes(actualValue);
 
-        PersistedKvMetadata saved = this.kvMetadataRepository.save(PersistedKvMetadata.builder()
-            .tenantId(this.tenant)
-            .namespace(this.namespace)
-            .name(key)
-            .description(Optional.ofNullable(value.metadata()).map(KVMetadata::getDescription).orElse(null))
-            .expirationDate(Optional.ofNullable(value.metadata()).map(KVMetadata::getExpirationDate).orElse(null))
-            .deleted(false)
-            .build());
-        this.storage.put(this.tenant, this.namespace, this.storageUri(key, saved.getVersion()), new StorageObject(
-            value.metadataAsMap(),
-            new ByteArrayInputStream(serialized)
-        ));
+        PersistedKvMetadata saved = this.kvMetadataRepository.save(
+            PersistedKvMetadata.builder()
+                .tenantId(this.tenant)
+                .namespace(this.namespace)
+                .name(key)
+                .description(Optional.ofNullable(value.metadata()).map(KVMetadata::getDescription).orElse(null))
+                .expirationDate(Optional.ofNullable(value.metadata()).map(KVMetadata::getExpirationDate).orElse(null))
+                .deleted(false)
+                .build()
+        );
+        this.storage.put(
+            this.tenant, this.namespace, this.storageUri(key, saved.getVersion()), new StorageObject(
+                value.metadataAsMap(),
+                new ByteArrayInputStream(serialized)
+            )
+        );
+    }
+
+    /**
+     * Puts a KV entry using an already-serialized (raw) value, bypassing ION serialization.
+     * This is intended for backup/restore where the value is already in its stored ION format.
+     *
+     * @param key      The key.
+     * @param metadata The metadata (nullable).
+     * @param rawValue The raw ION-serialized value bytes.
+     */
+    public void putRaw(String key, @Nullable KVMetadata metadata, byte[] rawValue) throws IOException {
+        KVStore.validateKey(key);
+
+        PersistedKvMetadata saved = this.kvMetadataRepository.save(
+            PersistedKvMetadata.builder()
+                .tenantId(this.tenant)
+                .namespace(this.namespace)
+                .name(key)
+                .description(Optional.ofNullable(metadata).map(KVMetadata::getDescription).orElse(null))
+                .expirationDate(Optional.ofNullable(metadata).map(KVMetadata::getExpirationDate).orElse(null))
+                .deleted(false)
+                .build()
+        );
+        KVValueAndMetadata wrapper = new KVValueAndMetadata(metadata, null);
+        this.storage.put(
+            this.tenant, this.namespace, this.storageUri(key, saved.getVersion()), new StorageObject(
+                wrapper.metadataAsMap(),
+                new ByteArrayInputStream(rawValue)
+            )
+        );
     }
 
     /**
@@ -100,7 +136,8 @@ public class InternalKVStore implements KVStore {
      */
     @Override
     public Optional<KVValue> getValue(String key) throws IOException, ResourceExpiredException {
-        return this.getRawValue(key).map(throwFunction(raw -> {
+        return this.getRawValue(key).map(throwFunction(raw ->
+        {
             Object value = JacksonMapper.ofIon().readValue(raw, Object.class);
             if (value instanceof String valueStr && DURATION_PATTERN.matcher(valueStr).matches()) {
                 return new KVValue(Duration.parse(valueStr));
@@ -204,9 +241,9 @@ public class InternalKVStore implements KVStore {
         Integer purgedMetadataCount = this.kvMetadataRepository.purge(kvEntries.stream().map(kv -> PersistedKvMetadata.from(tenant, kv)).toList());
 
         long actualDeletedEntries = kvEntries.stream()
-            .map(KVEntry::key)
-            .map(this::storageUri)
-            .map(throwFunction(uri -> {
+            .map(entry -> this.storageUri(entry.key(), entry.version()))
+            .map(throwFunction(uri ->
+            {
                 boolean deleted = this.storage.delete(tenant, namespace, uri);
                 URI metadataURI = URI.create(uri.getPath() + ".metadata");
                 if (this.storage.exists(this.tenant, this.namespace, metadataURI)) {

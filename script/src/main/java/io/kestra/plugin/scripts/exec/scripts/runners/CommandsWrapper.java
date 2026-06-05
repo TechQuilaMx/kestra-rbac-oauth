@@ -1,32 +1,32 @@
 package io.kestra.plugin.scripts.exec.scripts.runners;
 
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.RunnableTaskException;
-import io.kestra.core.models.tasks.runners.DefaultLogConsumer;
-import io.kestra.core.models.tasks.runners.*;
-import io.kestra.core.runners.DefaultRunContext;
-import io.kestra.core.runners.RunContextInitializer;
-import io.kestra.core.utils.NamespaceFilesUtils;
-import io.kestra.plugin.core.runner.Process;
-import io.kestra.core.models.tasks.NamespaceFiles;
-import io.kestra.core.runners.FilesService;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.utils.IdUtils;
-import io.kestra.plugin.scripts.exec.scripts.models.DockerOptions;
-import io.kestra.plugin.scripts.exec.scripts.models.RunnerType;
-import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
-import io.kestra.plugin.scripts.runner.docker.Docker;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.With;
-import org.apache.commons.lang3.SystemUtils;
-
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
+
+import org.apache.commons.lang3.SystemUtils;
+
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.NamespaceFiles;
+import io.kestra.core.models.tasks.RunnableTaskException;
+import io.kestra.core.models.tasks.runners.*;
+import io.kestra.core.models.tasks.runners.DefaultLogConsumer;
+import io.kestra.core.runners.FilesService;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.utils.IdUtils;
+import io.kestra.core.utils.NamespaceFilesUtils;
+import io.kestra.plugin.core.runner.Process;
+import io.kestra.plugin.scripts.exec.scripts.models.DockerOptions;
+import io.kestra.plugin.scripts.exec.scripts.models.RunnerType;
+import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
+import io.kestra.plugin.scripts.runner.docker.Docker;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.With;
 
 import static io.kestra.core.utils.Rethrow.throwFunction;
 
@@ -153,8 +153,25 @@ public class CommandsWrapper implements TaskCommands {
         }
 
         TaskRunner<T> realTaskRunner = this.getTaskRunner();
+        // Inject non-glob outputFiles into the Pebble render context as a name→path map before any rendering.
+        // This makes {{ outputFiles["name"] }} resolvable in scripts, consistent with JDBC tasks.
+        // Glob patterns are skipped here — they cannot resolve to a single path; post-run collection still handles them.
+        Map<String, Object> runnerVars = realTaskRunner.additionalVars(runContext, this);
+        if (this.outputFiles != null && !this.outputFiles.isEmpty()) {
+            String workingDir = String.valueOf(runnerVars.getOrDefault(ScriptService.VAR_WORKING_DIR, this.workingDirectory));
+            Map<String, String> outputFilesMap = new LinkedHashMap<>();
+            for (String name : this.outputFiles) {
+                if (!name.contains("*") && !name.contains("?") && !name.contains("[")) {
+                    outputFilesMap.put(name, workingDir + "/" + name);
+                }
+            }
+            if (!outputFilesMap.isEmpty()) {
+                runnerVars.put("outputFiles", outputFilesMap);
+            }
+        }
+
         if (this.inputFiles != null) {
-            FilesService.inputFiles(runContext, realTaskRunner.additionalVars(runContext, this), this.inputFiles);
+            FilesService.inputFiles(runContext, runnerVars, this.inputFiles);
         }
 
         RunContext taskRunnerRunContext = runContext.cloneForPlugin(realTaskRunner);
@@ -163,11 +180,10 @@ public class CommandsWrapper implements TaskCommands {
         List<String> renderedBeforeCommands = this.renderCommands(runContext, beforeCommands);
         List<String> renderedInterpreter = this.renderCommands(runContext, interpreter);
 
-        List<String> finalCommands = renderedBeforeCommands.isEmpty() && renderedInterpreter.isEmpty() ?
-            renderedCommands :
-            ScriptService.scriptCommands(
+        List<String> finalCommands = renderedBeforeCommands.isEmpty() && renderedInterpreter.isEmpty() ? renderedCommands
+            : ScriptService.scriptCommands(
                 renderedInterpreter,
-                this.isBeforeCommandsWithOptions() ? getBeforeCommandsWithOptions(renderedBeforeCommands) :  renderedBeforeCommands,
+                this.isBeforeCommandsWithOptions() ? getBeforeCommandsWithOptions(renderedBeforeCommands) : renderedBeforeCommands,
                 renderedCommands,
                 Optional.ofNullable(targetOS).orElse(TargetOS.AUTO)
             );
@@ -266,7 +282,21 @@ public class CommandsWrapper implements TaskCommands {
             return null;
         }
 
-        return runContext.render(command).as(String.class, taskRunner.additionalVars(runContext, this))
+        Map<String, Object> additionalVars = taskRunner.additionalVars(runContext, this);
+        if (this.outputFiles != null && !this.outputFiles.isEmpty()) {
+            String workingDir = String.valueOf(additionalVars.getOrDefault(ScriptService.VAR_WORKING_DIR, this.workingDirectory));
+            Map<String, String> outputFilesMap = new LinkedHashMap<>();
+            for (String name : this.outputFiles) {
+                if (!name.contains("*") && !name.contains("?") && !name.contains("[")) {
+                    outputFilesMap.put(name, workingDir + "/" + name);
+                }
+            }
+            if (!outputFilesMap.isEmpty()) {
+                additionalVars.put("outputFiles", outputFilesMap);
+            }
+        }
+
+        return runContext.render(command).as(String.class, additionalVars)
             .map(throwFunction(c -> ScriptService.replaceInternalStorage(runContext, c, taskRunner instanceof RemoteRunnerInterface)))
             .orElse(null);
     }
@@ -300,8 +330,10 @@ public class CommandsWrapper implements TaskCommands {
         TargetOS os = this.getTargetOS();
 
         // If targetOS is Windows OR targetOS is AUTO && current system is windows and we use process as a runner.(TLDR will run on windows)
-        if (os == TargetOS.WINDOWS ||
-            (os == TargetOS.AUTO && SystemUtils.IS_OS_WINDOWS && this.getTaskRunner() instanceof Process)) {
+        if (
+            os == TargetOS.WINDOWS ||
+                (os == TargetOS.AUTO && SystemUtils.IS_OS_WINDOWS && this.getTaskRunner() instanceof Process)
+        ) {
             return List.of("");
         }
         // errexit option may be unsupported by non-shell interpreter.

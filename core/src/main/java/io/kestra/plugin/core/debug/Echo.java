@@ -1,17 +1,19 @@
 package io.kestra.plugin.core.debug;
 
-import io.kestra.core.models.property.Property;
-import io.kestra.plugin.core.log.Log;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
+import org.slf4j.event.Level;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.VoidOutput;
 import io.kestra.core.runners.RunContext;
-import org.slf4j.event.Level;
+import io.kestra.plugin.core.log.Log;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 /**
  * @deprecated
@@ -22,8 +24,11 @@ import org.slf4j.event.Level;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Log a message in the task logs (Deprecated).",
-    description = "This task is deprecated, please use the `io.kestra.plugin.core.log.Log` task instead.",
+    title = "Log a templated message (deprecated).",
+    description = """
+        Renders a string and writes it to the task log at the chosen level.
+
+        This task is deprecated; use `io.kestra.plugin.core.log.Log`, which supports multiple messages and richer options. Keep in mind the `level` here only controls the emitted log entry, not the flow-level `logLevel` filter.""",
     deprecated = true
 )
 @Plugin(

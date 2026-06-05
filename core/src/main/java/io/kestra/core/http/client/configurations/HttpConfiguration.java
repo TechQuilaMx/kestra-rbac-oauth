@@ -1,7 +1,14 @@
 package io.kestra.core.http.client.configurations;
 
+import java.net.Proxy;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.List;
+
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
+
 import io.micronaut.logging.LogLevel;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -9,10 +16,8 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.jackson.Jacksonized;
 
-import java.net.Proxy;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.List;
 
 @Builder(toBuilder = true)
@@ -27,7 +32,7 @@ public class HttpConfiguration {
     @PluginProperty
     private ProxyConfiguration proxy;
 
-    @Schema(title = "The authentification to use.")
+    @Schema(title = "The authentication to use.")
     private AbstractAuthConfiguration auth;
 
     @Setter
@@ -46,6 +51,13 @@ public class HttpConfiguration {
     @Setter
     @Schema(title = "List of response code allowed for this request")
     private Property<List<Integer>> allowedResponseCodes;
+
+    @Schema(
+        title = "Whether to enable TCP Keep-Alive extended socket options (TCP_KEEPIDLE, TCP_KEEPINTERVAL, TCP_KEEPCOUNT).",
+        description = "Set to `false` when running on Windows workers, as these extended socket options are not supported by the Windows JDK and will cause connection failures."
+    )
+    @Builder.Default
+    private Property<Boolean> enabledTcpExtendedKeepAlive = Property.ofValue(true);
 
     @Schema(title = "The default charset for the request.")
     @Builder.Default
@@ -91,13 +103,17 @@ public class HttpConfiguration {
     @Deprecated
     private final String proxyPassword;
 
-    @Schema(title = "The username for HTTP basic authentication. " +
-        "Deprecated, use `auth` property with a `BasicAuthConfiguration` instance instead.")
+    @Schema(
+        title = "The username for HTTP basic authentication. " +
+            "Deprecated, use `auth` property with a `BasicAuthConfiguration` instance instead."
+    )
     @Deprecated
     private final String basicAuthUser;
 
-    @Schema(title = "The password for HTTP basic authentication. " +
-        "Deprecated, use `auth` property with a `BasicAuthConfiguration` instance instead.")
+    @Schema(
+        title = "The password for HTTP basic authentication. " +
+            "Deprecated, use `auth` property with a `BasicAuthConfiguration` instance instead."
+    )
     @Deprecated
     private final String basicAuthPassword;
 
@@ -147,7 +163,6 @@ public class HttpConfiguration {
 
             return this;
         }
-
 
         @Deprecated
         public HttpConfigurationBuilder proxyType(Proxy.Type proxyType) {
@@ -219,7 +234,6 @@ public class HttpConfiguration {
             return this;
         }
 
-
         @SuppressWarnings("DeprecatedIsStillUsed")
         @Deprecated
         public HttpConfigurationBuilder basicAuthUser(String basicAuthUser) {
@@ -253,19 +267,19 @@ public class HttpConfiguration {
         @Deprecated
         public HttpConfigurationBuilder logLevel(LogLevel logLevel) {
             if (logLevel == LogLevel.TRACE) {
-                this.logs = new LoggingType[]{
+                this.logs = new LoggingType[] {
                     LoggingType.REQUEST_HEADERS,
                     LoggingType.REQUEST_BODY,
                     LoggingType.RESPONSE_HEADERS,
                     LoggingType.RESPONSE_BODY
                 };
             } else if (logLevel == LogLevel.DEBUG) {
-                this.logs = new LoggingType[]{
+                this.logs = new LoggingType[] {
                     LoggingType.REQUEST_HEADERS,
                     LoggingType.RESPONSE_HEADERS,
                 };
             } else if (logLevel == LogLevel.INFO) {
-                this.logs = new LoggingType[]{
+                this.logs = new LoggingType[] {
                     LoggingType.RESPONSE_HEADERS,
                 };
             }

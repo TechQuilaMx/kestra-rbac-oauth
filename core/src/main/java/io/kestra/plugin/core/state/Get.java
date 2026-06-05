@@ -1,16 +1,17 @@
 package io.kestra.plugin.core.state;
 
+import java.io.FileNotFoundException;
+import java.util.Map;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.io.FileNotFoundException;
-import java.util.Map;
 
 @SuperBuilder
 @ToString
@@ -18,7 +19,9 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Get a state from the state store (Deprecated, use KV store instead)."
+    title = "Get state from the legacy state store (deprecated).",
+    description = """
+        Deprecated; use the KV store instead. Fetches the named state (default Flow state if `name` unset). If `errorOnMissing` is true, missing state raises an error; otherwise returns empty data."""
 )
 @Plugin(
     examples = {

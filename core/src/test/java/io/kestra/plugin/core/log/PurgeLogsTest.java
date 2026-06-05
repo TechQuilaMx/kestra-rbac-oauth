@@ -1,14 +1,9 @@
 package io.kestra.plugin.core.log;
 
-import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.junit.annotations.LoadFlows;
-import io.kestra.core.models.executions.Execution;
-import io.kestra.core.models.executions.LogEntry;
-import io.kestra.core.repositories.LogRepositoryInterface;
-import io.kestra.core.runners.TestRunnerUtils;
-import jakarta.inject.Inject;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.stream.Stream;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -16,7 +11,14 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.event.Level;
 
-import java.time.Instant;
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.junit.annotations.LoadFlows;
+import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.executions.LogEntry;
+import io.kestra.core.repositories.LogRepositoryInterface;
+import io.kestra.core.runners.TestRunnerUtils;
+
+import jakarta.inject.Inject;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,54 +70,72 @@ class PurgeLogsTest {
 
     static Stream<Arguments> buildArguments() {
         return Stream.of(
-            Arguments.of(LogEntry.builder()
-                .namespace("purge.namespace")
-                .flowId("purgeFlowId")
-                .tenantId(MAIN_TENANT)
-                .timestamp(Instant.now().plus(5, ChronoUnit.HOURS))
-                .level(Level.INFO)
-                .message("Hello World")
-                .build(), 0, "The log is too recent to be found"),
-            Arguments.of(LogEntry.builder()
-                .namespace("purge.namespace")
-                .flowId("purgeFlowId")
-                .tenantId(MAIN_TENANT)
-                .timestamp(Instant.now().minus(5, ChronoUnit.HOURS))
-                .level(Level.INFO)
-                .message("Hello World")
-                .build(), 0, "The log is too old to be found"),
-            Arguments.of(LogEntry.builder()
-                .namespace("uncorrect.namespace")
-                .flowId("purgeFlowId")
-                .tenantId(MAIN_TENANT)
-                .timestamp(Instant.now().minusSeconds(10))
-                .level(Level.INFO)
-                .message("Hello World")
-                .build(), 0, "The log has an incorrect namespace"),
-            Arguments.of(LogEntry.builder()
-                .namespace("purge.namespace")
-                .flowId("wrongFlowId")
-                .tenantId(MAIN_TENANT)
-                .timestamp(Instant.now().minusSeconds(10))
-                .level(Level.INFO)
-                .message("Hello World")
-                .build(), 0, "The log has an incorrect flow id"),
-            Arguments.of(LogEntry.builder()
-                .namespace("purge.namespace")
-                .flowId("purgeFlowId")
-                .tenantId(MAIN_TENANT)
-                .timestamp(Instant.now().minusSeconds(10))
-                .level(Level.WARN)
-                .message("Hello World")
-                .build(), 0, "The log has an incorrect LogLevel"),
-            Arguments.of(LogEntry.builder()
-                .namespace("purge.namespace")
-                .flowId("purgeFlowId")
-                .tenantId(MAIN_TENANT)
-                .timestamp(Instant.now().minusSeconds(10))
-                .level(Level.INFO)
-                .message("Hello World")
-                .build(), 1, "The log should be deleted")
+            Arguments.of(
+                LogEntry.builder()
+                    .namespace("purge.namespace")
+                    .flowId("purgeFlowId")
+                    .tenantId(MAIN_TENANT)
+                    .timestamp(Instant.now().plus(5, ChronoUnit.HOURS))
+                    .level(Level.INFO)
+                    .message("Hello World")
+                    .build(),
+                0, "The log is too recent to be found"
+            ),
+            Arguments.of(
+                LogEntry.builder()
+                    .namespace("purge.namespace")
+                    .flowId("purgeFlowId")
+                    .tenantId(MAIN_TENANT)
+                    .timestamp(Instant.now().minus(5, ChronoUnit.HOURS))
+                    .level(Level.INFO)
+                    .message("Hello World")
+                    .build(),
+                0, "The log is too old to be found"
+            ),
+            Arguments.of(
+                LogEntry.builder()
+                    .namespace("incorrect.namespace")
+                    .flowId("purgeFlowId")
+                    .tenantId(MAIN_TENANT)
+                    .timestamp(Instant.now().minusSeconds(10))
+                    .level(Level.INFO)
+                    .message("Hello World")
+                    .build(),
+                0, "The log has an incorrect namespace"
+            ),
+            Arguments.of(
+                LogEntry.builder()
+                    .namespace("purge.namespace")
+                    .flowId("wrongFlowId")
+                    .tenantId(MAIN_TENANT)
+                    .timestamp(Instant.now().minusSeconds(10))
+                    .level(Level.INFO)
+                    .message("Hello World")
+                    .build(),
+                0, "The log has an incorrect flow id"
+            ),
+            Arguments.of(
+                LogEntry.builder()
+                    .namespace("purge.namespace")
+                    .flowId("purgeFlowId")
+                    .tenantId(MAIN_TENANT)
+                    .timestamp(Instant.now().minusSeconds(10))
+                    .level(Level.WARN)
+                    .message("Hello World")
+                    .build(),
+                0, "The log has an incorrect LogLevel"
+            ),
+            Arguments.of(
+                LogEntry.builder()
+                    .namespace("purge.namespace")
+                    .flowId("purgeFlowId")
+                    .tenantId(MAIN_TENANT)
+                    .timestamp(Instant.now().minusSeconds(10))
+                    .level(Level.INFO)
+                    .message("Hello World")
+                    .build(),
+                1, "The log should be deleted"
+            )
         );
     }
 }

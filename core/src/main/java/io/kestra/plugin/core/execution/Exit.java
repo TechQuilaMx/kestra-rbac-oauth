@@ -1,5 +1,7 @@
 package io.kestra.plugin.core.execution;
 
+import java.util.Optional;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.exceptions.InternalException;
 import io.kestra.core.models.annotations.Example;
@@ -16,6 +18,7 @@ import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.runners.DefaultRunContext;
 import io.kestra.core.runners.RunContext;
+
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -23,16 +26,17 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.Optional;
-
 @SuperBuilder
 @ToString
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Terminate an execution in the state defined by the property state.",
-    description = "Note that if this execution has running tasks, for example in a parallel branch, the tasks will not be terminated except if `state` is set to `KILLED`."
+    title = "Terminate the current execution with a chosen state.",
+    description = """
+        Updates the execution to `SUCCESS`, `WARNING`, `FAILED`, `CANCELED`, or `KILLED`. When set to `KILLED`, an out-of-band kill event is sent so running task runs are stopped; other states simply mark the execution and parent task runs as finished.
+
+        Use with care inside parallel branches: only `KILLED` stops sibling tasks."""
 )
 @Plugin(
     examples = {
@@ -86,26 +90,29 @@ public class Exit extends Task implements ExecutionUpdatableTask {
         // if the state is killed, we send a kill event and end here
         if (exitState == State.Type.KILLED) {
             @SuppressWarnings("unchecked")
-            QueueInterface<ExecutionKilled> killQueue = ((DefaultRunContext) runContext).getApplicationContext().getBean(QueueInterface.class, Qualifiers.byName(QueueFactoryInterface.KILL_NAMED));
-            killQueue.emit(ExecutionKilledExecution
-                .builder()
-                .state(ExecutionKilled.State.REQUESTED)
-                .executionId(execution.getId())
-                .isOnKillCascade(false)
-                .tenantId(execution.getTenantId())
-                .build()
+            QueueInterface<ExecutionKilled> killQueue = ((DefaultRunContext) runContext).getApplicationContext()
+                .getBean(QueueInterface.class, Qualifiers.byName(QueueFactoryInterface.KILL_NAMED));
+            killQueue.emit(
+                ExecutionKilledExecution
+                    .builder()
+                    .state(ExecutionKilled.State.REQUESTED)
+                    .executionId(execution.getId())
+                    .isOnKillCascade(false)
+                    .tenantId(execution.getTenantId())
+                    .build()
             );
             return execution.withState(exitState);
         }
 
         return execution.findLastNotTerminated()
-            .map(taskRun -> {
+            .map(taskRun ->
+            {
                 try {
                     TaskRun newTaskRun = taskRun.withState(exitState);
                     Execution newExecution = execution.withTaskRun(newTaskRun);
                     // ends all parents
                     while (newTaskRun.getParentTaskRunId() != null) {
-                        newTaskRun = newExecution.findTaskRunByTaskRunId(newTaskRun.getParentTaskRunId()).withState(exitState);
+                        newTaskRun = newExecution.findTaskRunByTaskRunId(newTaskRun.getParentTaskRunId()).withStateAndAttempt(exitState);
                         newExecution = newExecution.withTaskRun(newTaskRun);
                     }
                     return newExecution;
@@ -130,11 +137,17 @@ public class Exit extends Task implements ExecutionUpdatableTask {
             case WARNING -> State.Type.WARNING;
             case KILLED -> State.Type.KILLED;
             case FAILED -> State.Type.FAILED;
-            case CANCELED -> State.Type.CANCELLED;
+            case CANCELED, CANCELLED -> State.Type.CANCELLED;
         };
     }
 
     public enum ExitState {
-        SUCCESS, WARNING, KILLED, FAILED, CANCELED
+        SUCCESS,
+        WARNING,
+        KILLED,
+        FAILED,
+        @Deprecated(since = "1.3", forRemoval = true)
+        CANCELED,
+        CANCELLED
     }
 }

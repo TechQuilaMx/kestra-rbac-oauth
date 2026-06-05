@@ -1,15 +1,16 @@
 package io.kestra.plugin.core.state;
 
+import java.io.FileNotFoundException;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.io.FileNotFoundException;
 
 @SuperBuilder
 @ToString
@@ -17,7 +18,9 @@ import java.io.FileNotFoundException;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Delete a state from the state store (Deprecated, use KV store instead)."
+    title = "Delete state from the legacy state store (deprecated).",
+    description = """
+        Deprecated; use the KV store instead. Deletes the named state (default Flow state if `name` unset). If `errorOnMissing` is true and the state doesn’t exist, the task fails."""
 )
 @Plugin(
     examples = {

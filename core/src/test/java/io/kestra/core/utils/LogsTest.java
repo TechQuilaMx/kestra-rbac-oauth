@@ -1,26 +1,30 @@
 package io.kestra.core.utils;
 
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.AppenderBase;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
+
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.executions.TaskRun;
 import io.kestra.core.models.flows.Flow;
 import io.kestra.core.models.triggers.TriggerContext;
-import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.AppenderBase;
+import lombok.extern.slf4j.Slf4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Slf4j
+@org.junit.jupiter.api.parallel.Execution(ExecutionMode.SAME_THREAD)
 class LogsTest {
 
     private static final InMemoryAppender MEMORY_APPENDER = new InMemoryAppender();

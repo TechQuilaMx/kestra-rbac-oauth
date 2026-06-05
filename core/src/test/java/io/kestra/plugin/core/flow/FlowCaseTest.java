@@ -1,19 +1,19 @@
 package io.kestra.plugin.core.flow;
 
-import com.google.common.collect.ImmutableMap;
-import io.kestra.core.models.Label;
-import io.kestra.core.models.executions.Execution;
-import io.kestra.core.models.flows.State;
-
-import io.kestra.core.runners.TestRunnerUtils;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.ImmutableMap;
+
+import io.kestra.core.models.Label;
+import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.flows.State;
+import io.kestra.core.runners.TestRunnerUtils;
+
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Singleton
@@ -22,8 +22,8 @@ public class FlowCaseTest {
     @Inject
     protected TestRunnerUtils runnerUtils;
 
-    public void waitSuccess() throws Exception {
-        this.run("OK", State.Type.SUCCESS, State.Type.SUCCESS, 2, "default > amazing", true);
+    public void waitSuccess(String tenantId) throws Exception {
+        this.run("OK", State.Type.SUCCESS, State.Type.SUCCESS, 2, "default > amazing", true, tenantId);
     }
 
     public void waitFailed(String tenantId) throws Exception {
@@ -38,16 +38,17 @@ public class FlowCaseTest {
         this.run("OK", State.Type.SUCCESS, State.Type.SUCCESS, 2, "default > amazing", false, tenantId);
     }
 
-    public void oldTaskName() throws Exception {
+    public void oldTaskName(String tenantId) throws Exception {
         Execution execution = runnerUtils.runOne(
-            MAIN_TENANT,
+            tenantId,
             "io.kestra.tests",
             "subflow-old-task-name"
         );
 
         Execution triggered = runnerUtils.awaitFlowExecution(
-            e -> e.getState().getCurrent().isTerminated(), MAIN_TENANT, "io.kestra.tests",
-            "minimal");
+            e -> e.getState().getCurrent().isTerminated(), tenantId, "io.kestra.tests",
+            "minimal"
+        );
 
         assertThat(execution.getTaskRunList()).hasSize(1);
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.SUCCESS);
@@ -58,12 +59,7 @@ public class FlowCaseTest {
         assertThat(triggered.getTrigger().getVariables().get("namespace")).isEqualTo(execution.getNamespace());
     }
 
-    void run(String input, State.Type fromState, State.Type triggerState, int count, String outputs, boolean testInherited)
-        throws Exception {
-        run(input, fromState, triggerState, count, outputs, testInherited, MAIN_TENANT);
-    }
-
-    @SuppressWarnings({"ResultOfMethodCallIgnored", "unchecked"})
+    @SuppressWarnings({ "ResultOfMethodCallIgnored", "unchecked" })
     void run(String input, State.Type fromState, State.Type triggerState, int count, String outputs, boolean testInherited, String tenantId) throws Exception {
         Execution execution = runnerUtils.runOne(
             tenantId,
@@ -76,7 +72,8 @@ public class FlowCaseTest {
         );
 
         Execution triggered = runnerUtils.awaitFlowExecution(
-            e -> e.getState().getCurrent().isTerminated(), tenantId, "io.kestra.tests", "switch");
+            e -> e.getState().getCurrent().isTerminated(), tenantId, "io.kestra.tests", "switch"
+        );
 
         assertThat(execution.getTaskRunList()).hasSize(1);
         assertThat(execution.getTaskRunList().getFirst().getAttempts()).hasSize(1);
@@ -103,10 +100,15 @@ public class FlowCaseTest {
 
         if (testInherited) {
             assertThat(triggered.getLabels().size()).isEqualTo(6);
-            assertThat(triggered.getLabels()).contains(new Label(Label.CORRELATION_ID, execution.getId()), new Label("mainFlowExecutionLabel", "execFoo"), new Label("mainFlowLabel", "flowFoo"), new Label("launchTaskLabel", "launchFoo"), new Label("switchFlowLabel", "switchFoo"), new Label("overriding", "child"));
+            assertThat(triggered.getLabels()).contains(
+                new Label(Label.CORRELATION_ID, execution.getId()), new Label("mainFlowExecutionLabel", "execFoo"), new Label("mainFlowLabel", "flowFoo"),
+                new Label("launchTaskLabel", "launchFoo"), new Label("switchFlowLabel", "switchFoo"), new Label("overriding", "child")
+            );
         } else {
             assertThat(triggered.getLabels().size()).isEqualTo(4);
-            assertThat(triggered.getLabels()).contains(new Label(Label.CORRELATION_ID, execution.getId()), new Label("launchTaskLabel", "launchFoo"), new Label("switchFlowLabel", "switchFoo"), new Label("overriding", "child"));
+            assertThat(triggered.getLabels()).contains(
+                new Label(Label.CORRELATION_ID, execution.getId()), new Label("launchTaskLabel", "launchFoo"), new Label("switchFlowLabel", "switchFoo"), new Label("overriding", "child")
+            );
             assertThat(triggered.getLabels()).doesNotContain(new Label("inherited", "label"));
         }
     }

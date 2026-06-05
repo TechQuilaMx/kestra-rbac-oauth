@@ -1,5 +1,12 @@
 package io.kestra.plugin.core.http;
 
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+import org.slf4j.Logger;
+
 import io.kestra.core.http.client.configurations.HttpConfiguration;
 import io.kestra.core.http.client.configurations.SslOptions;
 import io.kestra.core.models.annotations.Example;
@@ -10,18 +17,12 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.*;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.utils.TruthUtils;
+
 import io.micronaut.http.MediaType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.slf4j.Logger;
-
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @SuperBuilder
 @ToString
@@ -29,7 +30,9 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Trigger a flow based on an HTTP response"
+    title = "Poll an HTTP endpoint and trigger when a condition matches.",
+    description = """
+        Periodically calls `uri` (default GET every 60s), evaluates `responseCondition` against status/body/headers, and launches the flow when true. Supports request customization (method, params, headers, auth via options) and `stopAfter` states to disable once satisfied."""
 )
 @Plugin(
     examples = {
@@ -42,7 +45,7 @@ import java.util.Optional;
 
                 tasks:
                   - id: send_slack_alert
-                    type: io.kestra.plugin.notifications.slack.SlackIncomingWebhook
+                    type: io.kestra.plugin.slack.SlackIncomingWebhook
                     url: "{{ secret('SLACK_WEBHOOK') }}"
                     payload: |
                       {
@@ -89,18 +92,18 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     private final Duration interval = Duration.ofSeconds(60);
 
     @Schema(
-            title = "The condition on the HTTP response to trigger a flow, which can be any expression that evaluates to a boolean value.",
-            description = """
-                The condition will be evaluated after calling the HTTP endpoint; it can use the response itself to determine whether to start a flow or not.
-                The following variables are available when evaluating the condition:
-                - `response.statusCode`: the response HTTP status code
-                - `response.body`: the response body as a string
-                - `response.headers`: the response headers
+        title = "The condition on the HTTP response to trigger a flow, which can be any expression that evaluates to a boolean value.",
+        description = """
+            The condition will be evaluated after calling the HTTP endpoint; it can use the response itself to determine whether to start a flow or not.
+            The following variables are available when evaluating the condition:
+            - `response.statusCode`: the response HTTP status code
+            - `response.body`: the response body as a string
+            - `response.headers`: the response headers
 
-                Boolean coercion allows 0, -0, null and '' to evaluate to false, all other values will evaluate to true.
+            Boolean coercion allows 0, -0, null and '' to evaluate to false, all other values will evaluate to true.
 
-                The condition will be evaluated before any 'generic trigger conditions' that can be configured via the `conditions` property.
-                """
+            The condition will be evaluated before any 'generic trigger conditions' that can be configured via the `conditions` property.
+            """
     )
     @Builder.Default
     @NotNull
@@ -137,7 +140,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
         RunContext runContext = conditionContext.getRunContext();
         Logger logger = runContext.logger();
 
-        if (this.options == null){
+        if (this.options == null) {
             this.options = HttpConfiguration.builder().build();
         }
         // we allow failed status code as it is the condition that must determine whether we trigger the flow

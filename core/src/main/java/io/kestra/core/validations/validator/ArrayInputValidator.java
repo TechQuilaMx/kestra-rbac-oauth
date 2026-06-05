@@ -3,6 +3,7 @@ package io.kestra.core.validations.validator;
 import io.kestra.core.models.flows.Type;
 import io.kestra.core.models.flows.input.ArrayInput;
 import io.kestra.core.validations.ArrayInputValidation;
+
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
@@ -20,9 +21,15 @@ public class ArrayInputValidator implements ConstraintValidator<ArrayInputValida
             return true; // nulls are allowed according to spec
         }
 
-        if (value.getItemType() == Type.ARRAY) {
+        if (
+            value.getItemType() == Type.ARRAY
+                || value.getItemType() == Type.SECRET
+                || value.getItemType() == Type.MULTISELECT
+                || value.getItemType() == Type.ENUM
+                || value.getItemType() == Type.SELECT
+        ) {
             context.disableDefaultConstraintViolation();
-            context.buildConstraintViolationWithTemplate("`itemType` cannot be `ARRAY`")
+            context.buildConstraintViolationWithTemplate("`itemType` cannot be " + value.getItemType())
                 .addConstraintViolation();
             return false;
         }

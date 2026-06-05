@@ -1,0 +1,14 @@
+name: Feature request
+description: Suggest a new feature or improvement to enhance the project
+
+labels: ["area/backend", "area/frontend"]
+type: Feature
+projects: ["kestra-io/15"]
+
+body:
+  - type: textarea
+    attributes:
+      label: Feature description
+      placeholder: Tell us more about your feature request. Don't forget to give us a star! ⭐
+    validations:
+      required: true

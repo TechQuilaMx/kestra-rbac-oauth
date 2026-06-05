@@ -3,6 +3,7 @@ package io.kestra.core.utils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import java.io.File;
 import java.net.URI;
 import java.util.Optional;
 
@@ -28,7 +29,8 @@ public final class FileUtils {
      * @return the file extension prefixed with the '.' or {@code null}.
      */
     public static String getExtension(final String file) {
-        if (file == null) return null;
+        if (file == null)
+            return null;
         String extension = FilenameUtils.getExtension(file);
         return StringUtils.isEmpty(extension) ? null : "." + extension;
     }
@@ -40,7 +42,8 @@ public final class FileUtils {
      * @return an optional URI, or {@link Optional#empty()} if the given path represent an invalid URI.
      */
     public static Optional<URI> getURI(final String path) {
-        if (path == null) return Optional.empty();
+        if (path == null)
+            return Optional.empty();
         try {
             return Optional.of(URI.create(path));
         } catch (IllegalArgumentException e) {
@@ -57,5 +60,19 @@ public final class FileUtils {
     public static String getFileName(final URI uri) {
         String path = uri.getPath();
         return path.substring(path.lastIndexOf('/') + 1);
+    }
+
+    /**
+     * Check if the provided URI does not contain relative parent path traversal (i.e., "..").
+     *
+     * @param uri the URI to validate
+     * @return true if there is a relative parent path traversal
+     */
+    public static boolean isParentTraversal(URI uri) {
+        if (uri == null) {
+            return false;
+        }
+        var path = uri.getPath();
+        return path != null && (path.contains(".." + File.separator) || path.contains(File.separator + "..") || path.equals(".."));
     }
 }

@@ -1,5 +1,7 @@
 package io.kestra.plugin.core.execution;
 
+import java.util.Map;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.executions.Execution;
@@ -9,15 +11,16 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.VoidOutput;
+import io.kestra.core.models.tasks.runners.PluginUtilsService;
 import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.ExecutionRepositoryInterface;
-import io.kestra.core.runners.FlowMetaStoreInterface;
 import io.kestra.core.runners.DefaultRunContext;
+import io.kestra.core.runners.FlowMetaStoreInterface;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.services.ExecutionService;
-import io.kestra.core.models.tasks.runners.PluginUtilsService;
 import io.kestra.plugin.core.flow.Pause;
+
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,17 +30,17 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
-import java.time.LocalDateTime;
-import java.util.Map;
-
 @SuperBuilder
 @ToString
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Resume a paused execution.",
-    description = "By default, the task assumes that you want to resume the current `executionId`. If you want to programmatically resume an execution of another flow, make sure to define the `executionId`, `flowId`, and `namespace` properties explicitly. Using the `inputs` property, you can additionally pass custom `onResume` input values to the execution."
+    title = "Resume a paused execution (deprecated).",
+    description = """
+        Deprecated; use `io.kestra.plugin.kestra.executions.Resume`.
+
+        Resumes a paused execution, defaulting to the current execution unless `executionId` is provided. For cross-flow resumes, specify `namespace` and `flowId` to satisfy permissions. Optional `inputs` are passed to the flow’s `onResume` block."""
 )
 @Plugin(
     examples = {
@@ -48,7 +51,8 @@ import java.util.Map;
         )
     }
 )
-public class Resume  extends Task implements RunnableTask<VoidOutput> {
+@Deprecated(since = "1.2", forRemoval = true)
+public class Resume extends Task implements RunnableTask<VoidOutput> {
     @Schema(
         title = "Filter for a specific namespace in case `executionId` is set. In case you wonder why `executionId` is not enough — we require specifying the namespace to make permissions explicit. The Enterprise Edition of Kestra allows you to resume executions from another namespaces only if the permissions allow it. Check the [Allowed Namespaces](https://kestra.io/docs/enterprise/allowed-namespaces) documentation for more details."
     )
@@ -85,7 +89,7 @@ public class Resume  extends Task implements RunnableTask<VoidOutput> {
             runContext.render(this.executionId).as(String.class).orElse(null)
         );
 
-        ApplicationContext applicationContext = ((DefaultRunContext)runContext).getApplicationContext();
+        ApplicationContext applicationContext = ((DefaultRunContext) runContext).getApplicationContext();
         ExecutionService executionService = applicationContext.getBean(ExecutionService.class);
         ExecutionRepositoryInterface executionRepository = applicationContext.getBean(ExecutionRepositoryInterface.class);
         FlowMetaStoreInterface flowExecutor = applicationContext.getBean(FlowMetaStoreInterface.class);

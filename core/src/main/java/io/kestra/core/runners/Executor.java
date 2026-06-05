@@ -1,15 +1,18 @@
 package io.kestra.core.runners;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import io.kestra.core.models.HasUID;
 import io.kestra.core.models.executions.*;
 import io.kestra.core.models.flows.FlowWithException;
 import io.kestra.core.models.flows.FlowWithSource;
 import io.kestra.core.models.flows.State;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-
-import java.util.ArrayList;
-import java.util.List;
 
 // TODO for 2.0: this class is used as a queue consumer (which should have been the ExecutorInterface instead),
 //  a queue message (only in Kafka) and an execution context.
@@ -17,7 +20,7 @@ import java.util.List;
 //  then rename the ExecutorInterface to just Executor (to be used as a queue consumer)
 @Getter
 @AllArgsConstructor
-public class Executor {
+public class Executor implements HasUID {
     private Execution execution;
     private Exception exception;
     private final List<String> from = new ArrayList<>();
@@ -193,5 +196,10 @@ public class Executor {
     public long incrementAndGetSeqId() {
         this.seqId++;
         return seqId;
+    }
+
+    @Override
+    public String uid() {
+        return execution.getId();
     }
 }

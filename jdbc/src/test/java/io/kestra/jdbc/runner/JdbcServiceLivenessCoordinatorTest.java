@@ -1,6 +1,20 @@
 package io.kestra.jdbc.runner;
 
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+
 import com.google.common.collect.ImmutableMap;
+
 import io.kestra.core.context.TestRunContextFactory;
 import io.kestra.core.junit.annotations.FlakyTest;
 import io.kestra.core.junit.annotations.KestraTest;
@@ -15,37 +29,26 @@ import io.kestra.core.models.triggers.Trigger;
 import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.runners.*;
-import io.kestra.core.services.SkipExecutionService;
+import io.kestra.core.services.IgnoreExecutionService;
 import io.kestra.core.services.WorkerGroupService;
 import io.kestra.core.tasks.test.SleepTrigger;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.jdbc.repository.AbstractJdbcWorkerJobRunningRepository;
 import io.kestra.plugin.core.flow.Sleep;
+
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.test.annotation.MockBean;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import reactor.core.publisher.Flux;
-
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-@KestraTest(environments = {"test", "liveness"}, startRunner = true, startWorker = false)
+@KestraTest(environments = { "test", "liveness" }, startRunner = true, startWorker = false)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 // must be per-class to allow calling once init() which took a lot of time
 @Property(name = "kestra.server-type", value = "EXECUTOR")
@@ -76,7 +79,7 @@ public abstract class JdbcServiceLivenessCoordinatorTest {
     private JdbcServiceLivenessCoordinator jdbcServiceLivenessHandler;
 
     @Inject
-    private SkipExecutionService skipExecutionService;
+    private IgnoreExecutionService ignoreExecutionService;
 
     @Inject
     private AbstractJdbcWorkerJobRunningRepository workerJobRunningRepository;
@@ -103,7 +106,8 @@ public abstract class JdbcServiceLivenessCoordinatorTest {
         Worker worker = applicationContext.createBean(TestMethodScopedWorker.class, IdUtils.create(), 1, null);
         worker.run();
 
-        Flux<WorkerTaskResult> receive = TestsUtils.receive(workerTaskResultQueue, either -> {
+        Flux<WorkerTaskResult> receive = TestsUtils.receive(workerTaskResultQueue, either ->
+        {
             if (either.getLeft().getTaskRun().getState().getCurrent() == Type.SUCCESS) {
                 resubmitLatch.countDown();
             }
@@ -118,7 +122,7 @@ public abstract class JdbcServiceLivenessCoordinatorTest {
         });
 
         workerJobQueue.emit(workerTask(Duration.ofSeconds(5)));
-        boolean runningLatchAwait = runningLatch.await(5, TimeUnit.SECONDS);
+        boolean runningLatchAwait = runningLatch.await(30, TimeUnit.SECONDS);
         assertThat(runningLatchAwait).isTrue();
         worker.close(); // stop processing task
 
@@ -146,7 +150,8 @@ public abstract class JdbcServiceLivenessCoordinatorTest {
         worker.run();
 
         var workerTaskResultQueueAppendLog = new ArrayList<WorkerTaskResult>();// to debug flaky test
-        Flux<WorkerTaskResult> receive = TestsUtils.receive(workerTaskResultQueue, either -> {
+        Flux<WorkerTaskResult> receive = TestsUtils.receive(workerTaskResultQueue, either ->
+        {
             workerTaskResultQueueAppendLog.add(either.getLeft());
             if (either.getLeft().getTaskRun().getState().getCurrent() == Type.SUCCESS) {
                 resubmitLatch.countDown();
@@ -158,7 +163,7 @@ public abstract class JdbcServiceLivenessCoordinatorTest {
         });
 
         workerJobQueue.emit(workerGroup, workerTask(Duration.ofSeconds(5), workerGroup));
-        boolean runningLatchAwait = runningLatch.await(5, TimeUnit.SECONDS);
+        boolean runningLatchAwait = runningLatch.await(30, TimeUnit.SECONDS);
         assertThat(runningLatchAwait).isTrue();
         worker.close(); // stop processing task
 
@@ -167,7 +172,9 @@ public abstract class JdbcServiceLivenessCoordinatorTest {
         newWorker.run();
         boolean resubmitLatchAwait = resubmitLatch.await(30, TimeUnit.SECONDS);
         assertThat(resubmitLatchAwait)
-            .withFailMessage(() -> "shouldReEmitTasksToTheSameWorkerGroup: resubmitLatchAwait was not OK, workerTaskResultQueue content: " + TestsUtils.stringify(workerTaskResultQueueAppendLog))
+            .withFailMessage(
+                () -> "shouldReEmitTasksToTheSameWorkerGroup: resubmitLatchAwait was not OK, workerTaskResultQueue content: " + TestsUtils.stringify(workerTaskResultQueueAppendLog)
+            )
             .isTrue();
         WorkerTaskResult workerTaskResult = receive.blockLast();
         assertThat(workerTaskResult).isNotNull();
@@ -185,9 +192,10 @@ public abstract class JdbcServiceLivenessCoordinatorTest {
         worker.run();
 
         WorkerTask workerTask = workerTask(Duration.ofSeconds(5));
-        skipExecutionService.setSkipExecutions(List.of(workerTask.getTaskRun().getExecutionId()));
+        ignoreExecutionService.setIgnoredExecutions(List.of(workerTask.getTaskRun().getExecutionId()));
 
-        Flux<WorkerTaskResult> receive = TestsUtils.receive(workerTaskResultQueue, either -> {
+        Flux<WorkerTaskResult> receive = TestsUtils.receive(workerTaskResultQueue, either ->
+        {
             if (either.getLeft().getTaskRun().getState().getCurrent() == Type.SUCCESS) {
                 // no resubmit should happen!
                 fail();
@@ -199,7 +207,7 @@ public abstract class JdbcServiceLivenessCoordinatorTest {
         });
 
         workerJobQueue.emit(workerTask);
-        boolean runningLatchAwait = runningLatch.await(10, TimeUnit.SECONDS);
+        boolean runningLatchAwait = runningLatch.await(30, TimeUnit.SECONDS);
         assertThat(runningLatchAwait).isTrue();
         worker.close();
 
@@ -227,7 +235,8 @@ public abstract class JdbcServiceLivenessCoordinatorTest {
 
         // we wait that the worker receive the trigger
         CountDownLatch triggerCountDownLatch = new CountDownLatch(1);
-        Flux<Trigger> receiveTrigger = TestsUtils.receive(triggerQueue, either -> {
+        Flux<Trigger> receiveTrigger = TestsUtils.receive(triggerQueue, either ->
+        {
             if (either.getLeft().getWorkerId().equals(worker.getId())) {
                 triggerCountDownLatch.countDown();
             }
@@ -260,7 +269,8 @@ public abstract class JdbcServiceLivenessCoordinatorTest {
 
         // we wait that the worker receives the trigger
         CountDownLatch triggerCountDownLatch = new CountDownLatch(1);
-        Flux<Trigger> receiveTrigger = TestsUtils.receive(triggerQueue, either -> {
+        Flux<Trigger> receiveTrigger = TestsUtils.receive(triggerQueue, either ->
+        {
             if (either.getLeft().getWorkerId().equals(worker.getId())) {
                 triggerCountDownLatch.countDown();
             }

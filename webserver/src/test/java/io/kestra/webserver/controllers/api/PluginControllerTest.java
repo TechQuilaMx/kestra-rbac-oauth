@@ -1,5 +1,11 @@
 package io.kestra.webserver.controllers.api;
 
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
 import io.kestra.core.Helpers;
 import io.kestra.core.docs.DocumentationWithSchema;
 import io.kestra.core.docs.InputType;
@@ -9,16 +15,12 @@ import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.annotations.PluginSubGroup;
 import io.kestra.plugin.core.debug.Return;
 import io.kestra.plugin.core.log.Log;
+
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.reactor.http.client.ReactorHttpClient;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -65,7 +67,7 @@ class PluginControllerTest {
             .findFirst()
             .orElseThrow();
 
-        assertThat(core.getCategories()).containsExactlyInAnyOrder(PluginSubGroup.PluginCategory.STORAGE, PluginSubGroup.PluginCategory.CORE);
+        assertThat(core.getCategories()).containsExactlyInAnyOrder(PluginSubGroup.PluginCategory.CORE);
 
         // classLoader can lead to duplicate plugins for the core, just verify that the response is still the same
         list = client.toBlocking().retrieve(
@@ -83,15 +85,18 @@ class PluginControllerTest {
             Argument.mapOf(String.class, PluginIcon.class)
         );
 
-        assertThat(list.entrySet().stream()
-            .filter(e -> e.getKey().equals(Log.class.getName()))
-            .findFirst().orElseThrow().getValue().getIcon()).isNotNull();
+        assertThat(
+            list.entrySet().stream()
+                .filter(e -> e.getKey().equals(Log.class.getName()))
+                .findFirst().orElseThrow().getValue().getIcon()
+        ).isNotNull();
         // test an alias
-        assertThat(list.entrySet().stream()
-            .filter(e -> e.getKey().equals("io.kestra.core.tasks.log.Log"))
-            .findFirst().orElseThrow().getValue().getIcon()).isNotNull();
+        assertThat(
+            list.entrySet().stream()
+                .filter(e -> e.getKey().equals("io.kestra.core.tasks.log.Log"))
+                .findFirst().orElseThrow().getValue().getIcon()
+        ).isNotNull();
     }
-
 
     @SuppressWarnings("unchecked")
     @Test
@@ -133,7 +138,6 @@ class PluginControllerTest {
         assertThat(doc.getMarkdown()).contains("::: warning\n");
     }
 
-
     @SuppressWarnings("unchecked")
     @Test
     void taskWithBase() {
@@ -167,7 +171,7 @@ class PluginControllerTest {
             Argument.mapOf(String.class, Object.class)
         );
 
-        assertThat((Map<String, Object>) doc.get("properties")).hasSize(23);
+        assertThat((Map<String, Object>) doc.get("properties")).hasSize(24);
         assertThat((List<String>) doc.get("required")).hasSize(3);
     }
 

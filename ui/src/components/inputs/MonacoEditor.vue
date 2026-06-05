@@ -31,6 +31,7 @@
     import JsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
     import TypeScriptWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
     import YamlWorker from "./yaml.worker.js?worker";
+    import {isOffsetInPebbleBlock} from "../../utils/pebbleBlock";
 
     const NodeTypesRaw = import.meta.glob("/node_modules/@types/node/**/*.d.ts", {eager: true, query: "?raw", import: "default"});
 
@@ -77,20 +78,12 @@
     };
 
     function isCursorInPebbleBlock(editor: monaco.editor.ICodeEditor) {
-        const editorValue = editor.getValue()
-        const cursorPos = editor.getPosition()
-
+        const cursorPos = editor.getPosition();
         if(!cursorPos){
             return false;
         }
-
-        // get the absolute index in the string
-        const absoluteOffset = editor.getModel()?.getOffsetAt(cursorPos) ?? 0
-
-        // if the previous token is {{ it means we are in a pebble block -> true
-        // if a }} comes after the {{ we have come out of the block and are not -> false
-        // if both are empty, they both return -1 -> false
-        return editorValue.lastIndexOf("{{", absoluteOffset) > editorValue.lastIndexOf("}}", absoluteOffset);
+        const absoluteOffset = editor.getModel()?.getOffsetAt(cursorPos) ?? 0;
+        return isOffsetInPebbleBlock(editor.getValue(), absoluteOffset);
     }
 </script>
 
@@ -322,6 +315,16 @@
     }>()
 
     const editorRef = ref<HTMLDivElement | null>(null);
+
+    const isFlowYamlEditor = computed(() => props.language === "yaml" && props.schemaType === "flow");
+
+    function hasVisibleInlineGhostText(codeEditor: monaco.editor.IStandaloneCodeEditor): boolean {
+        return codeEditor.getDomNode()?.querySelector(".ghost-text") !== null;
+    }
+
+    function isTypeLine(lineContent: string): boolean {
+        return /^\s*(?:-\s*)?type\s*:\s*.+\s*$/.test(lineContent);
+    }
 
     watch(() => props.path, (newValue, oldValue) => {
         if (newValue !== oldValue) {
@@ -556,6 +559,8 @@
 
     const disposeCompletions = ref<() => void>();
 
+    let moveCursorCmdDisposable: monaco.IDisposable | undefined;
+
     const pluginsStore = usePluginsStore();
     const flowStore = useFlowStore();
 
@@ -718,6 +723,11 @@
                 showClasses: false,
                 showWords: false
             },
+            ...(isFlowYamlEditor.value ? {
+                inlineSuggest: {
+                    enabled: true,
+                },
+            } : {}),
             ...(isInFlowEditor ? {
                 padding: {
                     top: 16
@@ -797,9 +807,79 @@
                     ...options,
                     fixedOverflowWidgets: true // Helps suggestion widget render above other elements
                 });
+
+                if (!moveCursorCmdDisposable) {
+                    moveCursorCmdDisposable = monaco.editor.registerCommand(
+                        "moveCursor",
+                        (_accessor, args?: { lineNumber: number; column: number }) => {
+                            const ed = localEditor.value;
+                            if (!ed || !args?.lineNumber || !args?.column) return;
+
+                            ed.setPosition({lineNumber: args.lineNumber, column: args.column});
+                            ed.revealPositionInCenter({lineNumber: args.lineNumber, column: args.column});
+                            ed.focus();
+                        }
+                    );
+                }
+
                 let localBackspaceTimeout: number | null = null;
+                let suggestController: {
+                    model: { state: 0 | 1 | 2 },
+                    cancelSuggestWidget: () => void
+                } | undefined;
 
                 localEditor.value.onKeyDown((e) => {
+                    if (
+                        isFlowYamlEditor.value &&
+                        suggestController?.model.state !== 0 &&
+                        (e.keyCode === monaco.KeyCode.Enter || e.keyCode === monaco.KeyCode.Tab)
+                    ) {
+                        const currentLine = localEditor.value?.getModel()?.getLineContent(localEditor.value.getPosition()?.lineNumber ?? 0) ?? "";
+                        if (isTypeLine(currentLine)) {
+                            // Let suggestion acceptance happen first, then move to next line and trigger ghost suggestion.
+                            setTimeout(() => {
+                                const editor = localEditor.value;
+                                if (!editor) {
+                                    return;
+                                }
+
+                                const position = editor.getPosition();
+                                if (!position) {
+                                    return;
+                                }
+
+                                const acceptedLine = editor.getModel()?.getLineContent(position.lineNumber) ?? "";
+                                if (!isTypeLine(acceptedLine)) {
+                                    return;
+                                }
+
+                                editor.trigger("typeAcceptedInsertLine", "editor.action.insertLineAfter", {});
+                                editor.trigger("typeAcceptedInlineSuggest", "editor.action.inlineSuggest.trigger", {});
+                            }, 0);
+                        }
+                    }
+
+                    if (isFlowYamlEditor.value && hasVisibleInlineGhostText(localEditor.value!)) {
+                        if (e.keyCode === monaco.KeyCode.Tab) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            localEditor.value?.trigger("inlineSuggestCommit", "editor.action.inlineSuggest.commit", {});
+                            return;
+                        }
+
+                        if (e.keyCode === monaco.KeyCode.Enter) {
+                            localEditor.value?.trigger("inlineSuggestHide", "editor.action.inlineSuggest.hide", {});
+                            return;
+                        }
+                    }
+
+                    if (isFlowYamlEditor.value && e.keyCode === monaco.KeyCode.Enter) {
+                        // Let Monaco insert the newline first, then ask inline provider for ghost suggestion.
+                        setTimeout(() => {
+                            localEditor.value?.trigger("inlineSuggestTrigger", "editor.action.inlineSuggest.trigger", {});
+                        }, 0);
+                    }
+
                     if (e.keyCode === monaco.KeyCode.Backspace) {
                         if (localBackspaceTimeout) clearTimeout(localBackspaceTimeout);
 
@@ -822,7 +902,7 @@
                     new PlaceholderContentWidget(props.placeholder, localEditor.value);
                 }
 
-                const suggestController = localEditor.value!.getContribution("editor.contrib.suggestController") as unknown as {
+                suggestController = localEditor.value!.getContribution("editor.contrib.suggestController") as unknown as {
                     model: { state: 0 | 1 | 2 },
                     cancelSuggestWidget: () => void
                 };
@@ -834,11 +914,17 @@
                     }
                 });
 
+                let wasInPebbleBlock = false;
                 localEditor.value.onDidChangeCursorPosition(debounce(() => {
+                    if (!localEditor.value) return;
+                    const inPebble = isCursorInPebbleBlock(localEditor.value);
                     if (suggestController.model.state !== 0) {
                         suggestController.cancelSuggestWidget();
-                        localEditor.value!.trigger("refreshSuggestionsOnCursorMove", "editor.action.triggerSuggest", {});
+                        localEditor.value.trigger("refreshSuggestionsOnCursorMove", "editor.action.triggerSuggest", {});
+                    } else if (inPebble && !wasInPebbleBlock) {
+                        localEditor.value.trigger("triggerSuggestionsInPebbleBlock", "editor.action.triggerSuggest", {});
                     }
+                    wasInPebbleBlock = inPebble;
                 }, 300))
 
                 localEditor.value.onMouseMove((e) => {
@@ -869,7 +955,7 @@
         setTimeout(() => monaco.editor.remeasureFonts(), 1)
         emit("editorDidMount", editorResolved.value);
 
-        /* Hhandle resizing. */
+        /* Handle resizing. */
         resizeObserver.value = new ResizeObserver(() => {
             if (localEditor.value) {
                 localEditor.value.layout();
@@ -952,6 +1038,9 @@
             localEditor.value?.dispose();
             localEditor.value?.getModel()?.dispose();
             localEditor.value = undefined
+
+            moveCursorCmdDisposable?.dispose();
+            moveCursorCmdDisposable = undefined;
         }
     }
 

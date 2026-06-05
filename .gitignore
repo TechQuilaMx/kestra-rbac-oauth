@@ -37,6 +37,7 @@ ui/coverage
 ui/stats.html
 ui/.frontend-gradle-plugin
 ui/test-report.junit.xml
+ui/frontend.*
 *storybook.log
 storybook-static
 
@@ -59,3 +60,7 @@ core/src/main/resources/gradle.properties
 **/allure-results/*
 
 /jmh-benchmarks/src/main/resources/gradle.properties
+
+# Helm chart dependencies (downloaded at build time, not committed)
+charts/kestra/charts/
+charts/kestra-starter/charts/

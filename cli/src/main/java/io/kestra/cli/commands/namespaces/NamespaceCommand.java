@@ -4,6 +4,7 @@ import io.kestra.cli.AbstractCommand;
 import io.kestra.cli.App;
 import io.kestra.cli.commands.namespaces.files.NamespaceFilesCommand;
 import io.kestra.cli.commands.namespaces.kv.KvCommand;
+
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import picocli.CommandLine;
@@ -24,6 +25,6 @@ public class NamespaceCommand extends AbstractCommand {
     public Integer call() throws Exception {
         super.call();
 
-        return App.runCli(new String[]{"namespace", "--help"});
+        return App.runCli(new String[] { "namespace", "--help" });
     }
 }

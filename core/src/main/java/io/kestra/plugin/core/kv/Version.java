@@ -1,11 +1,19 @@
 package io.kestra.plugin.core.kv;
 
+import java.io.IOException;
+import java.time.ZonedDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import io.kestra.core.models.FetchVersion;
 import io.kestra.core.models.QueryFilter;
 import io.kestra.core.storages.kv.KVEntry;
 import io.kestra.core.storages.kv.KVStore;
 import io.kestra.core.validations.KvVersionBehaviorValidation;
+
 import io.micronaut.data.model.Pageable;
 import io.micronaut.data.model.Sort;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -14,12 +22,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-
-import java.io.IOException;
-import java.time.ZonedDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @SuperBuilder
 @Getter
@@ -39,7 +41,7 @@ public class Version extends KvPurgeBehavior {
 
     @Schema(
         title = "How much versions should be kept for each matching KV.",
-        description = "By default, every matching versions will be purged."
+        description = "By default, every matching version is eligible for purge; set `keepAmount` to retain the most recent N per key."
     )
     private Integer keepAmount;
 

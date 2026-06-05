@@ -1,0 +1,48 @@
+name: Publish docker
+
+on:
+  workflow_dispatch:
+    inputs:
+      retag-latest:
+        description: 'Retag latest Docker images'
+        required: true
+        type: boolean
+        default: false
+      retag-lts:
+        description: 'Retag LTS Docker images'
+        required: true
+        type: boolean
+        default: false
+      dry-run:
+        description: 'Dry run mode that will not write or release anything'
+        required: true
+        type: boolean
+        default: false
+      java-version:
+        description: "Java version"
+        type: string
+        default: '25'
+        required: false
+
+jobs:
+  publish-docker:
+    name: Publish Docker
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: kestra-io/actions/.github/workflows/kestra-oss-publish-docker.yml@main
+    with:
+      retag-latest: ${{ inputs.retag-latest }}
+      retag-lts: ${{ inputs.retag-lts }}
+      dry-run: ${{ inputs.dry-run }}
+      java-version: ${{ inputs.java-version }}
+    secrets: inherit
+
+  helm-release:
+    name: Helm release
+    needs: publish-docker
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/helm-release.yml
+    with:
+      dry_run: ${{ inputs.dry-run }}

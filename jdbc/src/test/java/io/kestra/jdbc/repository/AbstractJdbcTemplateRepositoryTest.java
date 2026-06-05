@@ -1,12 +1,14 @@
 package io.kestra.jdbc.repository;
 
-import io.kestra.core.models.templates.Template;
-import io.kestra.core.utils.TestsUtils;
-import io.micronaut.data.model.Pageable;
-import io.micronaut.data.model.Sort;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
+import io.kestra.core.models.templates.Template;
+import io.kestra.core.utils.TestsUtils;
+
+import io.micronaut.data.model.Pageable;
+import io.micronaut.data.model.Sort;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

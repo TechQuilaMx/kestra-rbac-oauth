@@ -1,16 +1,10 @@
 package io.kestra.repository.mysql;
 
-import io.kestra.core.queues.QueueService;
-import io.kestra.core.repositories.ArrayListTotal;
-import io.kestra.jdbc.AbstractJdbcRepository;
-import io.kestra.jdbc.JdbcTableConfig;
-import io.kestra.jdbc.JooqDSLContextWrapper;
-import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.Parameter;
-import io.micronaut.data.model.Pageable;
-import io.micronaut.data.model.Sort;
-import io.micronaut.data.model.Sort.Order;
-import jakarta.inject.Inject;
+import java.sql.Timestamp;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
@@ -21,10 +15,18 @@ import org.jooq.Select;
 import org.jooq.SelectConditionStep;
 import org.jooq.impl.DSL;
 
-import java.sql.Timestamp;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
+import io.kestra.core.queues.QueueService;
+import io.kestra.core.repositories.ArrayListTotal;
+import io.kestra.jdbc.AbstractJdbcRepository;
+import io.kestra.jdbc.JdbcTableConfig;
+import io.kestra.jdbc.JooqDSLContextWrapper;
+
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.data.model.Pageable;
+import io.micronaut.data.model.Sort;
+import io.micronaut.data.model.Sort.Order;
+import jakarta.inject.Inject;
 
 @SuppressWarnings("this-escape")
 @MysqlRepositoryEnabled
@@ -33,9 +35,9 @@ public class MysqlRepository<T> extends AbstractJdbcRepository<T> {
 
     @Inject
     public MysqlRepository(@Parameter JdbcTableConfig jdbcTableConfig,
-                           QueueService queueService,
-                           JooqDSLContextWrapper dslContextWrapper) {
-        super(jdbcTableConfig, queueService, dslContextWrapper);
+        QueueService queueService,
+        JooqDSLContextWrapper dslContextWrapper) {
+        super(jdbcTableConfig, dslContextWrapper);
         this.table = DSL.table(DSL.quotedName(this.getTable().getName()));
     }
 
@@ -46,28 +48,49 @@ public class MysqlRepository<T> extends AbstractJdbcRepository<T> {
             return DSL.trueCondition();
         }
 
-        String match = Arrays
-            .stream(query.split("\\p{IsPunct}"))
+        String escaped = escapeForLike(query);
+        String pattern = "%" + escaped + "%";
+
+        Condition likeCondition = DSL.falseCondition();
+        for (String fieldName : fields) {
+            Field<String> f = DSL.field(fieldName, String.class);
+            likeCondition = likeCondition.or(f.like(pattern, '\\'));
+        }
+
+        String booleanQuery = Arrays.stream(query.split("\\p{IsPunct}|\\s+"))
             .filter(s -> s.length() >= 3)
             .map(s -> "+" + s + "*")
             .collect(Collectors.joining(" "));
 
-        if (match.isEmpty()) {
-            return DSL.falseCondition();
+        Condition fulltextCondition;
+        if (booleanQuery.isEmpty()) {
+            fulltextCondition = DSL.falseCondition();
+        } else {
+            fulltextCondition = DSL.condition(
+                "MATCH (" + String.join(", ", fields) + ") AGAINST (? IN BOOLEAN MODE)",
+                booleanQuery
+            );
         }
 
-        return DSL.condition("MATCH (" + String.join(", ", fields) + ") AGAINST (? IN BOOLEAN MODE)", match);
+        return fulltextCondition.or(likeCondition);
+    }
+
+    private static String escapeForLike(String s) {
+        return s
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_");
     }
 
     @Override
     public <R extends Record, E> ArrayListTotal<E> fetchPage(DSLContext context, SelectConditionStep<R> select, Pageable pageable, RecordMapper<R, E> mapper) {
-        Integer rows = context.fetchCount(select);
+        int rows = context.fetchCount(select);
         Result<R> records = this.pageable(select, pageable).fetch();
         return new ArrayListTotal<>(records.map(mapper), rows);
     }
 
     @Override
-    public <R extends Record> Select<R> buildQuery(DSLContext context, SelectConditionStep<R> select, String orderField){
+    public <R extends Record> Select<R> buildQuery(DSLContext context, SelectConditionStep<R> select, String orderField) {
         return this.sort(select, Pageable.from(Sort.of(Order.asc(orderField))));
     }
 
