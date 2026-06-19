@@ -15,6 +15,9 @@ WORKDIR /build
 COPY gradlew gradlew.bat gradle.properties settings.gradle build.gradle ./
 COPY gradle ./gradle
 
+# GitHub Actions checkouts can lose executable mode; ensure wrapper is runnable.
+RUN chmod +x ./gradlew
+
 # Copy docker-entrypoint.sh
 COPY --chown=kestra:kestra --chmod=755 docker/app/docker-entrypoint.sh /docker-entrypoint.sh
 
