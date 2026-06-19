@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for building Kestra from source
-FROM eclipse-temurin:21-jdk-jammy AS builder
+FROM eclipse-temurin:25-jdk-jammy AS builder
 
 # Install Node.js for building the UI
 RUN apt-get update && \
@@ -28,7 +28,7 @@ COPY . .
 RUN ./gradlew executableJar --no-daemon --info
 
 # Runtime stage
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:25-jre-jammy
 
 ARG KESTRA_PLUGINS=""
 ARG APT_PACKAGES=""
