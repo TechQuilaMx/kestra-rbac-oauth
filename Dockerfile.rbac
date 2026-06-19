@@ -21,11 +21,11 @@ RUN chmod +x ./gradlew
 # Copy docker-entrypoint.sh
 COPY --chown=kestra:kestra --chmod=755 docker/app/docker-entrypoint.sh /docker-entrypoint.sh
 
-# Download dependencies (this layer will be cached)
-RUN ./gradlew dependencies --no-daemon || true
-
 # Copy all source code
 COPY . .
+
+# COPY can reset executable bit from build context; enforce before invoking Gradle.
+RUN chmod +x ./gradlew
 
 # Build the executable JAR (includes UI build)
 RUN ./gradlew executableJar --no-daemon --info
