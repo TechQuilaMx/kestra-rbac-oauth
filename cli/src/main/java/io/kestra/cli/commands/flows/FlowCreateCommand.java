@@ -1,8 +1,12 @@
 package io.kestra.cli.commands.flows;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import io.kestra.cli.AbstractApiCommand;
 import io.kestra.cli.AbstractValidateCommand;
 import io.kestra.cli.services.TenantIdSelectorService;
+
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
@@ -12,15 +16,13 @@ import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import picocli.CommandLine;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 @CommandLine.Command(
     name = "create",
     description = "Create a single flow",
     mixinStandardHelpOptions = true
 )
 @Slf4j
+@Deprecated(forRemoval = true, since = "1.3.0")
 public class FlowCreateCommand extends AbstractApiCommand {
     @CommandLine.Parameters(index = "0", description = "The file containing the flow")
     public Path flowFile;
@@ -32,12 +34,13 @@ public class FlowCreateCommand extends AbstractApiCommand {
     @Override
     public Integer call() throws Exception {
         super.call();
+        stdErr("WARNING: this command is deprecated, use `kestractl flows deploy` instead");
 
         checkFile();
 
         String body = Files.readString(flowFile);
 
-        try(DefaultHttpClient client = client()) {
+        try (DefaultHttpClient client = client()) {
             MutableHttpRequest<String> request = HttpRequest
                 .POST(apiUri("/flows", tenantService.getTenantId(tenantId)), body).contentType(MediaType.APPLICATION_YAML);
 
@@ -47,11 +50,10 @@ public class FlowCreateCommand extends AbstractApiCommand {
             );
 
             stdOut("Flow successfully created !");
-        } catch (HttpClientResponseException e){
+        } catch (HttpClientResponseException e) {
             AbstractValidateCommand.handleHttpException(e, "flow");
             return 1;
         }
-
 
         return 0;
     }

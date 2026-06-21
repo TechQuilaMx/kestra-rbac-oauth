@@ -1,15 +1,18 @@
 package io.kestra.plugin.core.namespace;
 
+import java.time.ZonedDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import io.kestra.core.models.FetchVersion;
 import io.kestra.core.models.QueryFilter;
-import io.kestra.core.models.namespaces.files.NamespaceFileMetadata;
-import io.kestra.core.repositories.NamespaceFileMetadataRepositoryInterface;
 import io.kestra.core.storages.Namespace;
 import io.kestra.core.storages.NamespaceFile;
-import io.kestra.core.storages.kv.KVEntry;
-import io.kestra.core.storages.kv.KVStore;
 import io.kestra.core.validations.FilesVersionBehaviorValidation;
+
 import io.micronaut.data.model.Pageable;
 import io.micronaut.data.model.Sort;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -18,12 +21,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-
-import java.io.IOException;
-import java.time.ZonedDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @SuperBuilder
 @Getter

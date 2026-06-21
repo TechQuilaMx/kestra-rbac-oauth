@@ -1,19 +1,5 @@
 package io.kestra.core.docs;
 
-import io.kestra.core.plugins.PluginClassAndMetadata;
-import io.kestra.plugin.core.runner.Process;
-import io.kestra.core.models.tasks.Task;
-import io.kestra.core.plugins.PluginScanner;
-import io.kestra.core.plugins.RegisteredPlugin;
-import io.kestra.plugin.core.debug.Echo;
-import io.kestra.plugin.core.debug.Return;
-import io.kestra.plugin.core.flow.Dag;
-import io.kestra.plugin.core.flow.Subflow;
-import io.kestra.plugin.core.state.Set;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
@@ -21,8 +7,24 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+
+import io.kestra.core.models.tasks.Task;
+import io.kestra.core.plugins.PluginClassAndMetadata;
+import io.kestra.core.plugins.PluginScanner;
+import io.kestra.core.plugins.RegisteredPlugin;
+import io.kestra.plugin.core.debug.Echo;
+import io.kestra.plugin.core.debug.Return;
+import io.kestra.plugin.core.flow.Dag;
+import io.kestra.plugin.core.flow.Subflow;
+import io.kestra.plugin.core.runner.Process;
+import io.kestra.plugin.core.state.Set;
+
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import jakarta.inject.Inject;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -54,14 +56,14 @@ class DocumentationGeneratorTest {
         assertThat(render).contains("`VALUE_2`");
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     @Test
     void dag() throws IOException {
         PluginScanner pluginScanner = new PluginScanner(ClassPluginDocumentationTest.class.getClassLoader());
         RegisteredPlugin scan = pluginScanner.scan();
         Class dag = scan.findClass(Dag.class.getName()).orElseThrow();
 
-        PluginClassAndMetadata<Task> metadata = PluginClassAndMetadata.create(scan,dag, Task.class, null);
+        PluginClassAndMetadata<Task> metadata = PluginClassAndMetadata.create(scan, dag, Task.class, null);
         ClassPluginDocumentation<? extends Task> doc = ClassPluginDocumentation.of(jsonSchemaGenerator, metadata, scan.version(), false);
 
         String render = DocumentationGenerator.render(doc);
@@ -80,7 +82,7 @@ class DocumentationGeneratorTest {
         Arrays.stream(definitionsDoc.split("[^#]### "))
             // first is 'Definitions' header
             .skip(1)
-                .forEach(DocumentationGeneratorTest::assertRequiredPropsAreFirst);
+            .forEach(DocumentationGeneratorTest::assertRequiredPropsAreFirst);
     }
 
     private static void assertRequiredPropsAreFirst(String propertiesDoc) {
@@ -91,7 +93,7 @@ class DocumentationGeneratorTest {
         }
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     @Test
     void returnDoc() throws IOException {
         PluginScanner pluginScanner = new PluginScanner(ClassPluginDocumentationTest.class.getClassLoader());
@@ -104,13 +106,13 @@ class DocumentationGeneratorTest {
         String render = DocumentationGenerator.render(doc);
 
         assertThat(render).contains("Return a value for debugging purposes.");
-        assertThat(render).contains("This task is mostly useful for troubleshooting.");
+        assertThat(render).contains("Render a templated string and return it so you can quickly inspect or reuse values during a flow.");
         assertThat(render).contains("## Metrics");
         assertThat(render).contains("### `length`\n" + "* **Type:** ==counter== ");
         assertThat(render).contains("### `duration`\n" + "* **Type:** ==timer== ");
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     @Test
     void defaultBool() throws IOException {
         PluginScanner pluginScanner = new PluginScanner(ClassPluginDocumentationTest.class.getClassLoader());
@@ -125,7 +127,7 @@ class DocumentationGeneratorTest {
         assertThat(render).contains("* **Default:** `false`");
     }
 
-    @SuppressWarnings({"unchecked", "deprecation"})
+    @SuppressWarnings({ "unchecked", "deprecation" })
     @Test
     void echo() throws IOException {
         PluginScanner pluginScanner = new PluginScanner(ClassPluginDocumentationTest.class.getClassLoader());
@@ -193,6 +195,6 @@ class DocumentationGeneratorTest {
         String render = DocumentationGenerator.render(doc);
 
         assertThat(render).contains("title: Process");
-        assertThat(render).contains("Task runner that executes a task as a subprocess on the Kestra host.");
+        assertThat(render).contains("Run tasks as local subprocesses on the worker.");
     }
 }

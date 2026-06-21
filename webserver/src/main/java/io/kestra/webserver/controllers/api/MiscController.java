@@ -1,7 +1,14 @@
 package io.kestra.webserver.controllers.api;
 
+import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.Optional;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+
+import io.kestra.core.contexts.KestraConfig;
 import io.kestra.core.models.collectors.ExecutionUsage;
 import io.kestra.core.models.collectors.FlowUsage;
 import io.kestra.core.plugins.PluginRegistry;
@@ -10,16 +17,14 @@ import io.kestra.core.reporter.reports.FeatureUsageReport;
 import io.kestra.core.repositories.DashboardRepositoryInterface;
 import io.kestra.core.repositories.ExecutionRepositoryInterface;
 import io.kestra.core.repositories.TemplateRepositoryInterface;
+import io.kestra.core.runners.pebble.PebbleExpressionService;
 import io.kestra.core.services.InstanceService;
 import io.kestra.core.utils.EditionProvider;
-import io.kestra.core.utils.NamespaceUtils;
 import io.kestra.core.utils.VersionProvider;
-import io.kestra.webserver.annotations.RequirePermission;
-import io.kestra.webserver.configurations.OAuth2Configuration;
-import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.services.BasicAuthCredentials;
 import io.kestra.webserver.services.BasicAuthService;
-import io.kestra.webserver.services.OAuth2Service;
+import io.kestra.webserver.services.ai.AiServiceManager;
+
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpResponse;
@@ -32,17 +37,13 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
-
-import java.time.Duration;
-import java.time.ZonedDateTime;
-import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Controller("/api/v1")
@@ -67,18 +68,18 @@ public class MiscController {
 
     @Inject
     Optional<BasicAuthService> basicAuthService = Optional.empty();
-    
-    @Inject
-    Optional<OAuth2Service> oauth2Service = Optional.empty();
 
     @Inject
     Optional<TemplateRepositoryInterface> templateRepository;
 
     @Inject
-    NamespaceUtils namespaceUtils;
+    Optional<AiServiceManager> aiServiceManager = Optional.empty();
 
-    @io.micronaut.context.annotation.Value("${kestra.ui.charts.default-duration:P30D}")
-private String chartDefaultDuration;
+    @Inject
+    KestraConfig kestraConfig;
+
+    @io.micronaut.context.annotation.Value("${kestra.ui.charts.default-duration:PT24H}")
+    private String chartDefaultDuration;
 
     @io.micronaut.context.annotation.Value("${kestra.anonymous-usage-report.enabled}")
     protected Boolean isAnonymousUsageEnabled;
@@ -117,11 +118,12 @@ private String chartDefaultDuration;
     @Inject
     protected EditionProvider editionProvider;
 
+    @Inject
+    PebbleExpressionService pebbleExpressionService;
 
     @Get("/configs")
     @ExecuteOn(TaskExecutors.IO)
-    @RequirePermission(Permission.SETTINGS_VIEW)
-    @Operation(tags = {"Misc"}, summary = "Retrieve the instance configuration.", description = "Global endpoint available to all users.")
+    @Operation(tags = { "Misc" }, summary = "Retrieve the instance configuration.", description = "Global endpoint available to all users.")
     public Configuration getConfiguration() throws JsonProcessingException { // JsonProcessingException might be thrown in EE
         Configuration.ConfigurationBuilder<?, ?> builder = Configuration
             .builder()
@@ -134,19 +136,21 @@ private String chartDefaultDuration;
             .isAnonymousUsageEnabled(this.isAnonymousUsageEnabled)
             .isUiAnonymousUsageEnabled(this.isUiAnonymousUsageEnabled)
             .isTemplateEnabled(templateRepository.isPresent())
-            .preview(Preview.builder()
-                .initial(this.initialPreviewRows)
-                .max(this.maxPreviewRows)
-                .build())
+            .preview(
+                Preview.builder()
+                    .initial(this.initialPreviewRows)
+                    .max(this.maxPreviewRows)
+                    .build()
+            )
             .isAiEnabled(applicationContext.containsBean(AiController.class))
+            .isAiApiKeyConfigured(aiServiceManager.map(AiServiceManager::hasConfiguredProvider).orElse(false))
             .isBasicAuthInitialized(basicAuthService.map(BasicAuthService::isBasicAuthInitialized).orElse(false))
-            .systemNamespace(namespaceUtils.getSystemFlowNamespace())
+            .systemNamespace(kestraConfig.getSystemFlowNamespace())
             .hiddenLabelsPrefixes(hiddenLabelsPrefixes)
             .url(kestraUrl)
             .pluginsHash(pluginRegistry.hash())
             .chartDefaultDuration(this.chartDefaultDuration)
-            .isConcurrencyViewEnabled(!this.queueType.equals("kafka"))
-            ;
+            .isConcurrencyViewEnabled(!this.queueType.equals("kafka"));
 
         if (this.environmentName != null || this.environmentColor != null) {
             builder.environment(
@@ -156,31 +160,13 @@ private String chartDefaultDuration;
                     .build()
             );
         }
-        
-        // Add OAuth2 configuration if enabled
-        if (oauth2Service.isPresent() && oauth2Service.get().isEnabled()) {
-            OAuth2Configuration oauth2Config = oauth2Service.get().getConfiguration();
-            log.info("OAuth2 Configuration: authEndpoint={}, tokenEndpoint={}, userInfoEndpoint={}", 
-                oauth2Config.getAuthorizationEndpoint(),
-                oauth2Config.getTokenEndpoint(),
-                oauth2Config.getUserInfoEndpoint()
-            );
-            builder
-                .oauth2ClientId(oauth2Config.getClientId())
-                .oauth2AuthEndpoint(oauth2Config.getAuthorizationEndpoint())
-                .oauth2TokenEndpoint(oauth2Config.getTokenEndpoint())
-                .oauth2UserInfoEndpoint(oauth2Config.getUserInfoEndpoint())
-                .oauth2LogoutEndpoint(oauth2Config.getLogoutEndpoint())
-                .oauth2Scope(oauth2Config.getScope());
-        }
 
         return builder.build();
     }
 
     @Get("/{tenant}/usages/all")
     @ExecuteOn(TaskExecutors.IO)
-    @RequirePermission(Permission.SETTINGS_VIEW)
-    @Operation(tags = {"Misc"}, summary = "Retrieve instance usage information")
+    @Operation(tags = { "Misc" }, summary = "Retrieve instance usage information")
     public ApiUsage getUsages() {
         ZonedDateTime now = ZonedDateTime.now();
         FeatureUsageReport.UsageEvent event = featureUsageReport.report(now.toInstant(), Reportable.TimeInterval.of(now.minus(Duration.ofDays(1)), now));
@@ -192,11 +178,9 @@ private String chartDefaultDuration;
 
     @Post(uri = "/{tenant}/basicAuth")
     @ExecuteOn(TaskExecutors.IO)
-    @Operation(tags = {"Misc"}, summary = "Configure basic authentication for the instance.", description = "Sets up basic authentication credentials.")
-    @RequirePermission(Permission.SETTINGS_EDIT)
+    @Operation(tags = { "Misc" }, summary = "Configure basic authentication for the instance.", description = "Sets up basic authentication credentials.")
     public HttpResponse<Void> createBasicAuth(
-        @RequestBody @Body BasicAuthCredentials basicAuthCredentials
-    ) {
+        @RequestBody @Valid @Body BasicAuthCredentials basicAuthCredentials) {
         basicAuthService
             .orElseThrow(() -> new IllegalStateException("basicAuthService bean is required in OSS"))
             .save(basicAuthCredentials);
@@ -204,15 +188,27 @@ private String chartDefaultDuration;
         return HttpResponse.noContent();
     }
 
-
     @Get("/basicAuthValidationErrors")
     @ExecuteOn(TaskExecutors.IO)
-    @RequirePermission(Permission.SETTINGS_VIEW)
-    @Operation(tags = {"Misc"}, summary = "Retrieve the instance configuration.", description = "Global endpoint available to all users.")
+    @Operation(tags = { "Misc" }, summary = "Retrieve the instance configuration.", description = "Global endpoint available to all users.")
     public List<String> getBasicAuthConfigErrors() {
         return basicAuthService
             .orElseThrow(() -> new IllegalStateException("basicAuthService bean is required in OSS"))
             .validationErrors();
+    }
+
+    @Get("/pebble/filters")
+    @ExecuteOn(TaskExecutors.IO)
+    @Operation(tags = { "Misc" }, summary = "Retrieve the list of available Pebble expression filters.")
+    public List<String> getExpressionFilters() {
+        return pebbleExpressionService.filters();
+    }
+
+    @Get("/pebble/functions")
+    @ExecuteOn(TaskExecutors.IO)
+    @Operation(tags = { "Misc" }, summary = "Retrieve the list of available Pebble expression functions.")
+    public List<String> getExpressionFunctions() {
+        return pebbleExpressionService.functions();
     }
 
     @Getter
@@ -255,30 +251,13 @@ private String chartDefaultDuration;
 
         Boolean isAiEnabled;
 
+        Boolean isAiApiKeyConfigured;
+
         Boolean isBasicAuthInitialized;
 
         Long pluginsHash;
 
         Boolean isConcurrencyViewEnabled;
-        
-        // OAuth2 configuration fields
-        @JsonInclude
-        String oauth2ClientId;
-        
-        @JsonInclude
-        String oauth2AuthEndpoint;
-        
-        @JsonInclude
-        String oauth2TokenEndpoint;
-        
-        @JsonInclude
-        String oauth2UserInfoEndpoint;
-        
-        @JsonInclude
-        String oauth2LogoutEndpoint;
-        
-        @JsonInclude
-        String oauth2Scope;
     }
 
     @Value

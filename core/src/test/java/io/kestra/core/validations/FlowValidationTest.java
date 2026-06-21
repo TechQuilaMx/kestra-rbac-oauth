@@ -1,30 +1,33 @@
 package io.kestra.core.validations;
 
+import java.io.File;
+import java.net.URL;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.core.JsonLocation;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.assets.AssetIdentifier;
 import io.kestra.core.models.assets.AssetsDeclaration;
 import io.kestra.core.models.flows.Flow;
+import io.kestra.core.models.flows.FlowSource;
 import io.kestra.core.models.flows.GenericFlow;
 import io.kestra.core.models.validations.ModelValidator;
+import io.kestra.core.models.validations.ValidateConstraintViolation;
 import io.kestra.core.serializers.YamlParser;
+import io.kestra.core.services.FlowService;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.plugin.core.log.Log;
+
 import jakarta.inject.Inject;
 import jakarta.validation.ConstraintViolation;
-import org.junit.jupiter.api.Test;
-import io.kestra.core.models.validations.ValidateConstraintViolation;
-import io.kestra.core.services.FlowService;
 import jakarta.validation.ConstraintViolationException;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.JsonLocation;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.util.List;
-import java.io.File;
-import java.net.URL;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -43,16 +46,16 @@ class FlowValidationTest {
         public TestJsonProcessingException(String msg, JsonLocation location) {
             super(msg, location);
         }
+
         public TestJsonProcessingException(String msg) {
             super(msg);
         }
     }
 
-
     @Test
     void testFormatYamlErrorMessage_WithExpectedFieldName() throws JsonProcessingException {
         JsonProcessingException e = new TestJsonProcessingException("Expected a field name", new JsonLocation(null, 100, 5, 10));
-        Object dummyTarget = new Object();  // Dummy target for toConstraintViolationException
+        Object dummyTarget = new Object(); // Dummy target for toConstraintViolationException
 
         ConstraintViolationException result = YamlParser.toConstraintViolationException(dummyTarget, "test resource", e);
 
@@ -99,7 +102,6 @@ class FlowValidationTest {
         assertThat(result.getMessage()).contains("YAML syntax error: Invalid structure").doesNotContain("at line");
     }
 
-
     @Test
     void testValidateFlowWithYamlSyntaxError() {
         String invalidYaml = """
@@ -111,10 +113,10 @@ class FlowValidationTest {
                 message: {{ abc }}
 
             """;
-            List<ValidateConstraintViolation> results = flowService.validate("my-tenant", invalidYaml);
+        List<ValidateConstraintViolation> results = flowService.validate("my-tenant", List.of(new FlowSource(null, invalidYaml)));
 
-            assertThat(results).hasSize(1);
-            assertThat(results.getFirst().getConstraints()).contains("YAML parsing error").contains("at line");
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().getConstraints()).contains("YAML parsing error").contains("at line");
     }
 
     @Test
@@ -128,7 +130,7 @@ class FlowValidationTest {
                 message: {{ undefinedVar }}
             """;
 
-        List<ValidateConstraintViolation> results = flowService.validate("my-tenant", yamlWithUndefinedVar);
+        List<ValidateConstraintViolation> results = flowService.validate("my-tenant", List.of(new FlowSource(null, yamlWithUndefinedVar)));
 
         assertThat(results).hasSize(1);
         assertThat(results.getFirst().getConstraints()).contains("Validation error");
@@ -140,7 +142,7 @@ class FlowValidationTest {
         Optional<ConstraintViolationException> validate = modelValidator.isValid(flow);
 
         assertThat(validate.isPresent()).isTrue();
-        assertThat(validate.get().getMessage()).contains(": Invalid Flow: Recursive call to flow [io.kestra.tests.recursive-flow]");
+        assertThat(validate.get().getMessage()).contains("Invalid Flow: Recursive call to flow [io.kestra.tests.recursive-flow]");
     }
 
     @Test
@@ -159,7 +161,8 @@ class FlowValidationTest {
         Optional<ConstraintViolationException> validate = modelValidator.isValid(flow);
 
         assertThat(validate.isPresent()).isEqualTo(true);
-        assertThat(validate.get().getMessage()).contains("Invalid input reference: use inputs[key-name] instead of inputs.key-name — keys with dashes require bracket notation, offending tasks: [hello]");
+        assertThat(validate.get().getMessage())
+            .contains("Invalid input reference: use inputs[key-name] instead of inputs.key-name — keys with dashes require bracket notation, offending tasks: [hello]");
     }
 
     @Test
@@ -168,8 +171,10 @@ class FlowValidationTest {
         Optional<ConstraintViolationException> validate = modelValidator.isValid(flow);
 
         assertThat(validate.isPresent()).isEqualTo(true);
-        assertThat(validate.get().getMessage()).contains("Invalid output reference: use outputs[key-name] instead of outputs.key-name — keys with dashes require bracket notation, offending tasks: [use_output]");
-        assertThat(validate.get().getMessage()).contains("Invalid output reference: use outputs[key-name] instead of outputs.key-name — keys with dashes require bracket notation, offending outputs: [final]");
+        assertThat(validate.get().getMessage())
+            .contains("Invalid output reference: use outputs[key-name] instead of outputs.key-name — keys with dashes require bracket notation, offending tasks: [use_output]");
+        assertThat(validate.get().getMessage())
+            .contains("Invalid output reference: use outputs[key-name] instead of outputs.key-name — keys with dashes require bracket notation, offending outputs: [final]");
     }
 
     @Test
@@ -238,16 +243,18 @@ class FlowValidationTest {
         Flow flow = Flow.builder()
             .id(TestsUtils.randomString())
             .namespace(TestsUtils.randomNamespace())
-            .tasks(List.of(
-                Log.builder()
-                    .id("log")
-                    .type(Log.class.getName())
-                    .message("any")
-                    .assets(io.kestra.core.models.property.Property.ofValue(
-                        new AssetsDeclaration(true, List.of(new AssetIdentifier(null, null, "anyId")), null))
-                    )
-                    .build()
-            ))
+            .tasks(
+                List.of(
+                    Log.builder()
+                        .id("log")
+                        .type(Log.class.getName())
+                        .message("any")
+                        .assets(
+                            new AssetsDeclaration(true, List.of(new AssetIdentifier(null, null, "anyId", "custom")), null)
+                        )
+                        .build()
+                )
+            )
             .build();
 
         Optional<ConstraintViolationException> violations = modelValidator.isValid(flow);
@@ -257,6 +264,48 @@ class FlowValidationTest {
             message -> assertThat(message).contains("Task 'log' can't have any `assets` because assets are only available in Enterprise Edition.")
         );
     };
+
+    @Test
+    void shouldNotFailValidationWhenSecretPropertyHasPlainTextValue() {
+        // Given
+        SecretFieldTask task = SecretFieldTask.builder()
+            .id("secret-task")
+            .type(SecretFieldTask.class.getName())
+            .secretField("plain-text-value")
+            .build();
+        Flow flow = Flow.builder()
+            .id("test-flow")
+            .namespace("io.kestra.tests")
+            .tasks(List.of(task))
+            .build();
+
+        // When
+        Optional<ConstraintViolationException> violation = modelValidator.isValid(flow);
+
+        // Then: plain-text secret is a warning, not a hard validation error
+        assertThat(violation).isEmpty();
+    }
+
+    @Test
+    void shouldProduceWarningWhenSecretPropertyHasPlainTextValue() {
+        // Given
+        SecretFieldTask task = SecretFieldTask.builder()
+            .id("secret-task")
+            .type(SecretFieldTask.class.getName())
+            .secretField("plain-text-value")
+            .build();
+        Flow flow = Flow.builder()
+            .id("test-flow")
+            .namespace("io.kestra.tests")
+            .tasks(List.of(task))
+            .build();
+
+        // When
+        List<String> warnings = flowService.warnings(flow, TenantService.MAIN_TENANT);
+
+        // Then
+        assertThat(warnings).anyMatch(w -> w.contains("secret-task") && w.contains("secretField"));
+    }
 
     private Flow parse(String path) {
         URL resource = TestsUtils.class.getClassLoader().getResource(path);

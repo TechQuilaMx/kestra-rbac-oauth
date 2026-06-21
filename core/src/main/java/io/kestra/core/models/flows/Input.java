@@ -3,9 +3,11 @@ package io.kestra.core.models.flows;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
 import io.kestra.core.models.flows.input.*;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.validations.InputValidation;
+
 import io.micronaut.core.annotation.Introspected;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.ConstraintViolationException;
@@ -24,27 +26,29 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Introspected
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type", visible = true, include = JsonTypeInfo.As.EXISTING_PROPERTY)
-@JsonSubTypes({
-    @JsonSubTypes.Type(value = ArrayInput.class, name = "ARRAY"),
-    @JsonSubTypes.Type(value = BooleanInput.class, name = "BOOLEAN"),
-    @JsonSubTypes.Type(value = BoolInput.class, name = "BOOL"),
-    @JsonSubTypes.Type(value = DateInput.class, name = "DATE"),
-    @JsonSubTypes.Type(value = DateTimeInput.class, name = "DATETIME"),
-    @JsonSubTypes.Type(value = DurationInput.class, name = "DURATION"),
-    @JsonSubTypes.Type(value = FileInput.class, name = "FILE"),
-    @JsonSubTypes.Type(value = FloatInput.class, name = "FLOAT"),
-    @JsonSubTypes.Type(value = IntInput.class, name = "INT"),
-    @JsonSubTypes.Type(value = JsonInput.class, name = "JSON"),
-    @JsonSubTypes.Type(value = SecretInput.class, name = "SECRET"),
-    @JsonSubTypes.Type(value = StringInput.class, name = "STRING"),
-    @JsonSubTypes.Type(value = EnumInput.class, name = "ENUM"),
-    @JsonSubTypes.Type(value = SelectInput.class, name = "SELECT"),
-    @JsonSubTypes.Type(value = TimeInput.class, name = "TIME"),
-    @JsonSubTypes.Type(value = URIInput.class, name = "URI"),
-    @JsonSubTypes.Type(value = MultiselectInput.class, name = "MULTISELECT"),
-    @JsonSubTypes.Type(value = YamlInput.class, name = "YAML"),
-    @JsonSubTypes.Type(value = EmailInput.class, name = "EMAIL"),
-})
+@JsonSubTypes(
+    {
+        @JsonSubTypes.Type(value = ArrayInput.class, name = "ARRAY"),
+        @JsonSubTypes.Type(value = BooleanInput.class, name = "BOOLEAN"),
+        @JsonSubTypes.Type(value = BoolInput.class, name = "BOOL"),
+        @JsonSubTypes.Type(value = DateInput.class, name = "DATE"),
+        @JsonSubTypes.Type(value = DateTimeInput.class, name = "DATETIME"),
+        @JsonSubTypes.Type(value = DurationInput.class, name = "DURATION"),
+        @JsonSubTypes.Type(value = FileInput.class, name = "FILE"),
+        @JsonSubTypes.Type(value = FloatInput.class, name = "FLOAT"),
+        @JsonSubTypes.Type(value = IntInput.class, name = "INT"),
+        @JsonSubTypes.Type(value = JsonInput.class, name = "JSON"),
+        @JsonSubTypes.Type(value = SecretInput.class, name = "SECRET"),
+        @JsonSubTypes.Type(value = StringInput.class, name = "STRING"),
+        @JsonSubTypes.Type(value = EnumInput.class, name = "ENUM"),
+        @JsonSubTypes.Type(value = SelectInput.class, name = "SELECT"),
+        @JsonSubTypes.Type(value = TimeInput.class, name = "TIME"),
+        @JsonSubTypes.Type(value = URIInput.class, name = "URI"),
+        @JsonSubTypes.Type(value = MultiselectInput.class, name = "MULTISELECT"),
+        @JsonSubTypes.Type(value = YamlInput.class, name = "YAML"),
+        @JsonSubTypes.Type(value = EmailInput.class, name = "EMAIL"),
+    }
+)
 @InputValidation
 public abstract class Input<T> implements Data {
     @Schema(
@@ -52,7 +56,7 @@ public abstract class Input<T> implements Data {
     )
     @NotNull
     @NotBlank
-    @Pattern(regexp="^[a-zA-Z0-9][.a-zA-Z0-9_-]*")
+    @Pattern(regexp = "^[a-zA-Z0-9][.a-zA-Z0-9_-]*")
     String id;
 
     @Deprecated
@@ -82,13 +86,13 @@ public abstract class Input<T> implements Data {
         title = "The default value to use if no value is specified."
     )
     Property<T> defaults;
-    
+
     @Schema(
         title = "The suggested value for the input.",
         description = "Optional UI hint for pre-filling the input. Cannot be used together with a default value."
     )
     Property<T> prefill;
-    
+
     @Schema(
         title = "The display name of the input."
     )

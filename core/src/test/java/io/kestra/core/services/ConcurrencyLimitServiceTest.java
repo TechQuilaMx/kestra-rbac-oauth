@@ -1,5 +1,16 @@
 package io.kestra.core.services;
 
+import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+
 import io.kestra.core.junit.annotations.ExecuteFlow;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.junit.annotations.LoadFlows;
@@ -11,23 +22,13 @@ import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.runners.ConcurrencyLimit;
-import io.kestra.core.runners.RunnerUtils;
+import io.kestra.core.runners.TestRunnerUtils;
 import io.kestra.core.utils.TestsUtils;
+
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import reactor.core.publisher.Flux;
 
-import java.time.Duration;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import static io.kestra.core.utils.Rethrow.throwRunnable;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,17 +40,17 @@ class ConcurrencyLimitServiceTest {
     private static final String CONCURRENCY_LIMIT_SERVICE_TEST_UNQUEUE_EXECUTION_TENANT = "concurrency_limit_service_test_unqueue_execution_tenant";
 
     @Inject
-    private RunnerUtils runnerUtils;
+    private TestRunnerUtils runnerUtils;
 
     @Inject
-    @Named(QueueFactoryInterface.EXECUTION_NAMED)
-    private QueueInterface<Execution> executionQueue;
+    private ConcurrencyLimitService concurrencyLimitService;
 
     @Inject
     private FlowRepositoryInterface flowRepositoryInterface;
 
     @Inject
-    private ConcurrencyLimitService concurrencyLimitService;
+    @Named(QueueFactoryInterface.EXECUTION_NAMED)
+    private QueueInterface<Execution> executionQueue;
 
     @AfterEach
     void tearDown() {
@@ -67,7 +68,8 @@ class ConcurrencyLimitServiceTest {
 
         // await for the execution to be terminated
         CountDownLatch terminated = new CountDownLatch(2);
-        Flux<Execution> receive = TestsUtils.receive(executionQueue, (either) -> {
+        Flux<Execution> receive = TestsUtils.receive(executionQueue, (either) ->
+        {
             if (either.getLeft().getId().equals(first.getId()) && either.getLeft().getState().isTerminated()) {
                 terminated.countDown();
             }
@@ -101,9 +103,8 @@ class ConcurrencyLimitServiceTest {
         Optional<ConcurrencyLimit> limit = concurrencyLimitService.findById(execution.getTenantId(), execution.getNamespace(), execution.getFlowId());
 
         assertThat(limit).isNotEmpty();
-        ConcurrencyLimit updated =  limit.get().withRunning(99);
+        ConcurrencyLimit updated = limit.get().withRunning(99);
         concurrencyLimitService.update(updated);
-
 
         limit = concurrencyLimitService.findById(execution.getTenantId(), execution.getNamespace(), execution.getFlowId());
         assertThat(limit).isNotEmpty();
@@ -121,20 +122,18 @@ class ConcurrencyLimitServiceTest {
         assertThat(list.getFirst().getFlowId()).isEqualTo(execution.getFlowId());
     }
 
-    private Execution runUntilQueued(String namespace, String flowId) throws TimeoutException, QueueException {
-        return runUntilQueued(TENANT_ID, namespace, flowId);
-    }
-
-    private Execution runUntilQueued(String tenantId, String namespace, String flowId) throws TimeoutException, QueueException {
+    private Execution runUntilQueued(String tenantId, String namespace, String flowId) throws QueueException {
         return runUntilState(tenantId, namespace, flowId, State.Type.QUEUED);
     }
 
-    private Execution runUntilState(String tenantId, String namespace, String flowId, State.Type state) throws TimeoutException, QueueException {
+    private Execution runUntilState(String tenantId, String namespace, String flowId, State.Type state) throws QueueException {
         Execution execution = this.createExecution(tenantId, namespace, flowId);
+        this.executionQueue.emit(execution);
         return runnerUtils.awaitExecution(
             it -> execution.getId().equals(it.getId()) && it.getState().getCurrent() == state,
-            throwRunnable(() -> this.executionQueue.emit(execution)),
-            Duration.ofSeconds(1));
+            execution,
+            Duration.ofSeconds(1)
+        );
     }
 
     private Execution createExecution(String tenantId, String namespace, String flowId) {

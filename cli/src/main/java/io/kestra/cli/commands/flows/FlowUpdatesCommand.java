@@ -1,9 +1,16 @@
 package io.kestra.cli.commands.flows;
 
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
 import io.kestra.cli.AbstractApiCommand;
 import io.kestra.cli.AbstractValidateCommand;
 import io.kestra.cli.services.TenantIdSelectorService;
 import io.kestra.core.serializers.YamlParser;
+
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -15,27 +22,22 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import picocli.CommandLine;
 
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-
 @CommandLine.Command(
     name = "updates",
     description = "Create or update flows from a folder, and optionally delete the ones not present",
     mixinStandardHelpOptions = true
 )
 @Slf4j
+@Deprecated(forRemoval = true, since = "1.3.0")
 public class FlowUpdatesCommand extends AbstractApiCommand {
 
     @CommandLine.Parameters(index = "0", description = "The directory containing files")
     public Path directory;
 
-    @CommandLine.Option(names = {"--delete"}, negatable = true, description = "Whether missing should be deleted")
+    @CommandLine.Option(names = { "--delete" }, negatable = true, description = "Whether missing should be deleted")
     public boolean delete = false;
 
-    @CommandLine.Option(names = {"--namespace"}, description = "The parent namespace of the flows, if not set, every namespace are allowed.")
+    @CommandLine.Option(names = { "--namespace" }, description = "The parent namespace of the flows, if not set, every namespace are allowed.")
     public String namespace;
 
     @Inject
@@ -45,12 +47,14 @@ public class FlowUpdatesCommand extends AbstractApiCommand {
     @Override
     public Integer call() throws Exception {
         super.call();
+        stdErr("WARNING: this command is deprecated, use `kestractl flows deploy` instead");
 
         try (var files = Files.walk(directory)) {
             List<String> flows = files
                 .filter(Files::isRegularFile)
                 .filter(YamlParser::isValidExtension)
-                .map(path -> {
+                .map(path ->
+                {
                     try {
                         return IncludeHelperExpander.expand(Files.readString(path, Charset.defaultCharset()), path.getParent());
                     } catch (IOException e) {
@@ -65,13 +69,14 @@ public class FlowUpdatesCommand extends AbstractApiCommand {
             } else {
                 body = String.join("\n---\n", flows);
             }
-            try(DefaultHttpClient client = client()) {
+            try (DefaultHttpClient client = client()) {
                 String namespaceQuery = "";
                 if (namespace != null) {
                     namespaceQuery = "&namespace=" + namespace;
                 }
                 MutableHttpRequest<String> request = HttpRequest
-                    .POST(apiUri("/flows/bulk", tenantIdSelectorService.getTenantId(tenantId)) + "?allowNamespaceChild=true&delete=" + delete + namespaceQuery, body).contentType(MediaType.APPLICATION_YAML);
+                    .POST(apiUri("/flows/bulk", tenantIdSelectorService.getTenantId(tenantId)) + "?allowNamespaceChild=true&delete=" + delete + namespaceQuery, body)
+                    .contentType(MediaType.APPLICATION_YAML);
 
                 List<UpdateResult> updated = client.toBlocking().retrieve(
                     this.requestOptions(request),
@@ -79,8 +84,8 @@ public class FlowUpdatesCommand extends AbstractApiCommand {
                 );
 
                 stdOut(updated.size() + " flow(s) successfully updated !");
-                updated.forEach(flow -> stdOut("- " + flow.getNamespace() + "."  + flow.getId()));
-            } catch (HttpClientResponseException e){
+                updated.forEach(flow -> stdOut("- " + flow.getNamespace() + "." + flow.getId()));
+            } catch (HttpClientResponseException e) {
                 AbstractValidateCommand.handleHttpException(e, "flow");
                 return 1;
             }

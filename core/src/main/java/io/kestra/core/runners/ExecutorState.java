@@ -1,15 +1,17 @@
 package io.kestra.core.runners;
 
-import io.kestra.core.models.flows.State;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import io.kestra.core.models.HasUID;
+import io.kestra.core.models.flows.State;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 @Data
 @NoArgsConstructor
-public class ExecutorState {
+public class ExecutorState implements HasUID {
     private String executionId;
     private Map<String, State.Type> workerTaskDeduplication = new ConcurrentHashMap<>();
     private Map<String, String> childDeduplication = new ConcurrentHashMap<>();
@@ -17,5 +19,10 @@ public class ExecutorState {
 
     public ExecutorState(String executionId) {
         this.executionId = executionId;
+    }
+
+    @Override
+    public String uid() {
+        return executionId;
     }
 }

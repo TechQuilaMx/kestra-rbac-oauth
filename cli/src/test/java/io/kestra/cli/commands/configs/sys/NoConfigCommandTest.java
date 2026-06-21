@@ -1,10 +1,4 @@
 package io.kestra.cli.commands.configs.sys;
-import io.kestra.cli.commands.flows.FlowCreateCommand;
-import io.kestra.cli.commands.namespaces.kv.KvCommand;
-import io.micronaut.configuration.picocli.PicocliRunner;
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -14,7 +8,17 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Objects;
 
+import org.junit.jupiter.api.Test;
+
+import io.kestra.cli.commands.flows.FlowCreateCommand;
+import io.kestra.cli.commands.namespaces.kv.KvCommand;
+
+import io.micronaut.configuration.picocli.PicocliRunner;
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.runtime.server.EmbeddedServer;
+
 import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Verifies CLI behavior without repository configuration:
  * - Repo-independent commands succeed (e.g. KV with no params).
@@ -44,14 +48,16 @@ class NoConfigCommandTest {
         Path flowPath = Paths.get(flowUrl.toURI());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ByteArrayOutputStream err=new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
 
         System.setOut(new PrintStream(out));
         System.setErr(new PrintStream(err));
 
-        try (ApplicationContext ctx = ApplicationContext.builder()
-            .deduceEnvironment(false)
-            .start()) {
+        try (
+            ApplicationContext ctx = ApplicationContext.builder()
+                .deduceEnvironment(false)
+                .start()
+        ) {
 
             EmbeddedServer embeddedServer = ctx.getBean(EmbeddedServer.class);
             embeddedServer.start();
@@ -65,7 +71,6 @@ class NoConfigCommandTest {
             };
 
             Integer exitCode = PicocliRunner.call(FlowCreateCommand.class, ctx, createArgs);
-
 
             assertThat(exitCode).isNotZero();
             // check that the only log is an access log: this has the advantage to also check that access log is working!

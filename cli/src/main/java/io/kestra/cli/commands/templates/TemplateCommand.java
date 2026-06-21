@@ -4,6 +4,7 @@ import io.kestra.cli.AbstractCommand;
 import io.kestra.cli.App;
 import io.kestra.cli.commands.templates.namespaces.TemplateNamespaceCommand;
 import io.kestra.core.models.templates.TemplateEnabled;
+
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import picocli.CommandLine;
@@ -26,6 +27,6 @@ public class TemplateCommand extends AbstractCommand {
     public Integer call() throws Exception {
         super.call();
 
-        return App.runCli(new String[]{"template",  "--help"});
+        return App.runCli(new String[] { "template", "--help" });
     }
 }

@@ -1,5 +1,11 @@
 package io.kestra.jdbc.runner;
 
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import org.apache.commons.lang3.NotImplementedException;
+
 import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.flows.FlowWithSource;
 import io.kestra.core.models.triggers.AbstractTrigger;
@@ -9,13 +15,9 @@ import io.kestra.core.queues.QueueException;
 import io.kestra.core.runners.ScheduleContextInterface;
 import io.kestra.core.runners.SchedulerTriggerStateInterface;
 import io.kestra.jdbc.repository.AbstractJdbcTriggerRepository;
+
 import jakarta.annotation.PostConstruct;
 import jakarta.inject.Singleton;
-import org.apache.commons.lang3.NotImplementedException;
-
-import java.time.ZonedDateTime;
-import java.util.List;
-import java.util.Optional;
 
 @Singleton
 @JdbcRunnerEnabled
@@ -30,7 +32,8 @@ public class JdbcSchedulerTriggerState implements SchedulerTriggerStateInterface
     public void initTriggerEvaluateRunning() {
         // trigger evaluateRunning lock can exist when launching the scheduler, we clear it.
         // it's possible since the scheduler on jdbc must be a single node
-        this.triggerRepository.findAllForAllTenants().forEach(trigger -> {
+        this.triggerRepository.findAllForAllTenants().forEach(trigger ->
+        {
             if (trigger.getEvaluateRunningDate() != null) {
                 var unlocked = trigger.toBuilder().evaluateRunningDate(null).build();
                 this.triggerRepository.save(unlocked);

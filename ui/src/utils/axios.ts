@@ -1,6 +1,7 @@
 import axios, {AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError, AxiosProgressEvent} from "axios"
 import NProgress from "nprogress"
-import {Router, useRouter} from "vue-router"
+import {inject} from "vue"
+import {Router, routerKey} from "vue-router"
 import {storageKeys} from "./constants"
 import {useLayoutStore} from "../stores/layout"
 import {useCoreStore} from "../stores/core"
@@ -8,7 +9,6 @@ import * as BasicAuth from "../utils/basicAuth"
 import {useAuthStore} from "override/stores/auth"
 import {useMiscStore} from "override/stores/misc";
 import {useUnsavedChangesStore} from "../stores/unsavedChanges"
-import {useOAuth2Store} from "../stores/oauth2"
 
 let pendingRoute = false
 let requestsTotal = 0
@@ -47,22 +47,8 @@ const increaseProgress = () => {
     }, latencyThreshold + 50)
 }
 
-const requestInterceptor = async (config: any) => {
+const requestInterceptor = (config: any) => {
     initProgress()
-    
-    // Add OAuth2 Bearer token if available
-    const oauth2Store = useOAuth2Store()
-    if (oauth2Store.isInitialized && oauth2Store.isAuthenticated) {
-        try {
-            const accessToken = await oauth2Store.getAccessToken()
-            if (accessToken) {
-                config.headers.Authorization = `Bearer ${accessToken}`
-            }
-        } catch (error) {
-            console.error("Failed to get OAuth2 access token:", error)
-        }
-    }
-    
     return config
 }
 
@@ -130,30 +116,6 @@ export const createAxios = (
             }
 
             const authStore = useAuthStore()
-
-            // Handle OAuth2 token refresh on 401
-            if (errorResponse.response.status === 401) {
-                const oauth2Store = useOAuth2Store()
-                
-                if (oauth2Store.isInitialized && oauth2Store.isAuthenticated) {
-                    try {
-                        // Try to refresh the token
-                        const newToken = await oauth2Store.refreshAccessToken()
-                        
-                        // Retry the original request with new token
-                        const originalRequest = errorResponse.config
-                        originalRequest.headers.Authorization = `Bearer ${newToken}`
-                        
-                        return instance(originalRequest)
-                    } catch (refreshError) {
-                        console.error("OAuth2 token refresh failed:", refreshError)
-                        
-                        // Logout and redirect to login
-                        oauth2Store.logout()
-                        return Promise.reject(errorResponse)
-                    }
-                }
-            }
 
             if (errorResponse.response.status === 401
                 && (oss || !authStore.isLogged)) {
@@ -332,7 +294,8 @@ export default (
 let axiosInstance: AxiosInstance | null = null;
 
 export const useAxios = () => {
-    const router = useRouter();
+    // for storybook tests we need to allow router to be undefined
+    const router = inject(routerKey, undefined as any) as Router | undefined;
 
     const miscStore = useMiscStore();
     const {edition} = miscStore.configs || {};

@@ -1,5 +1,15 @@
 package io.kestra.webserver.controllers.api;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
+
 import io.kestra.core.models.templates.Template;
 import io.kestra.core.models.templates.TemplateEnabled;
 import io.kestra.core.models.validations.ManualConstraintViolation;
@@ -8,12 +18,11 @@ import io.kestra.core.models.validations.ValidateConstraintViolation;
 import io.kestra.core.repositories.TemplateRepositoryInterface;
 import io.kestra.core.serializers.YamlParser;
 import io.kestra.core.tenant.TenantService;
-import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.controllers.domain.IdWithNamespace;
-import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.BulkResponse;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.PageableUtils;
+
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -29,20 +38,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.inject.Inject;
-
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import java.util.zip.ZipOutputStream;
 
 @Validated
 @Controller("/api/v1/{tenant}/templates")
@@ -61,12 +59,10 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/{id}")
-    @RequirePermission(Permission.TEMPLATES_VIEW)
-    @Operation(tags = {"Templates"}, summary = "Get a template")
+    @Operation(tags = { "Templates" }, summary = "Get a template")
     public Template index(
         @Parameter(description = "The template namespace") @PathVariable String namespace,
-        @Parameter(description = "The template id") @PathVariable String id
-    ) {
+        @Parameter(description = "The template id") @PathVariable String id) {
         return templateRepository
             .findById(tenantService.resolveTenant(), namespace, id)
             .orElse(null);
@@ -74,34 +70,34 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/search")
-    @RequirePermission(Permission.TEMPLATES_VIEW)
-    @Operation(tags = {"Templates"}, summary = "Search for templates")
+    @Operation(tags = { "Templates" }, summary = "Search for templates")
     public PagedResults<Template> find(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
         @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) int size,
         @Parameter(description = "The sort of current page") @Nullable @QueryValue List<String> sort,
         @Parameter(description = "A string filter") @Nullable @QueryValue(value = "q") String query,
-        @Parameter(description = "A namespace filter prefix") @Nullable @QueryValue String namespace
-    ) throws HttpStatusException {
+        @Parameter(description = "A namespace filter prefix") @Nullable @QueryValue String namespace) throws HttpStatusException {
         return PagedResults.of(templateRepository.find(PageableUtils.from(page, size, sort), query, tenantService.resolveTenant(), namespace));
     }
 
     @ExecuteOn(TaskExecutors.IO)
     @Post
-    @Operation(tags = {"Templates"}, summary = "Create a template")
-    @RequirePermission(Permission.TEMPLATES_CREATE)
+    @Operation(tags = { "Templates" }, summary = "Create a template")
     public HttpResponse<Template> create(
-        @Parameter(description = "The template") @Valid @Body Template template
-    ) throws ConstraintViolationException {
+        @Parameter(description = "The template") @Valid @Body Template template) throws ConstraintViolationException {
         template.setTenantId(tenantService.resolveTenant());
         if (templateRepository.findById(tenantService.resolveTenant(), template.getNamespace(), template.getId()).isPresent()) {
-            throw new ConstraintViolationException(Collections.singleton(ManualConstraintViolation.of(
-                "Template id already exists",
-                template,
-                Template.class,
-                "template.id",
-                template.getId()
-            )));
+            throw new ConstraintViolationException(
+                Collections.singleton(
+                    ManualConstraintViolation.of(
+                        "Template id already exists",
+                        template,
+                        Template.class,
+                        "template.id",
+                        template.getId()
+                    )
+                )
+            );
         }
 
         return HttpResponse.ok(templateRepository.create(template));
@@ -109,13 +105,11 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Put(uri = "{namespace}/{id}")
-    @Operation(tags = {"Templates"}, summary = "Update a template")
-    @RequirePermission(Permission.TEMPLATES_EDIT)
+    @Operation(tags = { "Templates" }, summary = "Update a template")
     public HttpResponse<Template> update(
         @Parameter(description = "The template namespace") @PathVariable String namespace,
         @Parameter(description = "The template id") @PathVariable String id,
-        @Parameter(description = "The template") @Valid @Body Template template
-    ) throws ConstraintViolationException {
+        @Parameter(description = "The template") @Valid @Body Template template) throws ConstraintViolationException {
         template.setTenantId(tenantService.resolveTenant());
         Optional<Template> existingTemplate = templateRepository.findById(tenantService.resolveTenant(), namespace, id);
 
@@ -128,13 +122,11 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Delete(uri = "{namespace}/{id}")
-    @Operation(tags = {"Templates"}, summary = "Delete a template")
+    @Operation(tags = { "Templates" }, summary = "Delete a template")
     @ApiResponse(responseCode = "204", description = "On success")
-    @RequirePermission(Permission.TEMPLATES_DELETE)
     public HttpResponse<Void> delete(
         @Parameter(description = "The template namespace") @PathVariable String namespace,
-        @Parameter(description = "The template id") @PathVariable String id
-    ) {
+        @Parameter(description = "The template id") @PathVariable String id) {
         Optional<Template> template = templateRepository.findById(tenantService.resolveTenant(), namespace, id);
         if (template.isPresent()) {
             templateRepository.delete(template.get());
@@ -146,34 +138,31 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "distinct-namespaces")
-    @RequirePermission(Permission.TEMPLATES_VIEW)
-    @Operation(tags = {"Templates"}, summary = "List all distinct namespaces")
+    @Operation(tags = { "Templates" }, summary = "List all distinct namespaces")
     public List<String> listDistinctNamespace() {
         return templateRepository.findDistinctNamespace(tenantService.resolveTenant());
     }
 
-
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "{namespace}")
     @Operation(
-        tags = {"Templates"},
+        tags = { "Templates" },
         summary = "Update a complete namespace from json object",
         description = "All Template will be created / updated for this namespace.\n" +
             "Template already created but not in `templates` will be deleted if the query delete is `true`"
     )
-    @RequirePermission(Permission.TEMPLATES_EDIT)
     public List<Template> updateNamespace(
         @Parameter(description = "The template namespace") @PathVariable String namespace,
         @Parameter(description = "A list of templates") @Body @Valid List<Template> templates,
-        @Parameter(description = "If missing template should be deleted") @QueryValue(defaultValue = "true") Boolean delete
-    ) throws ConstraintViolationException {
+        @Parameter(description = "If missing template should be deleted") @QueryValue(defaultValue = "true") Boolean delete) throws ConstraintViolationException {
         templates.forEach(template -> template.setTenantId(tenantService.resolveTenant()));
-        return new ArrayList<>(this
-            .updateCompleteNamespace(
-                namespace,
-                templates,
-                delete
-            )
+        return new ArrayList<>(
+            this
+                .updateCompleteNamespace(
+                    namespace,
+                    templates,
+                    delete
+                )
         );
     }
 
@@ -182,13 +171,15 @@ public class TemplateController {
         Set<ManualConstraintViolation<Template>> invalids = templates
             .stream()
             .filter(template -> !template.getNamespace().equals(namespace))
-            .map(template -> ManualConstraintViolation.of(
-                "Template namespace is invalid",
-                template,
-                Template.class,
-                "template.namespace",
-                template.getNamespace()
-            ))
+            .map(
+                template -> ManualConstraintViolation.of(
+                    "Template namespace is invalid",
+                    template,
+                    Template.class,
+                    "template.namespace",
+                    template.getNamespace()
+                )
+            )
             .collect(Collectors.toSet());
 
         if (!invalids.isEmpty()) {
@@ -203,13 +194,17 @@ public class TemplateController {
             .toList();
 
         if (duplicate.size() < templates.size()) {
-            throw new ConstraintViolationException(Collections.singleton(ManualConstraintViolation.of(
-                "Duplicate template id",
-                templates,
-                List.class,
-                "template.id",
-                duplicate
-            )));
+            throw new ConstraintViolationException(
+                Collections.singleton(
+                    ManualConstraintViolation.of(
+                        "Duplicate template id",
+                        templates,
+                        List.class,
+                        "template.id",
+                        duplicate
+                    )
+                )
+            );
         }
 
         // list all ids of updated templates
@@ -232,7 +227,8 @@ public class TemplateController {
         // update or create templates
         List<Template> updatedOrCreated = templates
             .stream()
-            .map(item -> {
+            .map(item ->
+            {
                 Optional<Template> existingTemplate = templateRepository.findById(tenantService.resolveTenant(), namespace, item.getId());
                 if (existingTemplate.isPresent()) {
                     return templateRepository.update(item, existingTemplate.get());
@@ -245,18 +241,16 @@ public class TemplateController {
         return Stream.concat(deleted.stream(), updatedOrCreated.stream()).toList();
     }
 
-
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "validate", consumes = MediaType.APPLICATION_YAML)
-    @RequirePermission(Permission.TEMPLATES_VIEW)
-    @Operation(tags = {"Templates"}, summary = "Validate a list of templates")
+    @Operation(tags = { "Templates" }, summary = "Validate a list of templates")
     public List<ValidateConstraintViolation> validateTemplates(
-        @Parameter(description= "A list of templates") @Body String templates
-    ) {
+        @Parameter(description = "A list of templates") @Body String templates) {
         AtomicInteger index = new AtomicInteger(0);
         return Stream
             .of(templates.split("---"))
-            .map(template -> {
+            .map(template ->
+            {
                 ValidateConstraintViolation.ValidateConstraintViolationBuilder<?, ?> validateConstraintViolationBuilder = ValidateConstraintViolation.builder();
                 validateConstraintViolationBuilder.index(index.getAndIncrement());
                 try {
@@ -266,7 +260,7 @@ public class TemplateController {
                     validateConstraintViolationBuilder.namespace(templateParse.getNamespace());
 
                     modelValidator.validate(templateParse);
-                } catch (ConstraintViolationException e){
+                } catch (ConstraintViolationException e) {
                     validateConstraintViolationBuilder.constraints(e.getMessage());
                 }
                 return validateConstraintViolationBuilder.build();
@@ -276,15 +270,13 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/export/by-query", produces = MediaType.APPLICATION_OCTET_STREAM)
-    @RequirePermission(Permission.TEMPLATES_VIEW)
     @Operation(
-        tags = {"Templates"},
+        tags = { "Templates" },
         summary = "Export templates as a ZIP archive of yaml sources."
     )
     public HttpResponse<byte[]> exportByQuery(
         @Parameter(description = "A string filter") @Nullable @QueryValue(value = "q") String query,
-        @Parameter(description = "A namespace filter prefix") @Nullable @QueryValue String namespace
-    ) throws IOException {
+        @Parameter(description = "A namespace filter prefix") @Nullable @QueryValue String namespace) throws IOException {
         var templates = templateRepository.find(query, tenantService.resolveTenant(), namespace);
         var bytes = zipTemplates(templates);
         return HttpResponse.ok(bytes).header("Content-Disposition", "attachment; filename=\"templates.zip\"");
@@ -292,14 +284,12 @@ public class TemplateController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/export/by-ids", produces = MediaType.APPLICATION_OCTET_STREAM)
-    @RequirePermission(Permission.TEMPLATES_VIEW)
     @Operation(
-        tags = {"Templates"},
+        tags = { "Templates" },
         summary = "Export templates as a ZIP archive of yaml sources."
     )
     public HttpResponse<byte[]> exportByIds(
-        @Parameter(description = "A list of tuple flow ID and namespace as template identifiers") @Body List<IdWithNamespace> ids
-    ) throws IOException {
+        @Parameter(description = "A list of tuple flow ID and namespace as template identifiers") @Body List<IdWithNamespace> ids) throws IOException {
         var templates = ids.stream()
             .map(id -> templateRepository.findById(tenantService.resolveTenant(), id.getNamespace(), id.getId()).orElseThrow())
             .toList();
@@ -310,14 +300,12 @@ public class TemplateController {
     @ExecuteOn(TaskExecutors.IO)
     @Delete(uri = "/delete/by-query")
     @Operation(
-        tags = {"Templates"},
+        tags = { "Templates" },
         summary = "Delete templates returned by the query parameters."
     )
-    @RequirePermission(Permission.TEMPLATES_DELETE)
     public HttpResponse<BulkResponse> deleteByQuery(
         @Parameter(description = "A string filter") @Nullable @QueryValue(value = "q") String query,
-        @Parameter(description = "A namespace filter prefix") @Nullable @QueryValue String namespace
-    ){
+        @Parameter(description = "A namespace filter prefix") @Nullable @QueryValue String namespace) {
         List<Template> list = templateRepository
             .find(query, tenantService.resolveTenant(), namespace)
             .stream()
@@ -330,13 +318,11 @@ public class TemplateController {
     @ExecuteOn(TaskExecutors.IO)
     @Delete(uri = "/delete/by-ids")
     @Operation(
-        tags = {"Templates"},
+        tags = { "Templates" },
         summary = "Delete templates by their IDs."
     )
-    @RequirePermission(Permission.TEMPLATES_DELETE)
     public HttpResponse<BulkResponse> deleteByIds(
-        @Parameter(description = "A list of tuple flow ID and namespace as flow identifiers") @Body List<IdWithNamespace> ids
-    ) {
+        @Parameter(description = "A list of tuple flow ID and namespace as flow identifiers") @Body List<IdWithNamespace> ids) {
         List<Template> list = ids
             .stream()
             .map(id -> templateRepository.findById(tenantService.resolveTenant(), id.getNamespace(), id.getId()).orElseThrow())
@@ -347,10 +333,12 @@ public class TemplateController {
     }
 
     private static byte[] zipTemplates(List<Template> templates) throws IOException {
-        try(ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            ZipOutputStream archive = new ZipOutputStream(bos)) {
+        try (
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ZipOutputStream archive = new ZipOutputStream(bos)
+        ) {
 
-            for(var template : templates) {
+            for (var template : templates) {
                 var zipEntry = new ZipEntry(template.getNamespace() + "." + template.getId() + ".yml");
                 archive.putNextEntry(zipEntry);
                 archive.write(template.generateSource().getBytes());
@@ -365,12 +353,12 @@ public class TemplateController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/import", consumes = MediaType.MULTIPART_FORM_DATA)
     @Operation(
-        tags = {"Templates"},
+        tags = { "Templates" },
         summary = "Import templates as a ZIP archive of yaml sources or a multi-objects YAML file."
     )
     @ApiResponse(responseCode = "204", description = "On success")
-    @RequirePermission(Permission.TEMPLATES_CREATE)
-    public HttpResponse<Void> importTemplates(@Parameter(description = "The file to import, can be a ZIP archive or a multi-objects YAML file") @Part CompletedFileUpload fileUpload) throws IOException {
+    public HttpResponse<Void> importTemplates(@Parameter(description = "The file to import, can be a ZIP archive or a multi-objects YAML file") @Part CompletedFileUpload fileUpload)
+        throws IOException {
         String fileName = fileUpload.getFilename().toLowerCase();
         if (fileName.endsWith(".yaml") || fileName.endsWith(".yml")) {
             List<String> sources = List.of(new String(fileUpload.getBytes()).split("---"));

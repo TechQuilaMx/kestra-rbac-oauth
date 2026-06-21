@@ -1,5 +1,8 @@
 package io.kestra.jdbc.services;
 
+import java.util.List;
+import java.util.Optional;
+
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.flows.State;
 import io.kestra.core.runners.ConcurrencyLimit;
@@ -7,11 +10,9 @@ import io.kestra.core.services.ConcurrencyLimitService;
 import io.kestra.jdbc.runner.AbstractJdbcConcurrencyLimitStorage;
 import io.kestra.jdbc.runner.AbstractJdbcExecutionQueuedStorage;
 import io.kestra.jdbc.runner.JdbcRunnerEnabled;
+
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-
-import java.util.List;
-import java.util.Optional;
 
 @Singleton
 @JdbcRunnerEnabled

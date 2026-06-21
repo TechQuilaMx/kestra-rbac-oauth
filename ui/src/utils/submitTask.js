@@ -1,5 +1,6 @@
 import _cloneDeep from "lodash/cloneDeep"
 import {useExecutionsStore} from "../stores/executions"
+import {useOnboardingV2Store} from "../stores/onboardingV2";
 
 export const inputsToFormData = (submitor, inputsList, values) => {
     let inputValuesCloned = _cloneDeep(values)
@@ -43,6 +44,7 @@ export const inputsToFormData = (submitor, inputsList, values) => {
 export const executeTask = (submitor, flow, values, options) => {
     const formData = inputsToFormData(submitor, flow.inputs, values);
     const executionsStore = useExecutionsStore();
+    const onboardingV2Store = useOnboardingV2Store();
 
     executionsStore
         .triggerExecution({
@@ -51,6 +53,7 @@ export const executeTask = (submitor, flow, values, options) => {
         })
         .then(response => {
             executionsStore.execution = response.data;
+            onboardingV2Store.recordExecution();
             if (options.redirect) {
                 if (options.newTab) {
                     const resolved = submitor.$router.resolve({
@@ -61,7 +64,8 @@ export const executeTask = (submitor, flow, values, options) => {
                             id: response.data.id,
                             tab: localStorage.getItem("executeDefaultTab") || "gantt",
                             tenant: submitor.$route.params.tenant
-                        }
+                        },
+                        query: options.query,
                     })
                     window.open(resolved.href, "_blank")
                 } else {
@@ -73,13 +77,11 @@ export const executeTask = (submitor, flow, values, options) => {
                             id: response.data.id,
                             tab: localStorage.getItem("executeDefaultTab") || "gantt",
                             tenant: submitor.$route.params.tenant
-                        }
+                        },
+                        query: options.query,
                     })
                 }
             }
-
-            if(options.nextStep) submitor.$tours["guidedTour"]?.nextStep();
-
             return response.data;
         })
         .then((execution) => {

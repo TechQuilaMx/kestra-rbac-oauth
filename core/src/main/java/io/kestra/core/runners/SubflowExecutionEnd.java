@@ -1,8 +1,10 @@
 package io.kestra.core.runners;
 
+import io.kestra.core.models.HasUID;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.executions.Variables;
 import io.kestra.core.models.flows.State;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,7 +14,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class SubflowExecutionEnd {
+public class SubflowExecutionEnd implements HasUID {
     private Execution childExecution;
     private String parentExecutionId;
     private String taskRunId;
@@ -28,5 +30,10 @@ public class SubflowExecutionEnd {
             ", taskRunId=" + this.getTaskRunId() +
             ", state=" + this.getState().toString() +
             ")";
+    }
+
+    @Override
+    public String uid() {
+        return parentExecutionId;
     }
 }

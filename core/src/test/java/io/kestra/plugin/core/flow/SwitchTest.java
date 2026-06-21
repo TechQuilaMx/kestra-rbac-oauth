@@ -1,10 +1,11 @@
 package io.kestra.plugin.core.flow;
 
-import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
-import static org.assertj.core.api.Assertions.as;
-import static org.assertj.core.api.Assertions.assertThat;
+import java.util.concurrent.TimeoutException;
+
+import org.junit.jupiter.api.Test;
 
 import com.google.common.collect.ImmutableMap;
+
 import io.kestra.core.junit.annotations.ExecuteFlow;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.junit.annotations.LoadFlows;
@@ -12,9 +13,10 @@ import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.flows.State;
 import io.kestra.core.queues.QueueException;
 import io.kestra.core.runners.TestRunnerUtils;
+
 import jakarta.inject.Inject;
-import java.util.concurrent.TimeoutException;
-import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @KestraTest(startRunner = true)
 class SwitchTest {
@@ -23,7 +25,7 @@ class SwitchTest {
     private TestRunnerUtils runnerUtils;
 
     @Test
-    @LoadFlows(value = {"flows/valids/switch.yaml"}, tenantId = "switch")
+    @LoadFlows(value = { "flows/valids/switch.yaml" }, tenantId = "switch")
     void switchFirst() throws TimeoutException, QueueException {
         Execution execution = runnerUtils.runOne(
             "switch",
@@ -39,7 +41,7 @@ class SwitchTest {
     }
 
     @Test
-    @LoadFlows(value = {"flows/valids/switch.yaml"}, tenantId = "second")
+    @LoadFlows(value = { "flows/valids/switch.yaml" }, tenantId = "second")
     void switchSecond() throws TimeoutException, QueueException {
         Execution execution = runnerUtils.runOne(
             "second",
@@ -56,10 +58,10 @@ class SwitchTest {
     }
 
     @Test
-    @LoadFlows(value = {"flows/valids/switch.yaml"}, tenantId = "third")
+    @LoadFlows(value = { "flows/valids/switch.yaml" }, tenantId = "switchthird")
     void switchThird() throws TimeoutException, QueueException {
         Execution execution = runnerUtils.runOne(
-            "third",
+            "switchthird",
             "io.kestra.tests",
             "switch",
             null,
@@ -74,10 +76,10 @@ class SwitchTest {
     }
 
     @Test
-    @LoadFlows({"flows/valids/switch.yaml"})
+    @LoadFlows(value = { "flows/valids/switch.yaml" }, tenantId = "switchdefault")
     void switchDefault() throws TimeoutException, QueueException {
         Execution execution = runnerUtils.runOne(
-            MAIN_TENANT,
+            "switchdefault",
             "io.kestra.tests",
             "switch",
             null,
@@ -86,14 +88,14 @@ class SwitchTest {
 
         assertThat(execution.getTaskRunList().get(1).getTaskId()).isEqualTo("default");
         assertThat(execution.findTaskRunsByTaskId("parent-seq").getFirst().getOutputs().get("value")).isEqualTo("DEFAULT");
-        assertThat((Boolean)execution.findTaskRunsByTaskId("parent-seq").getFirst().getOutputs().get("defaults")).isTrue();
+        assertThat((Boolean) execution.findTaskRunsByTaskId("parent-seq").getFirst().getOutputs().get("defaults")).isTrue();
     }
 
     @Test
-    @LoadFlows({"flows/valids/switch-impossible.yaml"})
+    @LoadFlows(value = { "flows/valids/switch-impossible.yaml" }, tenantId = "switchimpossible")
     void switchImpossible() throws TimeoutException, QueueException {
         Execution execution = runnerUtils.runOne(
-            MAIN_TENANT,
+            "switchimpossible",
             "io.kestra.tests",
             "switch-impossible",
             null,
@@ -104,7 +106,7 @@ class SwitchTest {
     }
 
     @Test
-    @ExecuteFlow("flows/valids/switch-in-concurrent-loop.yaml")
+    @ExecuteFlow(value = "flows/valids/switch-in-concurrent-loop.yaml", tenantId = "switchinconcurrentloop")
     void switchInConcurrentLoop(Execution execution) {
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.SUCCESS);
         assertThat(execution.getTaskRunList()).hasSize(5);

@@ -1,29 +1,34 @@
 package io.kestra.core.runners;
 
+import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.junit.jupiter.api.Test;
+
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.flows.FlowWithSource;
 import io.kestra.core.models.flows.GenericFlow;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.utils.Await;
-import io.kestra.core.utils.TestsUtils;
-import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.TimeoutException;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.services.FlowListenersInterface;
-import io.kestra.plugin.core.debug.Return;
+import io.kestra.core.utils.Await;
 import io.kestra.core.utils.IdUtils;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.core.debug.Return;
 
-import java.util.Collections;
-import java.util.concurrent.atomic.AtomicInteger;
 import jakarta.inject.Inject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @KestraTest
+@Slf4j
 abstract public class FlowListenersTest {
+    @Inject
+    private FlowListenersInterface flowListenersService;
+
     @Inject
     protected FlowRepositoryInterface flowRepository;
 
@@ -33,45 +38,51 @@ abstract public class FlowListenersTest {
             .namespace("io.kestra.unittest")
             .tenantId(tenantId)
             .revision(1)
-            .tasks(Collections.singletonList(Return.builder()
-                .id(taskId)
-                .type(Return.class.getName())
-                .format(Property.ofValue("test"))
-                .build()))
+            .tasks(
+                Collections.singletonList(
+                    Return.builder()
+                        .id(taskId)
+                        .type(Return.class.getName())
+                        .format(Property.ofValue("test"))
+                        .build()
+                )
+            )
             .build();
         return flow.toBuilder().source(flow.sourceOrGenerateIfNull()).build();
     }
 
-    private static final Logger LOG = LoggerFactory.getLogger(FlowListenersTest.class);
+    @Test
+    public void all() throws Exception {
+        this.suite(flowListenersService);
+    }
 
-    public void suite(FlowListenersInterface flowListenersService) throws TimeoutException {
-        String tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+    public void suite(FlowListenersInterface flowListenersService) throws Exception {
         flowListenersService.run();
+        String tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
 
         AtomicInteger count = new AtomicInteger();
 
         flowListenersService.listen(flows -> count.set(getFlowsForTenant(flowListenersService, tenant).size()));
 
         // initial state
-        LOG.info("-----------> wait for zero");
+        log.info("-----------> wait for zero");
         Await.until(() -> count.get() == 0, Duration.ofMillis(10), Duration.ofSeconds(5));
         assertThat(getFlowsForTenant(flowListenersService, tenant).size()).isZero();
 
         // resend on startup done for kafka
-        LOG.info("-----------> wait for zero kafka");
+        log.info("-----------> wait for zero kafka");
         if (flowListenersService.getClass().getName().equals("io.kestra.ee.runner.kafka.KafkaFlowListeners")) {
             Await.until(() -> count.get() == 0, Duration.ofMillis(10), Duration.ofSeconds(5));
             assertThat(getFlowsForTenant(flowListenersService, tenant).size()).isZero();
         }
 
         // create first
-        LOG.info("-----------> create fist flow");
+        log.info("-----------> create first flow");
         FlowWithSource first = create(tenant, "first_" + IdUtils.create(), "test");
         FlowWithSource firstUpdated = create(tenant, first.getId(), "test2");
 
-
         flowRepository.create(GenericFlow.of(first));
-        Await.until(() -> count.get() == 1, Duration.ofMillis(10), Duration.ofSeconds(5));
+        Await.until(() -> "Expected to have 1 flow but got " + count.get(), () -> count.get() == 1, Duration.ofMillis(10), Duration.ofSeconds(5));
         assertThat(getFlowsForTenant(flowListenersService, tenant).size()).isEqualTo(1);
 
         // create the same id than first, no additional flows
@@ -94,10 +105,9 @@ abstract public class FlowListenersTest {
         flowRepository.create(GenericFlow.of(first));
         Await.until(() -> count.get() == 2, Duration.ofMillis(10), Duration.ofSeconds(5));
         assertThat(getFlowsForTenant(flowListenersService, tenant).size()).isEqualTo(2);
-
     }
 
-    public List<FlowWithSource> getFlowsForTenant(FlowListenersInterface flowListenersService, String tenantId){
+    public List<FlowWithSource> getFlowsForTenant(FlowListenersInterface flowListenersService, String tenantId) {
         return flowListenersService.flows().stream()
             .filter(f -> tenantId.equals(f.getTenantId()))
             .toList();

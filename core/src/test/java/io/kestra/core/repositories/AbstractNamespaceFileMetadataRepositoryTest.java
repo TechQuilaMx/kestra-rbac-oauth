@@ -1,23 +1,26 @@
 package io.kestra.core.repositories;
 
-import io.kestra.core.models.FetchVersion;
-import io.kestra.core.models.QueryFilter;
-import io.kestra.core.models.namespaces.files.NamespaceFileMetadata;
-import io.kestra.core.utils.TestsUtils;
-import io.micronaut.data.model.Pageable;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import io.kestra.core.models.FetchVersion;
+import io.kestra.core.models.QueryFilter;
+import io.kestra.core.models.namespaces.files.NamespaceFileMetadata;
+import io.kestra.core.utils.TestsUtils;
+
+import io.micronaut.data.model.Pageable;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import jakarta.inject.Inject;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -272,7 +275,7 @@ public abstract class AbstractNamespaceFileMetadataRepositoryTest {
                 Collections.emptyList(),
                 FetchVersion.ALL
             )
-            // endregion
+        // endregion
         );
     }
 
@@ -315,6 +318,27 @@ public abstract class AbstractNamespaceFileMetadataRepositoryTest {
     }
 
     @Test
+    void findDistinctNamespace() throws IOException {
+        String tenantId = TestsUtils.randomTenant();
+        String namespace1 = TestsUtils.randomNamespace();
+        String namespace2 = TestsUtils.randomNamespace();
+        String deletedNamespace = TestsUtils.randomNamespace();
+
+        namespaceFileMetadataRepositoryInterface.save(NamespaceFileMetadata.builder()
+            .tenantId(tenantId).namespace(namespace1).path("file1.txt").size(1L).build());
+        namespaceFileMetadataRepositoryInterface.save(NamespaceFileMetadata.builder()
+            .tenantId(tenantId).namespace(namespace2).path("file2.txt").size(1L).build());
+        NamespaceFileMetadata deletedEntry = namespaceFileMetadataRepositoryInterface.save(NamespaceFileMetadata.builder()
+            .tenantId(tenantId).namespace(deletedNamespace).path("file3.txt").size(1L).build());
+        namespaceFileMetadataRepositoryInterface.delete(deletedEntry);
+
+        Set<String> namespaces = namespaceFileMetadataRepositoryInterface.findDistinctNamespace(tenantId);
+
+        assertThat(namespaces).containsExactlyInAnyOrder(namespace1, namespace2);
+        assertThat(namespaces).doesNotContain(deletedNamespace);
+    }
+
+    @Test
     void purgeAllVersions() throws IOException {
         String tenantId = TestsUtils.randomTenant();
         String namespace = TestsUtils.randomNamespace();
@@ -331,12 +355,14 @@ public abstract class AbstractNamespaceFileMetadataRepositoryTest {
         metadata = namespaceFileMetadataRepositoryInterface.save(metadata);
         assertThat(metadata.getVersion()).isEqualTo(2);
 
-        Integer purgedAmount = namespaceFileMetadataRepositoryInterface.purge(List.of(
-            NamespaceFileMetadata.builder()
-                .tenantId(tenantId)
-                .namespace(namespace)
-                .path(path).build()
-        ));
+        Integer purgedAmount = namespaceFileMetadataRepositoryInterface.purge(
+            List.of(
+                NamespaceFileMetadata.builder()
+                    .tenantId(tenantId)
+                    .namespace(namespace)
+                    .path(path).build()
+            )
+        );
 
         assertThat(purgedAmount).isEqualTo(2);
 

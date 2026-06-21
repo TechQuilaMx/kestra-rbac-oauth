@@ -1,5 +1,17 @@
 package io.kestra.core.plugins;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.jar.Manifest;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.ObjectUtils;
+
 import io.kestra.core.app.AppBlockInterface;
 import io.kestra.core.app.AppPluginInterface;
 import io.kestra.core.models.annotations.PluginSubGroup;
@@ -15,18 +27,8 @@ import io.kestra.core.models.tasks.runners.TaskRunner;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.secret.SecretPluginInterface;
 import io.kestra.core.storages.StorageInterface;
-import lombok.*;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.ObjectUtils;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.jar.Manifest;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import lombok.*;
 
 import static io.kestra.core.utils.Rethrow.throwFunction;
 
@@ -80,16 +82,15 @@ public class RegisteredPlugin {
             !storages.isEmpty() ||
             !secrets.isEmpty() ||
             !taskRunners.isEmpty() ||
-            !assets.isEmpty()  ||
+            !assets.isEmpty() ||
             !assetExporters.isEmpty() ||
-            !apps.isEmpty()  ||
+            !apps.isEmpty() ||
             !appBlocks.isEmpty() ||
             !charts.isEmpty() ||
             !dataFilters.isEmpty() ||
             !dataFiltersKPI.isEmpty() ||
             !logExporters.isEmpty() ||
-            !additionalPlugins.isEmpty()
-        ;
+            !additionalPlugins.isEmpty();
     }
 
     public boolean hasClass(String cls) {
@@ -212,7 +213,8 @@ public class RegisteredPlugin {
     public Set<String> subGroupNames() {
         return allClass()
             .stream()
-            .map(clazz -> {
+            .map(clazz ->
+            {
                 var pluginSubGroup = clazz.getPackage().getDeclaredAnnotation(PluginSubGroup.class);
 
                 // some plugins declare subgroup for main plugins
@@ -268,11 +270,10 @@ public class RegisteredPlugin {
 
     public String longDescription() {
         try (var is = this.getClassLoader().getResourceAsStream("doc/" + this.group() + ".md")) {
-            if(is != null) {
+            if (is != null) {
                 return IOUtils.toString(is, StandardCharsets.UTF_8);
             }
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             // silently fail
         }
 
@@ -282,10 +283,14 @@ public class RegisteredPlugin {
     public Map<String, String> guides() throws IOException {
         return this.guides
             .stream()
-            .map(throwFunction(s -> new AbstractMap.SimpleEntry<>(
-                s,
-                IOUtils.toString(Objects.requireNonNull(this.getClassLoader().getResourceAsStream("doc/guides/" + s + ".md")), StandardCharsets.UTF_8)
-            )))
+            .map(
+                throwFunction(
+                    s -> new AbstractMap.SimpleEntry<>(
+                        s,
+                        IOUtils.toString(Objects.requireNonNull(this.getClassLoader().getResourceAsStream("doc/guides/" + s + ".md")), StandardCharsets.UTF_8)
+                    )
+                )
+            )
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
@@ -427,10 +432,14 @@ public class RegisteredPlugin {
 
         if (!this.getAliases().isEmpty()) {
             b.append("[Aliases: ");
-            b.append(this.getAliases().values().stream().collect(Collectors.toMap(
-                Map.Entry::getKey,
-                Map.Entry::getValue
-            )));
+            b.append(
+                this.getAliases().values().stream().collect(
+                    Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue
+                    )
+                )
+            );
             b.append("] ");
         }
 

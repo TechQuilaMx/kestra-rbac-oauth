@@ -1,14 +1,15 @@
 package io.kestra.runner.postgres;
 
+import java.util.List;
+
 import io.kestra.core.models.flows.Flow;
 import io.kestra.core.models.triggers.multipleflows.AbstractMultipleConditionStorageTest;
 import io.kestra.core.models.triggers.multipleflows.MultipleConditionStorageInterface;
 import io.kestra.core.models.triggers.multipleflows.MultipleConditionWindow;
 import io.kestra.repository.postgres.PostgresRepository;
+
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
-
-import java.util.List;
 
 class PostgresMultipleConditionStorageTest extends AbstractMultipleConditionStorageTest {
 

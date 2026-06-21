@@ -1,9 +1,22 @@
 package io.kestra.webserver.controllers.api;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.util.*;
+import java.util.regex.Pattern;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+
+import io.kestra.core.models.Label;
 import io.kestra.core.models.QueryFilter;
 import io.kestra.core.models.dashboards.Dashboard;
 import io.kestra.core.models.dashboards.DataFilter;
 import io.kestra.core.models.dashboards.DataFilterKPI;
+import io.kestra.core.models.dashboards.TimeWindow;
 import io.kestra.core.models.dashboards.charts.Chart;
 import io.kestra.core.models.dashboards.charts.DataChart;
 import io.kestra.core.models.dashboards.charts.DataChartKPI;
@@ -19,13 +32,12 @@ import io.kestra.core.tenant.TenantService;
 import io.kestra.plugin.core.dashboard.chart.Markdown;
 import io.kestra.plugin.core.dashboard.chart.Table;
 import io.kestra.plugin.core.dashboard.chart.mardown.sources.FlowDescription;
-import io.kestra.webserver.annotations.RequirePermission;
-import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.models.ChartFiltersOverrides;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.CSVUtils;
 import io.kestra.webserver.utils.PageableUtils;
 import io.kestra.webserver.utils.TimeLineSearch;
+
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.Pageable;
@@ -44,15 +56,9 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
 import lombok.extern.slf4j.Slf4j;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.time.Duration;
-import java.time.ZonedDateTime;
-import java.util.*;
-import java.util.regex.Pattern;
 
 import static io.kestra.core.utils.DateUtils.validateTimeline;
 
@@ -77,39 +83,34 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get
-    @RequirePermission(Permission.DASHBOARDS_VIEW)
-    @Operation(tags = {"Dashboards"}, summary = "Search for dashboards")
-    public PagedResults<Dashboard> searchDashboards(
+    @Operation(tags = { "Dashboards" }, summary = "Search for dashboards")
+    public PagedResults<DashboardResponse> searchDashboards(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
         @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) int size,
         @Parameter(description = "The filter query") @Nullable @QueryValue String q,
-        @Parameter(description = "The sort of current page") @Nullable @QueryValue List<String> sort
-    ) throws ConstraintViolationException {
-        return PagedResults.of(dashboardRepository.list(PageableUtils.from(page, size, sort), tenantService.resolveTenant(), q));
+        @Parameter(description = "The sort of current page") @Nullable @QueryValue List<String> sort) throws ConstraintViolationException {
+        return PagedResults.of(dashboardRepository.list(PageableUtils.from(page, size, sort), tenantService.resolveTenant(), q).map(DashboardResponse::new));
     }
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{id}")
-    @RequirePermission(Permission.DASHBOARDS_VIEW)
-    @Operation(tags = {"Dashboards"}, summary = "Get a dashboard")
-    public Dashboard getDashboard(
-        @Parameter(description = "The dashboard id") @PathVariable String id
-    ) throws ConstraintViolationException {
-        return dashboardRepository.get(tenantService.resolveTenant(), id).map(d -> {
+    @Operation(tags = { "Dashboards" }, summary = "Get a dashboard")
+    public DashboardResponse getDashboard(
+        @Parameter(description = "The dashboard id") @PathVariable String id) throws ConstraintViolationException {
+        return dashboardRepository.get(tenantService.resolveTenant(), id).map(d ->
+        {
             if (!DASHBOARD_ID_PATTERN.matcher(d.getSourceCode()).find()) {
-                return d.toBuilder().sourceCode("id: " + d.getId() + "\n" + d.getSourceCode()).build();
+                d = d.toBuilder().sourceCode("id: " + d.getId() + "\n" + d.getSourceCode()).build();
             }
-            return d;
+            return new DashboardResponse(d);
         }).orElse(null);
     }
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(consumes = MediaType.APPLICATION_YAML)
-    @RequirePermission(Permission.DASHBOARDS_CREATE)
-    @Operation(tags = {"Dashboards"}, summary = "Create a dashboard from yaml source")
-    public HttpResponse<Dashboard> createDashboard(
-        @RequestBody(description = "The dashboard definition as YAML") @Body String dashboard
-    ) throws ConstraintViolationException {
+    @Operation(tags = { "Dashboards" }, summary = "Create a dashboard from yaml source")
+    public HttpResponse<DashboardResponse> createDashboard(
+        @RequestBody(description = "The dashboard definition as YAML") @Body String dashboard) throws ConstraintViolationException {
         Dashboard dashboardParsed = parseDashboard(dashboard);
 
         if (dashboardParsed.getId() == null) {
@@ -119,25 +120,27 @@ public class DashboardController {
 
         Optional<Dashboard> existingDashboard = dashboardRepository.get(tenantService.resolveTenant(), dashboardParsed.getId());
         if (existingDashboard.isPresent()) {
-            throw new ConstraintViolationException(Collections.singleton(ManualConstraintViolation.of(
-                "Dashboard id already exists",
-                dashboardParsed,
-                Dashboard.class,
-                "dashboard.id",
-                dashboardParsed.getId()
-            )));
+            throw new ConstraintViolationException(
+                Collections.singleton(
+                    ManualConstraintViolation.of(
+                        "Dashboard id already exists",
+                        dashboardParsed,
+                        Dashboard.class,
+                        "dashboard.id",
+                        dashboardParsed.getId()
+                    )
+                )
+            );
         }
 
-        return HttpResponse.ok(this.save(null, dashboardParsed, dashboard));
+        return HttpResponse.ok(new DashboardResponse(this.save(null, dashboardParsed, dashboard)));
     }
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "validate", consumes = MediaType.APPLICATION_YAML)
-    @RequirePermission(Permission.DASHBOARDS_CREATE)
-    @Operation(tags = {"Dashboards"}, summary = "Validate dashboard from yaml source")
+    @Operation(tags = { "Dashboards" }, summary = "Validate dashboard from yaml source")
     public ValidateConstraintViolation validateDashboard(
-        @RequestBody(description = "The dashboard definition as YAML") @Body String dashboard
-    ) throws ConstraintViolationException {
+        @RequestBody(description = "The dashboard definition as YAML") @Body String dashboard) throws ConstraintViolationException {
         ValidateConstraintViolation.ValidateConstraintViolationBuilder<?, ?> validateConstraintViolationBuilder = ValidateConstraintViolation.builder();
         validateConstraintViolationBuilder.index(0);
 
@@ -160,29 +163,31 @@ public class DashboardController {
 
     @Put(uri = "{id}", consumes = MediaType.APPLICATION_YAML)
     @ExecuteOn(TaskExecutors.IO)
-    @RequirePermission(Permission.DASHBOARDS_EDIT)
-    @Operation(tags = {"Dashboards"}, summary = "Update a dashboard")
-    public HttpResponse<Dashboard> updateDashboard(
+    @Operation(tags = { "Dashboards" }, summary = "Update a dashboard")
+    public HttpResponse<DashboardResponse> updateDashboard(
         @Parameter(description = "The dashboard id") @PathVariable String id,
-        @RequestBody(description = "The dashboard definition as YAML") @Body String dashboard
-    ) throws ConstraintViolationException {
+        @RequestBody(description = "The dashboard definition as YAML") @Body String dashboard) throws ConstraintViolationException {
         Optional<Dashboard> existingDashboard = dashboardRepository.get(tenantService.resolveTenant(), id);
         if (existingDashboard.isEmpty()) {
             return HttpResponse.status(HttpStatus.NOT_FOUND);
         }
         Dashboard dashboardToSave = parseDashboard(dashboard);
         if (!dashboardToSave.getId().equals(id)) {
-            throw new ConstraintViolationException(Set.of(ManualConstraintViolation.of(
-                "Illegal dashboard id update",
-                dashboardToSave,
-                Dashboard.class,
-                "dashboard.id",
-                dashboardToSave.getId()
-            )));
+            throw new ConstraintViolationException(
+                Set.of(
+                    ManualConstraintViolation.of(
+                        "Illegal dashboard id update",
+                        dashboardToSave,
+                        Dashboard.class,
+                        "dashboard.id",
+                        dashboardToSave.getId()
+                    )
+                )
+            );
         }
         modelValidator.validate(dashboardToSave);
 
-        return HttpResponse.ok(this.save(existingDashboard.get(), dashboardToSave, dashboard));
+        return HttpResponse.ok(new DashboardResponse(this.save(existingDashboard.get(), dashboardToSave, dashboard)));
     }
 
     private Dashboard parseDashboard(String dashboard) {
@@ -197,11 +202,9 @@ public class DashboardController {
 
     @Delete(uri = "{id}")
     @ExecuteOn(TaskExecutors.IO)
-    @RequirePermission(Permission.DASHBOARDS_DELETE)
-    @Operation(tags = {"Dashboards"}, summary = "Delete a dashboard")
+    @Operation(tags = { "Dashboards" }, summary = "Delete a dashboard")
     public HttpResponse<Void> deleteDashboard(
-        @Parameter(description = "The dashboard id") @PathVariable String id
-    ) throws ConstraintViolationException {
+        @Parameter(description = "The dashboard id") @PathVariable String id) throws ConstraintViolationException {
         if (dashboardRepository.delete(tenantService.resolveTenant(), id) != null) {
             return HttpResponse.status(HttpStatus.NO_CONTENT);
         } else {
@@ -211,16 +214,15 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "{id}/charts/{chartId}")
-    @RequirePermission(Permission.DASHBOARDS_VIEW)
-    @Operation(tags = {"Dashboards"}, summary = "Generate a dashboard chart data")
+    @Operation(tags = { "Dashboards" }, summary = "Generate a dashboard chart data")
     public PagedResults<Map<String, Object>> getDashboardChartData(
         @Parameter(description = "The dashboard id") @PathVariable String id,
         @Parameter(description = "The chart id") @PathVariable String chartId,
-        @RequestBody(description = "The filters to apply, some can override chart definition like labels & namespace") @Body ChartFiltersOverrides globalFilter
-    ) throws IOException {
+        @RequestBody(description = "The filters to apply, some can override chart definition like labels & namespace") @Body ChartFiltersOverrides globalFilter) throws IOException {
         var fetchChartDataQuery = buildDashboardChardDataQuery(id, chartId, globalFilter);
 
-        if (fetchChartDataQuery == null) return null;
+        if (fetchChartDataQuery == null)
+            return null;
 
         return fetchChartData(fetchChartDataQuery);
     }
@@ -228,6 +230,9 @@ public class DashboardController {
     private FetchChartDataQuery buildDashboardChardDataQuery(String id, String chartId, ChartFiltersOverrides globalFilter) {
         String tenantId = tenantService.resolveTenant();
         List<QueryFilter> filters = globalFilter.getFilters();
+
+        filters = formatLabelsFilters(filters);
+
         Dashboard dashboard = dashboardRepository.get(tenantId, id).orElse(null);
         if (dashboard == null) {
             return null;
@@ -264,27 +269,42 @@ public class DashboardController {
         return new FetchChartDataQuery(chart, filters, startDate, endDate, tenantId, pageable);
     }
 
+    private List<QueryFilter> formatLabelsFilters(List<QueryFilter> filters) {
+        return Optional.ofNullable(filters)
+            .map(queryFilters -> queryFilters.stream().map(f ->
+            {
+                if (f.field() == QueryFilter.Field.LABELS && f.value() instanceof String filterStr) {
+                    return QueryFilter.builder()
+                        .field(f.field())
+                        .operation(f.operation())
+                        .value(Label.from(filterStr))
+                        .build();
+                }
+                return f;
+            }).toList())
+            .orElse(null);
+    }
+
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "charts/preview")
-    @RequirePermission(Permission.DASHBOARDS_VIEW)
-    @Operation(tags = {"Dashboards"}, summary = "Preview a chart data")
+    @Operation(tags = { "Dashboards" }, summary = "Preview a chart data")
     public PagedResults<Map<String, Object>> previewChart(
-        @Parameter(description = "The chart") @Body @Valid PreviewRequest previewRequest
-    ) throws IOException {
+        @Parameter(description = "The chart") @Body @Valid PreviewRequest previewRequest) throws IOException {
         var fetchChartDataQuery = buildChartPreviewDataQuery(previewRequest);
         return fetchChartData(fetchChartDataQuery);
     }
 
-    private FetchChartDataQuery buildChartPreviewDataQuery(PreviewRequest previewRequest){
+    private FetchChartDataQuery buildChartPreviewDataQuery(PreviewRequest previewRequest) {
         String tenantId = tenantService.resolveTenant();
         Chart<?> chart = YAML_PARSER.parse(previewRequest.chart(), Chart.class);
         ChartFiltersOverrides globalFilter = previewRequest.globalFilter();
 
-        List<QueryFilter> filters =
-            globalFilter != null ? globalFilter.getFilters() : null;
+        List<QueryFilter> filters = globalFilter != null ? globalFilter.getFilters() : null;
+
+        filters = formatLabelsFilters(filters);
 
         ZonedDateTime endDate = null;
-        ZonedDateTime startDate = null;
+        ZonedDateTime startDate;
         if (filters != null) {
             TimeLineSearch timeLineSearch = TimeLineSearch.extractFrom(filters);
             validateTimeline(timeLineSearch.getStartDate(), timeLineSearch.getEndDate());
@@ -307,10 +327,10 @@ public class DashboardController {
     }
 
     private record FetchChartDataQuery(Chart<?> chart, List<QueryFilter> filters, ZonedDateTime startDate,
-                                       ZonedDateTime endDate, String tenantId, Pageable pageable) {
+        ZonedDateTime endDate, String tenantId, Pageable pageable) {
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private PagedResults<Map<String, Object>> fetchChartData(FetchChartDataQuery fetchChartDataQuery) throws IOException {
         var chart = fetchChartDataQuery.chart();
         var filters = fetchChartDataQuery.filters();
@@ -352,13 +372,11 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "validate/chart", consumes = MediaType.APPLICATION_YAML)
-    @RequirePermission(Permission.DASHBOARDS_EDIT)
-    @Operation(tags = {"Dashboards"}, summary = "Validate a chart from yaml source")
+    @Operation(tags = { "Dashboards" }, summary = "Validate a chart from yaml source")
     public ValidateConstraintViolation validateChart(
-        @RequestBody(description = "The chart definition as YAML") @Body String chart
-    ) throws ConstraintViolationException {
+        @RequestBody(description = "The chart definition as YAML") @Body String chart) throws ConstraintViolationException {
         ValidateConstraintViolation.ValidateConstraintViolationBuilder<?, ?> validateConstraintViolationBuilder = ValidateConstraintViolation.builder();
-            validateConstraintViolationBuilder.index(0);
+        validateConstraintViolationBuilder.index(0);
 
         try {
             Chart<?> parsed = YamlParser.parse(chart, Chart.class);
@@ -379,13 +397,11 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "{id}/charts/{chartId}/export/to-csv", produces = MediaType.APPLICATION_OCTET_STREAM)
-    @RequirePermission(Permission.DASHBOARDS_VIEW)
-    @Operation(tags = {"Dashboards"}, summary = "Export a dashboard chart data to CSV")
+    @Operation(tags = { "Dashboards" }, summary = "Export a dashboard chart data to CSV")
     public HttpResponse<byte[]> exportDashboardChartDataToCSV(
         @Parameter(description = "The dashboard id") @PathVariable String id,
         @Parameter(description = "The chart id") @PathVariable String chartId,
-        @RequestBody(description = "The filters to apply, some can override chart definition like labels & namespace") @Body ChartFiltersOverrides globalFilter
-    ) throws IOException {
+        @RequestBody(description = "The filters to apply, some can override chart definition like labels & namespace") @Body ChartFiltersOverrides globalFilter) throws IOException {
         var fetchChartDataQuery = buildDashboardChardDataQuery(id, chartId, globalFilter);
         if (fetchChartDataQuery == null) {
             return null;
@@ -405,11 +421,9 @@ public class DashboardController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "charts/export/to-csv", produces = MediaType.APPLICATION_OCTET_STREAM)
-    @RequirePermission(Permission.DASHBOARDS_VIEW)
-    @Operation(tags = {"Dashboards"}, summary = "Export a table chart data to CSV")
+    @Operation(tags = { "Dashboards" }, summary = "Export a table chart data to CSV")
     public HttpResponse<byte[]> exportChartToCsv(
-        @Parameter(description = "The chart") @Body @Valid PreviewRequest previewRequest
-    ) throws IOException {
+        @Parameter(description = "The chart") @Body @Valid PreviewRequest previewRequest) throws IOException {
         var fetchChartDataQuery = buildChartPreviewDataQuery(previewRequest);
         if (!(fetchChartDataQuery.chart instanceof Table)) {
             throw new IllegalArgumentException("Only Table data charts can be exported.");
@@ -427,6 +441,54 @@ public class DashboardController {
     @Introspected
     public record PreviewRequest(
         @Parameter(description = "The chart") @NotBlank String chart,
-        @Parameter(description = "The filters to apply, some can override chart definition like labels & namespace") @Nullable ChartFiltersOverrides globalFilter) {}
+        @Parameter(description = "The filters to apply, some can override chart definition like labels & namespace") @Nullable ChartFiltersOverrides globalFilter) {
+    }
 
+    @Getter
+    public static class DashboardResponse {
+        @jakarta.validation.constraints.Pattern(regexp = "^[a-z0-9][a-z0-9_-]*")
+        private final String tenantId;
+        @NotNull
+        @NotBlank
+        private final String id;
+        @NotNull
+        @NotBlank
+        private final String title;
+        private final String description;
+        private final TimeWindow timeWindow;
+        private final List<Chart<?>> charts;
+        @NotNull
+        private final boolean deleted;
+        private final Instant created;
+        private final Instant updated;
+        private final String sourceCode;
+
+        public DashboardResponse(Dashboard dashboard) {
+            this.tenantId = dashboard.getTenantId();
+            this.id = dashboard.getId();
+            this.title = dashboard.getTitle();
+            this.description = dashboard.getDescription();
+            this.timeWindow = dashboard.getTimeWindow();
+            this.charts = dashboard.getCharts();
+            this.deleted = dashboard.isDeleted();
+            this.created = dashboard.getCreated();
+            this.updated = dashboard.getUpdated();
+            this.sourceCode = dashboard.getSourceCode();
+        }
+
+        @JsonCreator
+        public DashboardResponse(String tenantId, String id, String title, String description, TimeWindow timeWindow, List<Chart<?>> charts, boolean deleted, Instant created, Instant updated,
+            String sourceCode) {
+            this.tenantId = tenantId;
+            this.id = id;
+            this.title = title;
+            this.description = description;
+            this.timeWindow = timeWindow;
+            this.charts = charts;
+            this.deleted = deleted;
+            this.created = created;
+            this.updated = updated;
+            this.sourceCode = sourceCode;
+        }
+    }
 }

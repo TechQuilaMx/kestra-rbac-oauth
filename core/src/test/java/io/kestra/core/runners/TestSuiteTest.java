@@ -1,5 +1,17 @@
 package io.kestra.core.runners;
 
+import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeoutException;
+
+import org.assertj.core.api.AbstractObjectAssert;
+import org.assertj.core.api.ObjectAssert;
+import org.junit.jupiter.api.Test;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.junit.annotations.LoadFlows;
 import io.kestra.core.models.executions.Execution;
@@ -11,20 +23,10 @@ import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.test.flow.TaskFixture;
 import io.kestra.core.utils.IdUtils;
+
 import io.micronaut.context.ApplicationContext;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
-import org.assertj.core.api.AbstractObjectAssert;
-import org.assertj.core.api.ObjectAssert;
-import org.junit.jupiter.api.Test;
-
-import java.time.Duration;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.TimeoutException;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,9 +49,9 @@ class TestSuiteTest {
     protected ApplicationContext applicationContext;
 
     @Test
-    @LoadFlows({"flows/valids/return.yaml"})
+    @LoadFlows({ "flows/valids/return.yaml" })
     void withoutAnyTaskFixture() throws QueueException, TimeoutException {
-        var fixtures = List.<TaskFixture>of();
+        var fixtures = List.<TaskFixture> of();
 
         var executionResult = runReturnFlow(fixtures, MAIN_TENANT);
 
@@ -59,14 +61,15 @@ class TestSuiteTest {
         assertOutputForTask(executionResult, "flow-id")
             .isEqualTo("return");
         assertOutputForTask(executionResult, "date")
-            .satisfies(output -> {
+            .satisfies(output ->
+            {
                 assertThat(output).asString().isNotBlank();
                 assertThat(ZonedDateTime.parse((String) output)).isCloseTo(ZonedDateTime.now(), within(300, ChronoUnit.SECONDS));
             });
     }
 
     @Test
-    @LoadFlows(value = {"flows/valids/return.yaml"}, tenantId = "tenant1")
+    @LoadFlows(value = { "flows/valids/return.yaml" }, tenantId = "tenant1")
     void taskFixture() throws TimeoutException, QueueException {
         var fixtures = List.of(
             TaskFixture.builder()
@@ -86,7 +89,7 @@ class TestSuiteTest {
     }
 
     @Test
-    @LoadFlows(value = {"flows/valids/return.yaml"}, tenantId = "tenant2")
+    @LoadFlows(value = { "flows/valids/return.yaml" }, tenantId = "tenant2")
     void twoTaskFixturesOverridingOutput() throws QueueException, TimeoutException {
         var fixtures = List.of(
             TaskFixture.builder()
@@ -111,7 +114,7 @@ class TestSuiteTest {
     }
 
     @Test
-    @LoadFlows(value = {"flows/valids/return.yaml"}, tenantId = "tenant3")
+    @LoadFlows(value = { "flows/valids/return.yaml" }, tenantId = "tenant3")
     void taskFixturesWithWarningState() throws QueueException, TimeoutException {
         var fixtures = List.of(
             TaskFixture.builder()

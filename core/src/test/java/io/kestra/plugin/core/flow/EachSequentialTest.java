@@ -1,30 +1,30 @@
 package io.kestra.plugin.core.flow;
 
-import io.kestra.core.junit.annotations.ExecuteFlow;
-import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.junit.annotations.LoadFlows;
-import io.kestra.core.queues.QueueException;
-import io.kestra.core.runners.TestRunnerUtils;
-import io.kestra.core.utils.TestsUtils;
-import org.junit.jupiter.api.Test;
-import io.kestra.core.exceptions.InternalException;
-import io.kestra.core.models.executions.Execution;
-import io.kestra.core.models.executions.LogEntry;
-import io.kestra.core.models.executions.TaskRun;
-import io.kestra.core.models.flows.State;
-import io.kestra.core.queues.QueueFactoryInterface;
-import io.kestra.core.queues.QueueInterface;
-
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeoutException;
 
+import org.junit.jupiter.api.Test;
+
+import io.kestra.core.exceptions.InternalException;
+import io.kestra.core.junit.annotations.ExecuteFlow;
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.junit.annotations.LoadFlows;
+import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.executions.LogEntry;
+import io.kestra.core.models.executions.TaskRun;
+import io.kestra.core.models.flows.State;
+import io.kestra.core.queues.QueueException;
+import io.kestra.core.queues.QueueFactoryInterface;
+import io.kestra.core.queues.QueueInterface;
+import io.kestra.core.runners.TestRunnerUtils;
+import io.kestra.core.utils.TestsUtils;
+
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import reactor.core.publisher.Flux;
 
-import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @KestraTest(startRunner = true)
@@ -37,14 +37,14 @@ public class EachSequentialTest {
     private TestRunnerUtils runnerUtils;
 
     @Test
-    @ExecuteFlow("flows/valids/each-sequential.yaml")
+    @ExecuteFlow(value = "flows/valids/each-sequential.yaml", tenantId = "sequential")
     void sequential(Execution execution) {
         assertThat(execution.getTaskRunList()).hasSize(11);
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.WARNING);
     }
 
     @Test
-    @ExecuteFlow("flows/valids/each-object.yaml")
+    @ExecuteFlow(value = "flows/valids/each-object.yaml", tenantId = "object")
     void object(Execution execution) {
         assertThat(execution.getTaskRunList()).hasSize(8);
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.SUCCESS);
@@ -52,7 +52,7 @@ public class EachSequentialTest {
     }
 
     @Test
-    @ExecuteFlow("flows/valids/each-object-in-list.yaml")
+    @ExecuteFlow(value = "flows/valids/each-object-in-list.yaml", tenantId = "objectinlist")
     void objectInList(Execution execution) {
         assertThat(execution.getTaskRunList()).hasSize(8);
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.SUCCESS);
@@ -60,7 +60,7 @@ public class EachSequentialTest {
     }
 
     @Test
-    @ExecuteFlow("flows/valids/each-sequential-nested.yaml")
+    @ExecuteFlow(value = "flows/valids/each-sequential-nested.yaml", tenantId = "sequentialnested")
     void sequentialNested(Execution execution) throws InternalException {
         assertThat(execution.getTaskRunList()).hasSize(23);
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.SUCCESS);
@@ -80,23 +80,28 @@ public class EachSequentialTest {
     }
 
     @Test
-    @ExecuteFlow("flows/valids/each-empty.yaml")
+    @ExecuteFlow(value = "flows/valids/each-empty.yaml", tenantId = "eachempty")
     void eachEmpty(Execution execution) {
         assertThat(execution.getTaskRunList()).hasSize(2);
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.SUCCESS);
     }
 
     @Test
-    @LoadFlows({"flows/valids/each-null.yaml"})
+    @LoadFlows(value = { "flows/valids/each-null.yaml" }, tenantId = "eachnull")
     void eachNull() throws TimeoutException, QueueException {
-        EachSequentialTest.eachNullTest(runnerUtils, logQueue);
+        EachSequentialTest.eachNullTest("eachnull", runnerUtils, logQueue);
     }
 
-    public static void eachNullTest(TestRunnerUtils runnerUtils, QueueInterface<LogEntry> logQueue) throws TimeoutException, QueueException {
+    public static void eachNullTest(String tenant, TestRunnerUtils runnerUtils, QueueInterface<LogEntry> logQueue) throws TimeoutException, QueueException {
         List<LogEntry> logs = new CopyOnWriteArrayList<>();
-        Flux<LogEntry> receive = TestsUtils.receive(logQueue, either -> logs.add(either.getLeft()));
+        Flux<LogEntry> receive = TestsUtils.receive(logQueue, either ->
+        {
+            if (tenant.equalsIgnoreCase(either.left().get().getTenantId())) {
+                logs.add(either.getLeft());
+            }
+        });
 
-        Execution execution = runnerUtils.runOne(MAIN_TENANT, "io.kestra.tests", "each-null", Duration.ofSeconds(60));
+        Execution execution = runnerUtils.runOne(tenant, "io.kestra.tests", "each-null", Duration.ofSeconds(60));
 
         assertThat(execution.getTaskRunList()).hasSize(1);
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.FAILED);
