@@ -51,7 +51,7 @@ COPY --chown=kestra:kestra --from=builder /build/cli/src/main/resources/applicat
 COPY --chown=kestra:kestra docker /
 
 # Copy docker entrypoint script to PATH for easy access
-COPY --chown=kestra:kestra --chmod=755 docker/app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --chown=kestra:kestra --chmod=755 docker/usr/local/bin/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Copy the built executable from builder stage
 COPY --chown=kestra:kestra --from=builder /build/build/executable/kestra-* /app/kestra
