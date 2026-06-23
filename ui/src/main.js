@@ -1,4 +1,5 @@
 import {createApp} from "vue"
+import VueAxios from "vue-axios";
 
 import App from "./App.vue"
 import initApp from "./utils/init"
@@ -8,9 +9,17 @@ import en from "./translations/en.json";
 import {setupTenantRouter} from "./composables/useTenant";
 import * as BasicAuth from "./utils/basicAuth";
 import {useMiscStore} from "override/stores/misc";
+import {useOAuth2Store} from "./stores/oauth2";
+import {vPermission, vRole, vAdmin} from "./directives/permissions";
 
+import {shouldShowWelcome, isDashboardRoute} from "./utils/welcomeGuard";
 
 const app = createApp(App)
+
+// Register permission directives
+app.directive('permission', vPermission);
+app.directive('role', vRole);
+app.directive('admin', vAdmin);
 
 const handleAuthError = (error, to) => {
     if (error.message?.includes("401")) {
@@ -30,7 +39,47 @@ initApp(app, routes, null, en).then(({router, piniaStore}) => {
         try {
             const miscStore = useMiscStore();
             const configs = await miscStore.loadConfigs();
+            
+            // Initialize OAuth2 if enabled
+            const oauth2Store = useOAuth2Store();
+            if (configs.oauth2ClientId) {
+                oauth2Store.initialize(configs);
+                console.log("OAuth2 initialized. isAuthenticated:", oauth2Store.isAuthenticated, "hasTokens:", oauth2Store.hasTokens);
+            }
 
+            // Handle OAuth2 authentication
+            if (configs.oauth2ClientId && oauth2Store.isInitialized) {
+                // Allow anonymous routes (login, callback, setup)
+                if (to.meta?.anonymous === true) {
+                    return next();
+                }
+
+                // Check if user is authenticated via OAuth2
+                if (!oauth2Store.isAuthenticated && !oauth2Store.hasTokens) {
+                    console.log("OAuth2 not authenticated, redirecting to login");
+                    const fromPath = to.fullPath !== "/ui/login" ? to.fullPath : undefined
+                    return next({name: "login", query: fromPath ? {from: fromPath} : {}})
+                }
+
+                // Update isAuthenticated if tokens exist
+                if (oauth2Store.hasTokens && !oauth2Store.isAuthenticated) {
+                    oauth2Store.isAuthenticated = true;
+                    // Ensure access token is refreshed if needed and user info is loaded
+                    oauth2Store.getAccessToken().then(() => oauth2Store.fetchUserInfo());
+                }
+
+                // Check welcome flow for dashboard routes
+                if (isDashboardRoute(to.name) && await shouldShowWelcome()) {
+                    return next({
+                        name: "welcome",
+                        params: {tenant: to.params.tenant}
+                    });
+                }
+
+                return next();
+            }
+
+            // Fallback to BasicAuth if OAuth2 not configured
             if(!configs.isBasicAuthInitialized) {
                 // Since, Configs takes preference
                 // we need to check if any regex validation error in BE.

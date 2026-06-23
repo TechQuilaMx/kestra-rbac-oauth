@@ -10,9 +10,11 @@ import io.kestra.core.models.QueryFilter;
 import io.kestra.core.repositories.ArrayListTotal;
 import io.kestra.core.secret.SecretService;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.converters.QueryFilterFormat;
 import io.kestra.webserver.models.api.secret.ApiSecretListResponse;
 import io.kestra.webserver.models.api.secret.ApiSecretMeta;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.utils.Searcheable;
 
 import io.micronaut.core.annotation.Nullable;
@@ -41,6 +43,7 @@ public class NamespaceSecretController<META extends ApiSecretMeta> {
     @Get(uri = "{namespace}/secrets")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Namespaces" }, summary = "Get secrets for a namespace")
+    @RequirePermission(Permission.SECRETS_VIEW)
     @Deprecated
     public HttpResponse<ApiSecretListResponse<META>> listNamespaceSecrets(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
@@ -83,6 +86,7 @@ public class NamespaceSecretController<META extends ApiSecretMeta> {
     @Get(uri = "{namespace}/inherited-secrets")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Namespaces" }, summary = "List inherited secrets")
+    @RequirePermission(Permission.SECRETS_VIEW)
     public HttpResponse<Map<String, Set<String>>> getInheritedSecrets(
         @Parameter(description = "The namespace id") @PathVariable String namespace) throws IllegalArgumentException, IOException {
         return HttpResponse.ok(secretService.inheritedSecrets(tenantService.resolveTenant(), namespace));

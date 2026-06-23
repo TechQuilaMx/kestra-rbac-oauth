@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 
 import io.kestra.core.tenant.TenantService;
 import io.kestra.webserver.services.ai.AiServiceInterface;
@@ -48,6 +50,7 @@ public class AiController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/generate/flow", produces = "application/yaml")
     @Operation(tags = { "AI" }, summary = "Generate or regenerate a flow based on a prompt")
+    @RequirePermission(Permission.FLOWS_CREATE)
     public HttpResponse<String> generateFlow(
         @RequestBody(description = "Prompt and context required for flow generation") @Body FlowGenerationPrompt flowGenerationPrompt,
         HttpRequest<?> httpRequest) {
@@ -64,6 +67,8 @@ public class AiController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/generate/dashboard", produces = "application/yaml")
     @Operation(tags = { "AI" }, summary = "Generate or regenerate a dashboard based on a prompt")
+    @RequirePermission(Permission.DASHBOARDS_CREATE)
+
     public HttpResponse<String> generateDashboard(
         @RequestBody(description = "Prompt and context required for dashboard generation") @Body DashboardGenerationPrompt dashboardGenerationPrompt,
         HttpRequest<?> httpRequest) {
@@ -86,6 +91,7 @@ public class AiController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "providers")
     @Operation(tags = { "AI" }, summary = "List available AI providers")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public List<AiProviderResponse> getProviders() {
         List<AiProviderResponse> response = new ArrayList<>();
         for (Map.Entry<String, AiServiceInterface> entry : aiServiceManager.getAllAiServices().entrySet()) {

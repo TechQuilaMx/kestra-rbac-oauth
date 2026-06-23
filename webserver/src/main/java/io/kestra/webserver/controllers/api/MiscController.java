@@ -21,6 +21,8 @@ import io.kestra.core.runners.pebble.PebbleExpressionService;
 import io.kestra.core.services.InstanceService;
 import io.kestra.core.utils.EditionProvider;
 import io.kestra.core.utils.VersionProvider;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.services.BasicAuthCredentials;
 import io.kestra.webserver.services.BasicAuthService;
 import io.kestra.webserver.services.ai.AiServiceManager;
@@ -167,6 +169,7 @@ public class MiscController {
     @Get("/{tenant}/usages/all")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Misc" }, summary = "Retrieve instance usage information")
+    @RequirePermission(Permission.ADMIN_STATS)
     public ApiUsage getUsages() {
         ZonedDateTime now = ZonedDateTime.now();
         FeatureUsageReport.UsageEvent event = featureUsageReport.report(now.toInstant(), Reportable.TimeInterval.of(now.minus(Duration.ofDays(1)), now));
@@ -179,6 +182,7 @@ public class MiscController {
     @Post(uri = "/{tenant}/basicAuth")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Misc" }, summary = "Configure basic authentication for the instance.", description = "Sets up basic authentication credentials.")
+    @RequirePermission(Permission.ADMIN_ACCESS)
     public HttpResponse<Void> createBasicAuth(
         @RequestBody @Valid @Body BasicAuthCredentials basicAuthCredentials) {
         basicAuthService
@@ -191,6 +195,7 @@ public class MiscController {
     @Get("/basicAuthValidationErrors")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Misc" }, summary = "Retrieve the instance configuration.", description = "Global endpoint available to all users.")
+    @RequirePermission(Permission.ADMIN_ACCESS)
     public List<String> getBasicAuthConfigErrors() {
         return basicAuthService
             .orElseThrow(() -> new IllegalStateException("basicAuthService bean is required in OSS"))

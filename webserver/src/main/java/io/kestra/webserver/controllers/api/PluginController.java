@@ -10,7 +10,8 @@ import io.kestra.core.models.flows.Input;
 import io.kestra.core.models.flows.Type;
 import io.kestra.core.models.tasks.FlowableTask;
 import io.kestra.core.plugins.PluginRegistry;
-
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import io.micronaut.cache.annotation.Cacheable;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -46,6 +47,7 @@ public class PluginController {
 
     @Get(uri = "schemas/{type}")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(
         tags = { "Plugins" },
         summary = "Get the JSON schema for a type",
@@ -61,6 +63,7 @@ public class PluginController {
 
     @Get(uri = "properties/{type}")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(
         tags = { "Plugins" },
         summary = "Get the properties part of the JSON schema for a type",
@@ -75,6 +78,7 @@ public class PluginController {
 
     @Get(uri = "inputs")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(
         tags = { "Plugins" },
         summary = "Get all types for an inputs"
@@ -87,6 +91,7 @@ public class PluginController {
 
     @Get(uri = "inputs/{type}")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(
         tags = { "Plugins" },
         summary = "Get the JSON schema for an input type",
@@ -119,6 +124,7 @@ public class PluginController {
 
     @Get
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Plugins" }, summary = "Get list of plugins")
     public List<Plugin> listPlugins() {
         return pluginRegistry.plugins()
@@ -129,6 +135,7 @@ public class PluginController {
 
     @Get(uri = "icons")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Plugins" }, summary = "Get plugins icons")
     public MutableHttpResponse<Map<String, PluginIcon>> getPluginIcons() {
         Map<String, PluginIcon> icons = pluginRegistry.plugins()
@@ -182,6 +189,7 @@ public class PluginController {
 
     @Get(uri = "icons/groups")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Plugins" }, summary = "Get plugins icons")
     public MutableHttpResponse<Map<String, PluginIcon>> getPluginGroupIcons() {
         Map<String, PluginIcon> icons = loadPluginsIcon();
@@ -213,6 +221,7 @@ public class PluginController {
 
     @Get(uri = "{cls}")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Plugins" }, summary = "Get plugin documentation")
     public HttpResponse<DocumentationWithSchema> getPluginDocumentation(
         @Parameter(description = "The plugin full class name") @PathVariable String cls,
@@ -222,6 +231,7 @@ public class PluginController {
 
     @Get(uri = "{cls}/versions/{version}")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Plugins" }, summary = "Get plugin documentation")
     public HttpResponse<DocumentationWithSchema> getPluginDocumentationFromVersion(
         @Parameter(description = "The plugin type") @PathVariable String cls,
@@ -248,6 +258,7 @@ public class PluginController {
 
     @Get(uri = "{cls}/versions")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(
         tags = { "Plugins" },
         summary = "Get all versions for a plugin"
@@ -259,6 +270,7 @@ public class PluginController {
 
     @Get("/groups/subgroups")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Plugins" }, summary = "Get plugins group by subgroups")
     public List<Plugin> getPluginBySubgroups() {
         return Stream.concat(

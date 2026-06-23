@@ -1,0 +1,60 @@
+version: '3.8'
+
+volumes:
+  postgres-data:
+    driver: local
+  kestra-data:
+    driver: local
+
+networks:
+  kestra-network:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: kestra-postgres
+    network_mode: bridge
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: k3str4
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  kestra:
+    # Use your custom built image
+    image: kestra-rbac-oauth:1.3.20
+    # Or build from source: 
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.rbac
+    container_name: kestra
+    network_mode: bridge
+    stop_grace_period: 6m
+    # Note that this setup with a root user is intended for development purpose.
+    # Our base image runs without root, but the Docker Compose implementation needs root to access the Docker socket
+    user: "root"
+    command: server standalone
+    volumes:
+      - kestra-data:/app/storage
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/kestra-wd:/tmp/kestra-wd
+      - ./cli/src/main/resources/application-override.yml:/app/confs/application-override.yml:ro
+    environment:
+      MICRONAUT_ENVIRONMENTS: "local,override"
+      MICRONAUT_CONFIG_FILES: "/app/confs/application-override.yml"
+
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_started

@@ -14,7 +14,9 @@ import io.kestra.core.repositories.ArrayListTotal;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.topologies.FlowTopologyService;
+import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.models.api.ApiAutocomplete;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.AutocompleteUtils;
 import io.kestra.webserver.utils.PageableUtils;
@@ -107,6 +109,7 @@ public class NamespaceController<N extends Namespace> {
         tags = { "Namespaces" }, summary = "List namespaces for autocomplete",
         description = "Returns a list of namespaces for use in autocomplete fields, optionally allowing to filter by query and ids. Used especially for binding creation."
     )
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     public List<String> autocompleteNamespaces(@NotNull @Body ApiAutocomplete autocomplete) throws HttpStatusException {
         return this.getNamespaces(
             AUTOCOMPLETE_PAGEABLE,
@@ -121,6 +124,7 @@ public class NamespaceController<N extends Namespace> {
     @Get(uri = "{id}")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Namespaces" }, summary = "Get a namespace")
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     public N getNamespace(
         @Parameter(description = "The namespace id") @PathVariable String id) {
         return (N) Namespace.builder().id(id).build();
@@ -129,6 +133,7 @@ public class NamespaceController<N extends Namespace> {
     @Get(uri = "/search")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Namespaces" }, summary = "Search for namespaces")
+    @RequirePermission(Permission.NAMESPACES_VIEW)
     public PagedResults<N> searchNamespaces(
         @Parameter(description = "A string filter") @Nullable @QueryValue(value = "q") String query,
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
@@ -148,6 +153,7 @@ public class NamespaceController<N extends Namespace> {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/dependencies")
     @Operation(tags = { "Flows" }, summary = "Get flow dependencies")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public FlowTopologyGraph getFlowDependenciesFromNamespace(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "if true, list only destination dependencies, otherwise list also source dependencies") @QueryValue(defaultValue = "false") boolean destinationOnly) {

@@ -27,6 +27,7 @@ public class ConcurrencyLimitController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/search")
+    @RequirePermission(Permission.SETTINGS_EDIT)
     @Operation(tags = { "Flows" }, summary = "Search for flow concurrency limits")
     public PagedResults<ConcurrencyLimit> searchConcurrencyLimits() {
         var results = concurrencyLimitService.find(tenantService.resolveTenant());
@@ -35,6 +36,7 @@ public class ConcurrencyLimitController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Put("/{namespace}/{flowId}")
+    @RequirePermission(Permission.SETTINGS_EDIT)
     @Operation(tags = { "Flows" }, summary = "Update a flow concurrency limit")
     public HttpResponse<ConcurrencyLimit> updateConcurrencyLimit(@Body @Valid ConcurrencyLimit concurrencyLimit) {
         var existing = concurrencyLimitService.findById(tenantService.resolveTenant(), concurrencyLimit.getNamespace(), concurrencyLimit.getFlowId());
