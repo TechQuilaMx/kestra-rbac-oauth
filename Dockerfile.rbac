@@ -17,7 +17,7 @@ COPY gradlew.bat gradle.properties settings.gradle build.gradle ./
 COPY gradle ./gradle
 
 # Copy docker-entrypoint.sh
-COPY --chown=kestra:kestra --chmod=755 docker/app/docker-entrypoint.sh /docker-entrypoint.sh
+COPY --chown=kestra:kestra --chmod=755 docker/usr/local/bin/docker-entrypoint.sh /docker-entrypoint.sh
 
 # Download dependencies (this layer will be cached)
 RUN ./gradlew dependencies --no-daemon || true
