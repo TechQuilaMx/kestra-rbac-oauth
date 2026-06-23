@@ -16,9 +16,6 @@ COPY --chmod=755 gradlew ./
 COPY gradlew.bat gradle.properties settings.gradle build.gradle ./
 COPY gradle ./gradle
 
-# Copy docker-entrypoint.sh
-COPY --chown=kestra:kestra --chmod=755 docker/usr/local/bin/docker-entrypoint.sh /docker-entrypoint.sh
-
 # Download dependencies (this layer will be cached)
 RUN ./gradlew dependencies --no-daemon || true
 
@@ -49,9 +46,7 @@ COPY --chown=kestra:kestra --from=builder /build/cli/src/main/resources/applicat
 
 # Copy docker configuration files (scripts and utilities)
 COPY --chown=kestra:kestra docker /
-
-# Copy docker entrypoint script to PATH for easy access
-COPY --chown=kestra:kestra --chmod=755 docker/usr/local/bin/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Copy the built executable from builder stage
 COPY --chown=kestra:kestra --from=builder /build/build/executable/kestra-* /app/kestra
@@ -70,6 +65,6 @@ RUN apt-get update -y && \
 
 USER kestra
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 CMD ["--help"]
