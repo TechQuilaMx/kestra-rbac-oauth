@@ -48,7 +48,7 @@ const increaseProgress = () => {
     }, latencyThreshold + 50)
 }
 
-const requestInterceptor = (config: any) => {
+const requestInterceptor = async (config: any) => {
     initProgress()
     
     // Add OAuth2 Bearer token if available
