@@ -9,6 +9,7 @@ export class Me {
 
     constructor() {
         this.oauth2Store = useOAuth2Store();
+    }
 
     hasAny(_permission: any, _namespace?: any) {
         return true;
