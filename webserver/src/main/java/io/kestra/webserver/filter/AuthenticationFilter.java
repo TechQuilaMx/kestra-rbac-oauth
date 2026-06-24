@@ -8,7 +8,7 @@ import org.reactivestreams.Publisher;
 
 import io.kestra.core.utils.AuthUtils;
 import io.kestra.webserver.services.BasicAuthService;
-
+import io.kestra.webserver.services.OAuth2Service;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
