@@ -4,6 +4,8 @@ import io.kestra.core.repositories.ArrayListTotal;
 import io.kestra.core.runners.ConcurrencyLimit;
 import io.kestra.core.services.ConcurrencyLimitService;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.PagedResults;
 
 import io.micronaut.http.HttpResponse;

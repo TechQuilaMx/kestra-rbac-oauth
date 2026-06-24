@@ -11,8 +11,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.kestra.core.utils.Enums;
 import io.kestra.core.utils.VersionProvider;
-import io.kestra.webserver.annotations.RequirePermission;
-import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.PagedResults;
 
 import io.micronaut.core.annotation.Introspected;
@@ -36,6 +34,8 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 
 @Validated
 @Controller("/api/v1/{tenant}/blueprints/community")
@@ -49,8 +49,8 @@ public class BlueprintController {
     @SuppressWarnings("unchecked")
     @ExecuteOn(TaskExecutors.IO)
     @Get("/{kind}")
-    @Operation(tags = { "Blueprints" }, summary = "List all blueprints")
     @RequirePermission(Permission.FLOWS_VIEW)
+    @Operation(tags = { "Blueprints" }, summary = "List all blueprints")
     public PagedResults<ApiBlueprintItem> searchBlueprints(
         @Parameter(description = "A string filter") @Nullable @QueryValue(value = "q") Optional<String> q,
         @Parameter(description = "The sort of current page") @Nullable @QueryValue(value = "sort") Optional<String> sort,
