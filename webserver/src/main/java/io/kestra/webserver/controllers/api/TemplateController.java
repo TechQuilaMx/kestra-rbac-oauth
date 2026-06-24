@@ -75,7 +75,6 @@ public class TemplateController {
     @Get(uri = "/search")
     @RequirePermission(Permission.TEMPLATES_VIEW)
     @Operation(tags = { "Templates" }, summary = "Search for templates")
-    @RequirePermission(Permission.TEMPLATES_VIEW)
     public PagedResults<Template> find(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
         @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) int size,
