@@ -45,7 +45,8 @@ RUN mkdir -p /app/confs
 COPY --chown=kestra:kestra --from=builder /build/cli/src/main/resources/application.yml /app/confs/application.yml
 
 # Copy docker configuration files (scripts and utilities)
-COPY --chown=kestra:kestra docker /
+COPY --chown=kestra:kestra docker/app /app
+COPY --chown=kestra:kestra docker/usr/local/bin/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Copy the built executable from builder stage
