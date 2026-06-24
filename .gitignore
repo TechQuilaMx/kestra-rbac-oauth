@@ -17,6 +17,7 @@ prettierrc.js
 .attach*
 **/*.class
 **/bin/*
+!docker/usr/local/bin/docker-entrypoint.sh
 
 ### Configurations
 docker-compose.override.yml
