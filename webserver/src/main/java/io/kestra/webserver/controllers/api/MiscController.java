@@ -22,11 +22,12 @@ import io.kestra.core.services.InstanceService;
 import io.kestra.core.utils.EditionProvider;
 import io.kestra.core.utils.VersionProvider;
 import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.configurations.OAuth2Configuration;
 import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.services.BasicAuthCredentials;
 import io.kestra.webserver.services.BasicAuthService;
 import io.kestra.webserver.services.ai.AiServiceManager;
-
+import io.kestra.webserver.services.OAuth2Service;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpResponse;
@@ -70,6 +71,9 @@ public class MiscController {
 
     @Inject
     Optional<BasicAuthService> basicAuthService = Optional.empty();
+    
+    @Inject
+    Optional<OAuth2Service> oauth2Service = Optional.empty();
 
     @Inject
     Optional<TemplateRepositoryInterface> templateRepository;
@@ -125,6 +129,7 @@ public class MiscController {
 
     @Get("/configs")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Misc" }, summary = "Retrieve the instance configuration.", description = "Global endpoint available to all users.")
     public Configuration getConfiguration() throws JsonProcessingException { // JsonProcessingException might be thrown in EE
         Configuration.ConfigurationBuilder<?, ?> builder = Configuration
@@ -162,14 +167,31 @@ public class MiscController {
                     .build()
             );
         }
+        
+        // Add OAuth2 configuration if enabled
+        if (oauth2Service.isPresent() && oauth2Service.get().isEnabled()) {
+            OAuth2Configuration oauth2Config = oauth2Service.get().getConfiguration();
+            log.info("OAuth2 Configuration: authEndpoint={}, tokenEndpoint={}, userInfoEndpoint={}", 
+                oauth2Config.getAuthorizationEndpoint(),
+                oauth2Config.getTokenEndpoint(),
+                oauth2Config.getUserInfoEndpoint()
+            );
+            builder
+                .oauth2ClientId(oauth2Config.getClientId())
+                .oauth2AuthEndpoint(oauth2Config.getAuthorizationEndpoint())
+                .oauth2TokenEndpoint(oauth2Config.getTokenEndpoint())
+                .oauth2UserInfoEndpoint(oauth2Config.getUserInfoEndpoint())
+                .oauth2LogoutEndpoint(oauth2Config.getLogoutEndpoint())
+                .oauth2Scope(oauth2Config.getScope());
+        }
 
         return builder.build();
     }
 
     @Get("/{tenant}/usages/all")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Misc" }, summary = "Retrieve instance usage information")
-    @RequirePermission(Permission.ADMIN_STATS)
     public ApiUsage getUsages() {
         ZonedDateTime now = ZonedDateTime.now();
         FeatureUsageReport.UsageEvent event = featureUsageReport.report(now.toInstant(), Reportable.TimeInterval.of(now.minus(Duration.ofDays(1)), now));
@@ -181,8 +203,8 @@ public class MiscController {
 
     @Post(uri = "/{tenant}/basicAuth")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_EDIT)
     @Operation(tags = { "Misc" }, summary = "Configure basic authentication for the instance.", description = "Sets up basic authentication credentials.")
-    @RequirePermission(Permission.ADMIN_ACCESS)
     public HttpResponse<Void> createBasicAuth(
         @RequestBody @Valid @Body BasicAuthCredentials basicAuthCredentials) {
         basicAuthService
@@ -195,7 +217,7 @@ public class MiscController {
     @Get("/basicAuthValidationErrors")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Misc" }, summary = "Retrieve the instance configuration.", description = "Global endpoint available to all users.")
-    @RequirePermission(Permission.ADMIN_ACCESS)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     public List<String> getBasicAuthConfigErrors() {
         return basicAuthService
             .orElseThrow(() -> new IllegalStateException("basicAuthService bean is required in OSS"))
@@ -204,6 +226,7 @@ public class MiscController {
 
     @Get("/pebble/filters")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Misc" }, summary = "Retrieve the list of available Pebble expression filters.")
     public List<String> getExpressionFilters() {
         return pebbleExpressionService.filters();
@@ -211,6 +234,7 @@ public class MiscController {
 
     @Get("/pebble/functions")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Misc" }, summary = "Retrieve the list of available Pebble expression functions.")
     public List<String> getExpressionFunctions() {
         return pebbleExpressionService.functions();
@@ -263,6 +287,25 @@ public class MiscController {
         Long pluginsHash;
 
         Boolean isConcurrencyViewEnabled;
+        
+        // OAuth2 configuration fields
+        @JsonInclude
+        String oauth2ClientId;
+        
+        @JsonInclude
+        String oauth2AuthEndpoint;
+        
+        @JsonInclude
+        String oauth2TokenEndpoint;
+        
+        @JsonInclude
+        String oauth2UserInfoEndpoint;
+        
+        @JsonInclude
+        String oauth2LogoutEndpoint;
+        
+        @JsonInclude
+        String oauth2Scope;
     }
 
     @Value
