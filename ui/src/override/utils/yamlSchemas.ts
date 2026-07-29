@@ -1,29 +1,49 @@
 import {apiUrlWithoutTenants} from "override/utils/route";
 import {SchemasSettings} from "monaco-yaml";
 
+const withAccessToken = (uri: string): string => {
+    try {
+        const rawTokens = sessionStorage.getItem("oauth2_tokens");
+        if (!rawTokens) {
+            return uri;
+        }
+
+        const parsedTokens = JSON.parse(rawTokens);
+        const token = parsedTokens?.accessToken;
+        if (!token) {
+            return uri;
+        }
+
+        const separator = uri.includes("?") ? "&" : "?";
+        return `${uri}${separator}token=${encodeURIComponent(token)}`;
+    } catch {
+        return uri;
+    }
+};
+
 export const yamlSchemas: () => SchemasSettings[] = () => [
     {
         fileMatch: ["flow-*.yaml"],
-        uri: `${apiUrlWithoutTenants()}/plugins/schemas/flow`
+        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/flow`)
     },
     {
         fileMatch: ["task-*.yaml"],
-        uri: `${apiUrlWithoutTenants()}/plugins/schemas/task`
+        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/task`)
     },
     {
         fileMatch: ["template-*.yaml"],
-        uri: `${apiUrlWithoutTenants()}/plugins/schemas/template`
+        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/template`)
     },
     {
         fileMatch: ["trigger-*.yaml"],
-        uri: `${apiUrlWithoutTenants()}/plugins/schemas/trigger`
+        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/trigger`)
     },
     {
         fileMatch: ["plugindefault-*.yaml"],
-        uri: `${apiUrlWithoutTenants()}/plugins/schemas/plugindefault?arrayOf=true`
+        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/plugindefault?arrayOf=true`)
     },
     {
         fileMatch: ["dashboard-*.yaml"],
-        uri: `${apiUrlWithoutTenants()}/plugins/schemas/dashboard`
+        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/dashboard`)
     }
 ]

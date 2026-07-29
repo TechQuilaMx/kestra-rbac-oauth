@@ -7,6 +7,7 @@ import throttle from "lodash/throttle";
 import {useRoute} from "vue-router";
 import {CLUSTER_PREFIX} from "@kestra-io/ui-libs/src/utils/constants.ts";
 import {useAxios} from "../utils/axios";
+import {useOAuth2Store} from "./oauth2";
 
 interface LogsState {
     total: number;
@@ -389,7 +390,9 @@ export const useExecutionsStore = defineStore("executions", () => {
             execution.value = undefined;
             closeSSE();
         }
-        const serverSentEventSource = new EventSource(`${apiUrl()}/executions/${options.id}/follow`, {withCredentials: true});
+        const token = useOAuth2Store().accessToken;
+        const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+        const serverSentEventSource = new EventSource(`${apiUrl()}/executions/${options.id}/follow${tokenParam}`, {withCredentials: true});
         if (options.rawSSE) {
             return Promise.resolve(serverSentEventSource);
         }
@@ -434,11 +437,15 @@ export const useExecutionsStore = defineStore("executions", () => {
     }
 
     function followExecutionDependencies(options: { id: string; expandAll?: boolean }) {
-        return new EventSource(`${apiUrl()}/executions/${options.id}/follow-dependencies${options.expandAll ? "?expandAll=true" : ""}`, {withCredentials: true});
+        const token = useOAuth2Store().accessToken;
+        const tokenParam = token ? `${options.expandAll ? "&" : "?"}token=${encodeURIComponent(token)}` : "";
+        return new EventSource(`${apiUrl()}/executions/${options.id}/follow-dependencies${options.expandAll ? "?expandAll=true" : ""}${tokenParam}`, {withCredentials: true});
     }
 
     const followLogs = (options: { id: string }) => {
-        return Promise.resolve(new EventSource(`${apiUrl()}/logs/${options.id}/follow`, {withCredentials: true}));
+        const token = useOAuth2Store().accessToken;
+        const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+        return Promise.resolve(new EventSource(`${apiUrl()}/logs/${options.id}/follow${tokenParam}`, {withCredentials: true}));
     }
 
     const loadLogs = (options: { executionId: string; params?: Record<string, any>; store?: boolean }) => {
