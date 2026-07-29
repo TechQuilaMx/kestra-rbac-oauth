@@ -37,6 +37,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.rbac
+      args:
+        KESTRA_PLUGINS: ${KESTRA_PLUGINS:-}
+        APT_PACKAGES: ${APT_PACKAGES:-python3 python-is-python3 python3-pip curl jattach}
+        PYTHON_LIBRARIES: ${PYTHON_LIBRARIES:-kestra}
     container_name: kestra
     networks:
       - kestra-network
@@ -46,7 +50,7 @@ services:
     # Note that this setup with a root user is intended for development purpose.
     # Our base image runs without root, but the Docker Compose implementation needs root to access the Docker socket
     user: "root"
-    command: server standalone
+    command: server standalone --plugins /app/plugins
     volumes:
       - kestra-data:/app/storage
       - /var/run/docker.sock:/var/run/docker.sock
@@ -55,6 +59,7 @@ services:
     environment:
       MICRONAUT_ENVIRONMENTS: "local,override"
       MICRONAUT_CONFIG_FILES: "/app/confs/application-override.yml"
+      KESTRA_PLUGINS_PATH: /app/plugins
 
     ports:
       - "8080:8080"
