@@ -76,9 +76,11 @@ public class AuthenticationFilter implements HttpServerFilter {
                 if (isConfigEndpoint || isOpenUrl || isOAuth2OpenUrl || isManagementEndpoint(request)) {
                     return chain.proceed(request);
                 }
+
+                boolean oauth2Enabled = oauth2Service.isPresent() && oauth2Service.get().isEnabled();
                 
                 // Try OAuth2 Bearer token authentication first
-                if (oauth2Service.isPresent() && oauth2Service.get().isEnabled()) {
+                if (oauth2Enabled) {
                     var bearerToken = fromBearerToken(request);
                     if (bearerToken.isPresent()) {
                         // Validate OAuth2 token
@@ -108,13 +110,11 @@ public class AuthenticationFilter implements HttpServerFilter {
                         ).equals(basicAuthConfiguration.credentials().getPassword())
                 ) {
                     Boolean isFromLoginPage = Optional.ofNullable(request.getHeaders().get("Referer")).map(referer -> referer.split("\\?")[0].endsWith("/login")).orElse(false);
-
-                    // Avoid sending a WWW-Authenticate: Basic header for API calls that expect JSON
-                    // (the browser will show a native credentials prompt when that header is present).
                     boolean acceptsHtml = Optional.ofNullable(request.getHeaders().get("Accept")).map(a -> a.contains("text/html")).orElse(false);
+                    boolean shouldChallengeWithBasic = !oauth2Enabled && !isFromLoginPage && acceptsHtml;
 
                     return Mono.just(HttpResponse.unauthorized())
-                        .map(response -> isFromLoginPage ? response : response.header("WWW-Authenticate", "Basic"));
+                        .map(response -> shouldChallengeWithBasic ? response.header("WWW-Authenticate", "Basic") : response);
                 }
 
                 return chain.proceed(request);
