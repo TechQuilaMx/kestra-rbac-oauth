@@ -1,0 +1,23 @@
+id: smb_trigger_flow
+namespace: com.tech.quila.kestra.test
+
+tasks:
+  - id: for_each_file
+    type: io.kestra.plugin.core.flow.ForEach
+    values: "{{ trigger.files }}"
+    tasks:
+      - id: return
+        type: io.kestra.plugin.core.debug.Return
+        format: "{{ taskrun.value | jq('.path') }}"
+
+triggers:
+  - id: test_smb_plugin_issue_with_ids_longer_than_50_chars
+    type: io.kestra.plugin.fs.smb.Trigger
+    host: localhost
+    port: "445"
+    username: foo
+    password: "{{ secret('SMB_PASSWORD') }}"
+    from: "/my_share/in/"
+    interval: PT10S
+    action: MOVE
+    moveDirectory: "/archive_share/"
