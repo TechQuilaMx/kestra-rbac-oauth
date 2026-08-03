@@ -1,6 +1,16 @@
 package io.kestra.core.runners;
 
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
+
 import com.google.common.annotations.VisibleForTesting;
+
 import io.kestra.core.models.Label;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.flows.Flow;
@@ -11,22 +21,15 @@ import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.services.ExecutionService;
 import io.kestra.core.utils.Await;
+
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
-import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
-import java.util.function.Predicate;
-
 import static io.kestra.core.utils.Rethrow.throwRunnable;
 
 @Singleton
+@Deprecated(since = "1.3.0", forRemoval = true)
 public class RunnerUtils {
     public static final Duration DEFAULT_MAX_WAIT_DURATION = Duration.ofSeconds(15);
 
@@ -48,7 +51,8 @@ public class RunnerUtils {
         return this.runOne(tenantId, namespace, flowId, revision, null, null, null);
     }
 
-    public Execution runOne(String tenantId, String namespace, String flowId, Integer revision, BiFunction<FlowInterface, Execution, Map<String, Object>> inputs) throws TimeoutException, QueueException {
+    public Execution runOne(String tenantId, String namespace, String flowId, Integer revision, BiFunction<FlowInterface, Execution, Map<String, Object>> inputs)
+        throws TimeoutException, QueueException {
         return this.runOne(tenantId, namespace, flowId, revision, inputs, null, null);
     }
 
@@ -56,18 +60,21 @@ public class RunnerUtils {
         return this.runOne(tenantId, namespace, flowId, null, null, duration, null);
     }
 
-    public Execution runOne(String tenantId, String namespace, String flowId, Integer revision, BiFunction<FlowInterface, Execution, Map<String, Object>> inputs, Duration duration) throws TimeoutException, QueueException {
+    public Execution runOne(String tenantId, String namespace, String flowId, Integer revision, BiFunction<FlowInterface, Execution, Map<String, Object>> inputs, Duration duration)
+        throws TimeoutException, QueueException {
         return this.runOne(tenantId, namespace, flowId, revision, inputs, duration, null);
     }
 
-    public Execution runOne(String tenantId, String namespace, String flowId, Integer revision, BiFunction<FlowInterface, Execution, Map<String, Object>> inputs, Duration duration, List<Label> labels) throws TimeoutException, QueueException {
+    public Execution runOne(String tenantId, String namespace, String flowId, Integer revision, BiFunction<FlowInterface, Execution, Map<String, Object>> inputs, Duration duration,
+        List<Label> labels) throws TimeoutException, QueueException {
         return this.runOne(
             flowRepository
                 .findById(tenantId, namespace, flowId, revision != null ? Optional.of(revision) : Optional.empty())
                 .orElseThrow(() -> new IllegalArgumentException("Unable to find flow '" + flowId + "'")),
             inputs,
             duration,
-            labels);
+            labels
+        );
     }
 
     public Execution runOne(Flow flow, BiFunction<FlowInterface, Execution, Map<String, Object>> inputs) throws TimeoutException, QueueException {
@@ -89,7 +96,8 @@ public class RunnerUtils {
     }
 
     public Execution runOne(Execution execution, Flow flow, Duration duration) throws TimeoutException, QueueException {
-        return this.awaitExecution(isTerminatedExecution(execution, flow), throwRunnable(() -> {
+        return this.awaitExecution(isTerminatedExecution(execution, flow), throwRunnable(() ->
+        {
             this.executionQueue.emit(execution);
         }), duration);
     }
@@ -98,7 +106,8 @@ public class RunnerUtils {
         return this.runOneUntilPaused(tenantId, namespace, flowId, null, null, null);
     }
 
-    public Execution runOneUntilPaused(String tenantId, String namespace, String flowId, Integer revision, BiFunction<FlowInterface, Execution, Map<String, Object>> inputs, Duration duration) throws TimeoutException, QueueException {
+    public Execution runOneUntilPaused(String tenantId, String namespace, String flowId, Integer revision, BiFunction<FlowInterface, Execution, Map<String, Object>> inputs, Duration duration)
+        throws TimeoutException, QueueException {
         return this.runOneUntilPaused(
             flowRepository
                 .findById(tenantId, namespace, flowId, revision != null ? Optional.of(revision) : Optional.empty())
@@ -115,7 +124,8 @@ public class RunnerUtils {
 
         Execution execution = Execution.newExecution(flow, inputs, null, Optional.empty());
 
-        return this.awaitExecution(isPausedExecution(execution), throwRunnable(() -> {
+        return this.awaitExecution(isPausedExecution(execution), throwRunnable(() ->
+        {
             this.executionQueue.emit(execution);
         }), duration);
     }
@@ -124,7 +134,8 @@ public class RunnerUtils {
         return this.runOneUntilRunning(tenantId, namespace, flowId, null, null, null);
     }
 
-    public Execution runOneUntilRunning(String tenantId, String namespace, String flowId, Integer revision, BiFunction<FlowInterface, Execution, Map<String, Object>> inputs, Duration duration) throws TimeoutException, QueueException {
+    public Execution runOneUntilRunning(String tenantId, String namespace, String flowId, Integer revision, BiFunction<FlowInterface, Execution, Map<String, Object>> inputs, Duration duration)
+        throws TimeoutException, QueueException {
         return this.runOneUntilRunning(
             flowRepository
                 .findById(tenantId, namespace, flowId, revision != null ? Optional.of(revision) : Optional.empty())
@@ -141,7 +152,8 @@ public class RunnerUtils {
 
         Execution execution = Execution.newExecution(flow, inputs, null, Optional.empty());
 
-        return this.awaitExecution(isRunningExecution(execution), throwRunnable(() -> {
+        return this.awaitExecution(isRunningExecution(execution), throwRunnable(() ->
+        {
             this.executionQueue.emit(execution);
         }), duration);
     }
@@ -150,7 +162,8 @@ public class RunnerUtils {
     public Execution awaitExecution(Predicate<Execution> predicate, Runnable executionEmitter, Duration duration) throws TimeoutException {
         AtomicReference<Execution> receive = new AtomicReference<>();
 
-        Runnable cancel = this.executionQueue.receive(null, current -> {
+        Runnable cancel = this.executionQueue.receive(null, current ->
+        {
             if (predicate.test(current.getLeft())) {
                 receive.set(current.getLeft());
             }
@@ -167,7 +180,6 @@ public class RunnerUtils {
         } finally {
             cancel.run();
         }
-
 
         return receive.get();
     }

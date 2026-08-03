@@ -25,6 +25,12 @@
                 </div>
             </el-option>
         </template>
+        <el-option label="welcome" value="welcome">
+            <RouterLink :to="startTutorial" class="menu-item">
+                <RocketLaunchOutline class="menu-icon" />
+                {{ $t("product_tour") }}
+            </RouterLink>
+        </el-option>
         <el-option label="Settings" value="settings">
             <RouterLink :to="{name: 'settings'}" class="menu-item">
                 <CogOutline class="menu-icon" />
@@ -32,7 +38,7 @@
             </RouterLink>
         </el-option>
         <el-option label="slack" value="slack">
-            <a href="https://kestra.io/slack" target="_blank" class="menu-item">
+            <a href="https://kestra.io/slack?utm_source=app&utm_medium=referral&utm_campaign=top-auth" target="_blank" class="menu-item">
                 <Slack class="menu-icon" />
                 {{ $t("join_slack") }}
             </a>
@@ -50,22 +56,28 @@
 
 <script setup lang="ts">
     import {computed} from "vue";
-    import {RouterLink, useRouter} from "vue-router";
+    import {useRoute, useRouter} from "vue-router";
 
     import CogOutline from "vue-material-design-icons/CogOutline.vue";
     import Slack from "vue-material-design-icons/Slack.vue";
     import ChevronRight from "vue-material-design-icons/ChevronRight.vue";
     import Logout from "vue-material-design-icons/Logout.vue";
+    import RocketLaunchOutline from "vue-material-design-icons/RocketLaunchOutline.vue";
 
     import * as BasicAuth from "../../../utils/basicAuth";
     import {useAxios} from "../../../utils/axios";
     import {useOAuth2Store} from "../../../stores/oauth2";
     import {useAuthStore} from "../../stores/auth";
-
-    const router = useRouter();
     const axios = useAxios();
     const oauth2Store = useOAuth2Store();
-    const authStore = useAuthStore();
+    const route = useRoute();
+    const router = useRouter();
+    
+    const startTutorial = computed(() => ({
+        name: "flows/create",
+        query: {onboarding: "guided", reset: "true"},
+        params: {tenant: route.params.tenant},
+    }));
 
     const userLabel = computed(() => {
         return oauth2Store.userInfo?.name
@@ -94,14 +106,10 @@
         return roles.map((role) => role.toUpperCase()).join(" • ");
     });
 
-    const logout = async () => {
-        try {
-            await authStore.logout();
-        } finally {
-            BasicAuth.logout();
-            delete axios.defaults.headers.common["Authorization"];
-            router.push({name: "login"});
-        }
+    const logout = () => {
+        BasicAuth.logout();
+        delete axios.defaults.headers.common["Authorization"];
+        router.push({name: "login"});
     };
 </script>
 

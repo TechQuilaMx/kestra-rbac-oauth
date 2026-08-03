@@ -27,7 +27,7 @@ public class ClusterController {
     @ExecuteOn(TaskExecutors.IO)
     @Get("services/{id}")
     @RequirePermission(Permission.ADMIN_STATS)
-    @Operation(tags = {"Services"}, summary = "Get details about a service")
+    @Operation(tags = { "Services" }, summary = "Get details about a service")
     public HttpResponse<ServiceInstance> getService(@PathVariable("id") String id) throws HttpStatusException {
         return repository.findById(id)
             .map(HttpResponse::ok)

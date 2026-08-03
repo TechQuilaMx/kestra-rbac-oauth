@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for building Kestra from source
-FROM eclipse-temurin:21-jdk-jammy AS builder
+FROM eclipse-temurin:25-jdk-jammy AS builder
 
 # Install Node.js for building the UI
 RUN apt-get update && \
@@ -16,9 +16,6 @@ COPY --chmod=755 gradlew ./
 COPY gradlew.bat gradle.properties settings.gradle build.gradle ./
 COPY gradle ./gradle
 
-# Copy docker-entrypoint.sh
-COPY --chown=kestra:kestra --chmod=755 docker/app/docker-entrypoint.sh /docker-entrypoint.sh
-
 # Download dependencies (this layer will be cached)
 RUN ./gradlew dependencies --no-daemon || true
 
@@ -32,7 +29,7 @@ RUN chmod +x ./gradlew
 RUN ./gradlew executableJar --no-daemon --info
 
 # Runtime stage
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:25-jre-jammy
 
 ARG KESTRA_PLUGINS=""
 ARG APT_PACKAGES=""
@@ -48,10 +45,9 @@ RUN mkdir -p /app/confs
 COPY --chown=kestra:kestra --from=builder /build/cli/src/main/resources/application.yml /app/confs/application.yml
 
 # Copy docker configuration files (scripts and utilities)
-COPY --chown=kestra:kestra docker /
-
-# Copy docker entrypoint script to PATH for easy access
-COPY --chown=kestra:kestra --chmod=755 docker/app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --chown=kestra:kestra docker/app /app
+COPY --chown=kestra:kestra docker/usr/local/bin/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Copy the built executable from builder stage
 COPY --chown=kestra:kestra --from=builder /build/build/executable/kestra-* /app/kestra
@@ -70,6 +66,6 @@ RUN apt-get update -y && \
 
 USER kestra
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 CMD ["--help"]

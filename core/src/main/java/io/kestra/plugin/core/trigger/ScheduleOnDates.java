@@ -1,5 +1,15 @@
 package io.kestra.plugin.core.trigger;
 
+import java.time.Duration;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.exceptions.InvalidTriggerConfigurationException;
 import io.kestra.core.models.annotations.Plugin;
@@ -11,22 +21,13 @@ import io.kestra.core.models.tasks.VoidOutput;
 import io.kestra.core.models.triggers.*;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.validations.TimezoneId;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Null;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
-
-import java.time.Duration;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.Predicate;
 
 import static io.kestra.core.utils.Rethrow.throwFunction;
 
@@ -37,7 +38,11 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Schedule a flow on specific dates."
+    title = "Schedule a Flow on specific dates.",
+    description = """
+        Triggers on an explicit list of `dates` (ZonedDateTime). Timezone defaults to server but can be overridden. Honors backfill/recover logic like other schedulables.
+
+        Use when a cron can’t express required occurrences (e.g., ad-hoc or irregular calendars)."""
 )
 @Plugin
 public class ScheduleOnDates extends AbstractTrigger implements Schedulable, TriggerOutput<VoidOutput> {
@@ -47,7 +52,7 @@ public class ScheduleOnDates extends AbstractTrigger implements Schedulable, Tri
     @Builder.Default
     @Null
     private final Duration interval = null;
-    
+
     private Map<String, Object> inputs;
 
     @TimezoneId
@@ -93,7 +98,8 @@ public class ScheduleOnDates extends AbstractTrigger implements Schedulable, Tri
             .map(ctx -> ctx.getBackfill() != null ? ctx.getBackfill().getCurrentDate() : ctx.getDate())
             .map(this::withTimeZone)
             .or(() -> Optional.of(ZonedDateTime.now()))
-            .flatMap(dt -> {
+            .flatMap(dt ->
+            {
                 try {
                     return nextDate(conditionContext.getRunContext(), date -> date.isAfter(dt));
                 } catch (IllegalVariableEvaluationException e) {
@@ -128,7 +134,7 @@ public class ScheduleOnDates extends AbstractTrigger implements Schedulable, Tri
         }
         return date.withZoneSameInstant(ZoneId.of(this.timezone));
     }
-    
+
     private Optional<ZonedDateTime> nextDate(RunContext runContext, Predicate<ZonedDateTime> predicate) throws IllegalVariableEvaluationException {
         return runContext.render(dates)
             .asList(ZonedDateTime.class).stream().sorted()

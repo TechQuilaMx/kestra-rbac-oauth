@@ -1,5 +1,19 @@
 package io.kestra.plugin.core.namespace;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+
 import io.kestra.core.context.TestRunContextFactory;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.exceptions.ValidationErrorException;
@@ -13,30 +27,14 @@ import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.storages.Namespace;
 import io.kestra.core.storages.NamespaceFile;
-import io.kestra.core.storages.kv.KVEntry;
-import io.kestra.core.storages.kv.KVMetadata;
-import io.kestra.core.storages.kv.KVStore;
-import io.kestra.core.storages.kv.KVValueAndMetadata;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
+
 import io.micronaut.data.model.Pageable;
 import jakarta.inject.Inject;
 import jakarta.validation.ConstraintViolationException;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.parallel.Execution;
-import org.junit.jupiter.api.parallel.ExecutionMode;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-
+import static io.kestra.core.storages.NamespaceFile.toLogicalPath;
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -57,7 +55,6 @@ public class PurgeFilesTest {
 
     @Inject
     ModelValidator modelValidator;
-
 
     @BeforeEach
     protected void setup() throws IOException {
@@ -82,7 +79,7 @@ public class PurgeFilesTest {
 
         PurgeFiles purgeFiles = PurgeFiles.builder()
             .type(PurgeFiles.class.getName())
-            .namespacePattern(Property.ofValue("*arent*"))
+            .namespacePattern(Property.ofValue("*arent*")) // codespell:ignore
             .build();
         List<String> namespaces = purgeFiles.findNamespaces(runContextFactory.of(NAMESPACE));
 
@@ -100,7 +97,7 @@ public class PurgeFilesTest {
             .build();
         List<String> namespaces = purgeFiles.findNamespaces(runContextFactory.of(NAMESPACE));
 
-        assertThat(namespaces).containsExactlyInAnyOrder(PARENT_NAMESPACE);
+        assertThat(namespaces).containsExactlyInAnyOrder(PARENT_NAMESPACE, "ns1", "ns2");
     }
 
     @Test
@@ -114,7 +111,7 @@ public class PurgeFilesTest {
             .build();
         List<String> namespaces = purgeFiles.findNamespaces(runContextFactory.of(NAMESPACE));
 
-        assertThat(namespaces).containsExactlyInAnyOrder(PARENT_NAMESPACE, CHILD_NAMESPACE);
+        assertThat(namespaces).containsExactlyInAnyOrder(PARENT_NAMESPACE, CHILD_NAMESPACE, "ns1", "ns2");
     }
 
     @Test
@@ -138,7 +135,6 @@ public class PurgeFilesTest {
         namespaceStorage.putFile(Path.of("my/second/file.txt"), new ByteArrayInputStream("unused".getBytes(StandardCharsets.UTF_8)));
         namespaceStorage.putFile(Path.of("not/found.txt"), new ByteArrayInputStream("unused".getBytes(StandardCharsets.UTF_8)));
 
-
         PurgeFiles purgeFiles = PurgeFiles.builder()
             .type(PurgeFiles.class.getName())
             .filePattern(Property.ofValue("*il*"))
@@ -149,7 +145,7 @@ public class PurgeFilesTest {
         assertThat(output.getSize()).isEqualTo(2L);
         List<NamespaceFile> namespaceFiles = namespaceStorage.all();
         assertThat(namespaceFiles.size()).isEqualTo(1);
-        assertThat(namespaceFiles.getFirst().path()).isEqualTo("not/found.txt");
+        assertThat(toLogicalPath(namespaceFiles.getFirst().path())).isEqualTo("not/found.txt");
     }
 
     @Test
@@ -216,23 +212,33 @@ public class PurgeFilesTest {
     @Test
     void validation() throws Exception {
         // valid
-        assertThat(modelValidator.isValid(PurgeFiles.builder()
-            .id(IdUtils.create())
-            .type(PurgeFiles.class.getName())
-            .behavior(Property.ofValue(Version.builder().before(Instant.now().toString()).build()))
-            .build()).isPresent()).isFalse();
-        assertThat(modelValidator.isValid(PurgeFiles.builder()
-            .id(IdUtils.create())
-            .type(PurgeFiles.class.getName())
-            .behavior(Property.ofValue(Version.builder().keepAmount(2).build()))
-            .build()).isPresent()).isFalse();
+        assertThat(
+            modelValidator.isValid(
+                PurgeFiles.builder()
+                    .id(IdUtils.create())
+                    .type(PurgeFiles.class.getName())
+                    .behavior(Property.ofValue(Version.builder().before(Instant.now().toString()).build()))
+                    .build()
+            ).isPresent()
+        ).isFalse();
+        assertThat(
+            modelValidator.isValid(
+                PurgeFiles.builder()
+                    .id(IdUtils.create())
+                    .type(PurgeFiles.class.getName())
+                    .behavior(Property.ofValue(Version.builder().keepAmount(2).build()))
+                    .build()
+            ).isPresent()
+        ).isFalse();
 
         // invalid
-        Optional<ConstraintViolationException> invalid = modelValidator.isValid(PurgeFiles.builder()
-            .id(IdUtils.create())
-            .type(PurgeFiles.class.getName())
-            .behavior(Property.ofValue(Version.builder().before(Instant.now().toString()).keepAmount(2).build()))
-            .build());
+        Optional<ConstraintViolationException> invalid = modelValidator.isValid(
+            PurgeFiles.builder()
+                .id(IdUtils.create())
+                .type(PurgeFiles.class.getName())
+                .behavior(Property.ofValue(Version.builder().before(Instant.now().toString()).keepAmount(2).build()))
+                .build()
+        );
         assertThat(invalid.isPresent()).isTrue();
         assertThat(invalid.get().getMessage()).contains("behavior: Cannot set both 'before' and 'keepAmount' properties");
     }
@@ -244,12 +250,16 @@ public class PurgeFilesTest {
     }
 
     private void addNamespace(String namespace) {
-        flowRepositoryInterface.create(GenericFlow.of(Flow.builder()
-            .tenantId(MAIN_TENANT)
-            .namespace(namespace)
-            .id("flow1")
-            .tasks(List.of(PurgeFiles.builder().type(PurgeFiles.class.getName()).build()))
-            .build()));
+        flowRepositoryInterface.create(
+            GenericFlow.of(
+                Flow.builder()
+                    .tenantId(MAIN_TENANT)
+                    .namespace(namespace)
+                    .id("flow1")
+                    .tasks(List.of(PurgeFiles.builder().type(PurgeFiles.class.getName()).build()))
+                    .build()
+            )
+        );
     }
 
 }

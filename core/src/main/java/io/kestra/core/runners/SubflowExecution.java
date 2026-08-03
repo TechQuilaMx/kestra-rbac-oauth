@@ -1,17 +1,18 @@
 package io.kestra.core.runners;
 
+import io.kestra.core.models.HasUID;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.executions.TaskRun;
 import io.kestra.core.models.tasks.ExecutableTask;
 import io.kestra.core.models.tasks.Task;
+
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.Data;
 
-import jakarta.validation.constraints.NotNull;
-
 @Data
 @Builder
-public class SubflowExecution<T extends Task & ExecutableTask<?>> {
+public class SubflowExecution<T extends Task & ExecutableTask<?>> implements HasUID {
     @NotNull
     private TaskRun parentTaskRun;
 
@@ -20,4 +21,9 @@ public class SubflowExecution<T extends Task & ExecutableTask<?>> {
 
     @NotNull
     private Execution execution;
+
+    @Override
+    public String uid() {
+        return execution.getId();
+    }
 }

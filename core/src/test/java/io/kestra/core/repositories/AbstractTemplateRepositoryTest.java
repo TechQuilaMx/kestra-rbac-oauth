@@ -1,35 +1,37 @@
 package io.kestra.core.repositories;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeoutException;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
 import io.kestra.core.events.CrudEvent;
 import io.kestra.core.events.CrudEventType;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.templates.Template;
 import io.kestra.core.utils.Await;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.core.debug.Return;
-import io.kestra.core.utils.IdUtils;
+
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.data.model.Pageable;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import java.time.Duration;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeoutException;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @MicronautTest
+@Slf4j
 public abstract class AbstractTemplateRepositoryTest {
     @Inject
     protected TemplateRepositoryInterface templateRepository;
@@ -126,7 +128,7 @@ public abstract class AbstractTemplateRepositoryTest {
         templateRepository.create(template3);
 
         // with pageable
-        List<Template> save = templateRepository.find(Pageable.from(1, 10),null, tenant, "kestra.test");
+        List<Template> save = templateRepository.find(Pageable.from(1, 10), null, tenant, "kestra.test");
         assertThat((long) save.size()).isGreaterThanOrEqualTo(3L);
 
         // without pageable
@@ -138,8 +140,6 @@ public abstract class AbstractTemplateRepositoryTest {
         templateRepository.delete(template3);
     }
 
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractTemplateRepositoryTest.class);
-
     @Test
     protected void delete() throws TimeoutException {
         String tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
@@ -150,8 +150,9 @@ public abstract class AbstractTemplateRepositoryTest {
 
         assertThat(templateRepository.findById(tenant, template.getNamespace(), template.getId()).isPresent()).isFalse();
 
-        Await.until(() -> {
-            LOG.info("-------------> number of event: {}", TemplateListener.getEmits(tenant).size());
+        Await.until(() ->
+        {
+            log.info("-------------> number of event: {}", TemplateListener.getEmits(tenant).size());
             return TemplateListener.getEmits(tenant).size() == 2;
 
         }, Duration.ofMillis(100), Duration.ofSeconds(5));
@@ -166,16 +167,20 @@ public abstract class AbstractTemplateRepositoryTest {
         @Override
         public void onApplicationEvent(CrudEvent<Template> event) {
             //The instanceOf is required because Micronaut may send non Template event via this method
-            if ((event.getModel() != null && event.getModel() instanceof Template) ||
-                    (event.getPreviousModel() != null && event.getPreviousModel() instanceof Template)) {
+            if (
+                (event.getModel() != null && event.getModel() instanceof Template) ||
+                    (event.getPreviousModel() != null && event.getPreviousModel() instanceof Template)
+            ) {
                 emits.add(event);
             }
         }
 
-        public static List<CrudEvent<Template>> getEmits(String tenantId){
+        public static List<CrudEvent<Template>> getEmits(String tenantId) {
             return emits.stream()
-                .filter(e -> (e.getModel() != null && e.getModel().getTenantId().equals(tenantId)) ||
-                    (e.getPreviousModel() != null && e.getPreviousModel().getTenantId().equals(tenantId)))
+                .filter(
+                    e -> (e.getModel() != null && e.getModel().getTenantId().equals(tenantId)) ||
+                        (e.getPreviousModel() != null && e.getPreviousModel().getTenantId().equals(tenantId))
+                )
                 .toList();
         }
 

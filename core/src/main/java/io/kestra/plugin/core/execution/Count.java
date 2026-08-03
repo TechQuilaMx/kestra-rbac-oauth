@@ -1,6 +1,12 @@
 package io.kestra.plugin.core.execution;
 
+import java.time.ZonedDateTime;
+import java.util.List;
+
+import org.slf4j.Logger;
+
 import com.google.common.collect.ImmutableMap;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -13,14 +19,11 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.repositories.ExecutionRepositoryInterface;
 import io.kestra.core.runners.DefaultRunContext;
 import io.kestra.core.runners.RunContext;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.slf4j.Logger;
-
-import java.time.ZonedDateTime;
-import java.util.List;
 
 import static io.kestra.core.utils.Rethrow.throwPredicate;
 
@@ -30,8 +33,11 @@ import static io.kestra.core.utils.Rethrow.throwPredicate;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "List execution counts for a list of flows.",
-    description = "This can be used to send an alert if a condition is met about execution counts."
+    title = "Count executions for flows or namespaces (deprecated).",
+    description = """
+        Deprecated; use `io.kestra.plugin.kestra.executions.Count` instead.
+
+        Fetches execution counts in a date range, optionally filtered by states, flows, or namespaces. Keeps rows where the rendered `expression` returns true (e.g., `{{ eq count 0 }}` to alert on inactivity). You must provide either `flows` or `namespaces`, otherwise the task errors."""
 )
 @Plugin(
     examples = {
@@ -75,6 +81,7 @@ import static io.kestra.core.utils.Rethrow.throwPredicate;
     },
     aliases = "io.kestra.core.tasks.executions.Counts"
 )
+@Deprecated(since = "1.2", forRemoval = true)
 public class Count extends Task implements RunnableTask<Count.Output> {
     @Schema(
         title = "A list of flows to be filtered",
@@ -115,7 +122,7 @@ public class Count extends Task implements RunnableTask<Count.Output> {
     @Override
     public Output run(RunContext runContext) throws Exception {
         Logger logger = runContext.logger();
-        ExecutionRepositoryInterface executionRepository = ((DefaultRunContext)runContext)
+        ExecutionRepositoryInterface executionRepository = ((DefaultRunContext) runContext)
             .getApplicationContext()
             .getBean(ExecutionRepositoryInterface.class);
 
@@ -148,15 +155,19 @@ public class Count extends Task implements RunnableTask<Count.Output> {
 
         List<Result> count = executionCounts
             .stream()
-            .filter(throwPredicate(item -> runContext
-                .render(this.expression, ImmutableMap.of("count", item.getCount().intValue()))
-                .equals("true")
-            ))
-            .map(item -> Result.builder()
-                .namespace(item.getNamespace())
-                .flowId(item.getFlowId())
-                .count(item.getCount())
-                .build()
+            .filter(
+                throwPredicate(
+                    item -> runContext
+                        .render(this.expression, ImmutableMap.of("count", item.getCount().intValue()))
+                        .equals("true")
+                )
+            )
+            .map(
+                item -> Result.builder()
+                    .namespace(item.getNamespace())
+                    .flowId(item.getFlowId())
+                    .count(item.getCount())
+                    .build()
             )
             .toList();
 

@@ -1,17 +1,20 @@
 package io.kestra.jdbc.repository;
 
-import com.google.common.annotations.VisibleForTesting;
-import io.kestra.core.repositories.WorkerJobRunningRepositoryInterface;
-import io.kestra.core.runners.WorkerJobRunning;
-import io.kestra.executor.WorkerJobRunningStateStore;
-import lombok.extern.slf4j.Slf4j;
+import java.util.List;
+import java.util.Optional;
+
 import org.jooq.DSLContext;
 import org.jooq.Record1;
 import org.jooq.SelectConditionStep;
 import org.jooq.impl.DSL;
 
-import java.util.List;
-import java.util.Optional;
+import com.google.common.annotations.VisibleForTesting;
+
+import io.kestra.core.repositories.WorkerJobRunningRepositoryInterface;
+import io.kestra.core.runners.WorkerJobRunning;
+import io.kestra.executor.WorkerJobRunningStateStore;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public abstract class AbstractJdbcWorkerJobRunningRepository extends AbstractJdbcRepository implements WorkerJobRunningRepositoryInterface, WorkerJobRunningStateStore {
@@ -29,11 +32,11 @@ public abstract class AbstractJdbcWorkerJobRunningRepository extends AbstractJdb
     @Override
     public void deleteByKey(String key) {
         this.jdbcRepository.getDslContextWrapper()
-            .transaction(configuration ->
-                DSL
+            .transaction(
+                configuration -> DSL
                     .using(configuration)
                     .deleteFrom(this.jdbcRepository.getTable())
-                    .where(field("key").eq(key))
+                    .where(KEY_FIELD.eq(key))
                     .execute()
             );
     }
@@ -42,13 +45,14 @@ public abstract class AbstractJdbcWorkerJobRunningRepository extends AbstractJdb
     public Optional<WorkerJobRunning> findByKey(String uid) {
         return this.jdbcRepository
             .getDslContextWrapper()
-            .transactionResult(configuration -> {
+            .transactionResult(configuration ->
+            {
                 SelectConditionStep<Record1<Object>> select = DSL
                     .using(configuration)
-                    .select((field("value")))
+                    .select((VALUE_FIELD))
                     .from(this.jdbcRepository.getTable())
                     .where(
-                        field("key").eq(uid)
+                        KEY_FIELD.eq(uid)
                     );
 
                 return this.jdbcRepository.fetchOne(select);
@@ -59,10 +63,11 @@ public abstract class AbstractJdbcWorkerJobRunningRepository extends AbstractJdb
     public List<WorkerJobRunning> findAll() {
         return this.jdbcRepository
             .getDslContextWrapper()
-            .transactionResult(configuration -> {
+            .transactionResult(configuration ->
+            {
                 var select = DSL
                     .using(configuration)
-                    .select((field("value")))
+                    .select((VALUE_FIELD))
                     .from(this.jdbcRepository.getTable());
 
                 return this.jdbcRepository.fetch(select);
@@ -71,13 +76,13 @@ public abstract class AbstractJdbcWorkerJobRunningRepository extends AbstractJdb
 
     public List<WorkerJobRunning> getWorkerJobWithWorkerDead(DSLContext context, List<String> workersToDelete) {
         return context
-                .select(field("value"))
-                .from(this.jdbcRepository.getTable())
-                .where(field("worker_uuid").in(workersToDelete))
-                .forUpdate()
-                .fetch()
-                .map(r -> this.jdbcRepository.deserialize(r.get("value").toString())
+            .select(VALUE_FIELD)
+            .from(this.jdbcRepository.getTable())
+            .where(field("worker_uuid").in(workersToDelete))
+            .forUpdate()
+            .fetch()
+            .map(
+                r -> this.jdbcRepository.deserialize(r.get("value", String.class))
             );
     }
 }
-

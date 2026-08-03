@@ -1,6 +1,16 @@
 package io.kestra.core.junit.extensions;
 
-import static io.kestra.core.junit.extensions.ExtensionUtils.loadFile;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.util.Objects;
+
+import org.junit.jupiter.api.extension.AfterEachCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.ParameterContext;
+import org.junit.jupiter.api.extension.ParameterResolutionException;
+import org.junit.jupiter.api.extension.ParameterResolver;
 
 import io.kestra.core.junit.annotations.ExecuteFlow;
 import io.kestra.core.models.executions.Execution;
@@ -11,18 +21,11 @@ import io.kestra.core.repositories.LocalFlowRepositoryLoader;
 import io.kestra.core.runners.TestRunnerUtils;
 import io.kestra.core.serializers.YamlParser;
 import io.kestra.core.utils.TestsUtils;
+
 import io.micronaut.context.ApplicationContext;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Paths;
-import java.time.Duration;
-import java.util.Objects;
 import lombok.SneakyThrows;
-import org.junit.jupiter.api.extension.AfterEachCallback;
-import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.jupiter.api.extension.ParameterContext;
-import org.junit.jupiter.api.extension.ParameterResolutionException;
-import org.junit.jupiter.api.extension.ParameterResolver;
+
+import static io.kestra.core.junit.extensions.ExtensionUtils.loadFile;
 
 public class FlowExecutorExtension implements AfterEachCallback, ParameterResolver {
     private ApplicationContext context;
@@ -38,7 +41,8 @@ public class FlowExecutorExtension implements AfterEachCallback, ParameterResolv
     public Object resolveParameter(ParameterContext parameterContext,
         ExtensionContext extensionContext) throws ParameterResolutionException {
         if (context == null) {
-            context = extensionContext.getRoot().getStore(ExtensionContext.Namespace.create(KestraTestExtension.class, extensionContext.getTestClass().get())).get(ApplicationContext.class, ApplicationContext.class);
+            context = extensionContext.getRoot().getStore(ExtensionContext.Namespace.create(KestraTestExtension.class, extensionContext.getTestClass().get()))
+                .get(ApplicationContext.class, ApplicationContext.class);
 
             if (context == null) {
                 throw new IllegalStateException("No application context, to use '@LoadFlows' annotation, you need to add '@KestraTest'");
@@ -58,7 +62,7 @@ public class FlowExecutorExtension implements AfterEachCallback, ParameterResolv
 
         Flow flow = YamlParser.parse(Paths.get(url.toURI()).toFile(), Flow.class);
         TestRunnerUtils runnerUtils = context.getBean(TestRunnerUtils.class);
-        return runnerUtils.runOne(tenantId, flow.getNamespace(), flow.getId(), Duration.parse(executeFlow.timeout()));
+        return runnerUtils.runOne(tenantId, flow.getNamespace(), flow.getId(), Duration.parse(executeFlow.timeout()), executeFlow.executionKind());
     }
 
     @Override

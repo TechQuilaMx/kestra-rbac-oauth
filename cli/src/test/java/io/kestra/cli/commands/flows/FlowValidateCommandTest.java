@@ -1,11 +1,12 @@
 package io.kestra.cli.commands.flows;
 
-import io.micronaut.configuration.picocli.PicocliRunner;
-import io.micronaut.context.ApplicationContext;
-import org.junit.jupiter.api.Test;
-
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+
+import org.junit.jupiter.api.Test;
+
+import io.micronaut.configuration.picocli.PicocliRunner;
+import io.micronaut.context.ApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,12 +24,12 @@ class FlowValidateCommandTest {
             Integer call = PicocliRunner.call(FlowValidateCommand.class, ctx, args);
 
             assertThat(call).isZero();
-            assertThat(out.toString()).contains("✓ - io.kestra.cli / include");
+            assertThat(out.toString()).contains("✓ - io.kestra.cli.include");
         }
     }
 
     @Test
-     // github action kestra-io/validate-action requires being able to validate Flows from OSS CLI against a remote EE instance
+    // github action kestra-io/validate-action requires being able to validate Flows from OSS CLI against a remote EE instance
     void runForEEInstance() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         System.setOut(new PrintStream(out));
@@ -43,7 +44,7 @@ class FlowValidateCommandTest {
             Integer call = PicocliRunner.call(FlowValidateCommand.class, ctx, args);
 
             assertThat(call).isZero();
-            assertThat(out.toString()).contains("✓ - io.kestra.cli / include");
+            assertThat(out.toString()).contains("✓ - io.kestra.cli.include");
         }
     }
 
@@ -60,7 +61,7 @@ class FlowValidateCommandTest {
             Integer call = PicocliRunner.call(FlowValidateCommand.class, ctx, args);
 
             assertThat(call).isZero();
-            assertThat(out.toString()).contains("✓ - system / warning");
+            assertThat(out.toString()).contains("✓ - system.warning");
             assertThat(out.toString()).contains("⚠ - tasks[0] is deprecated");
             assertThat(out.toString()).contains("ℹ - io.kestra.core.tasks.log.Log is replaced by io.kestra.plugin.core.log.Log");
         }

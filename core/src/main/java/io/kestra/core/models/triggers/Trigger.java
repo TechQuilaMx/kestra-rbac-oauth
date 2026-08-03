@@ -1,5 +1,10 @@
 package io.kestra.core.models.triggers;
 
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
+
 import io.kestra.core.exceptions.InvalidTriggerConfigurationException;
 import io.kestra.core.models.HasUID;
 import io.kestra.core.models.conditions.ConditionContext;
@@ -10,14 +15,10 @@ import io.kestra.core.models.flows.FlowInterface;
 import io.kestra.core.models.flows.State;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.core.trigger.Schedule;
+
 import io.micronaut.core.annotation.Nullable;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.Optional;
 
 @SuperBuilder(toBuilder = true)
 @ToString
@@ -48,7 +49,6 @@ public class Trigger extends TriggerContext implements HasUID {
     public static TriggerBuilder<?, ?> builder() {
         return new TriggerBuilderImpl();
     }
-
 
     /** {@inheritDoc **/
     @Override
@@ -199,9 +199,10 @@ public class Trigger extends TriggerContext implements HasUID {
                 throw new IllegalArgumentException("Unable to find trigger with id '" + this.getTriggerId() + "'");
             }
             // If trigger is a schedule and execution ended after the next execution date
-            else if (abstractTrigger instanceof Schedule schedule &&
-                this.getNextExecutionDate() != null &&
-                execution.getState().getEndDate().get().isAfter(this.getNextExecutionDate().toInstant())
+            else if (
+                abstractTrigger instanceof Schedule schedule &&
+                    this.getNextExecutionDate() != null &&
+                    execution.getState().getEndDate().get().isAfter(this.getNextExecutionDate().toInstant())
             ) {
                 RecoverMissedSchedules recoverMissedSchedules = Optional.ofNullable(schedule.getRecoverMissedSchedules())
                     .orElseGet(() -> schedule.defaultRecoverMissedSchedules(conditionContext.getRunContext()));
@@ -266,7 +267,8 @@ public class Trigger extends TriggerContext implements HasUID {
                         .end(backfill.getEnd() != null ? backfill.getEnd() : ZonedDateTime.now())
                         .currentDate(backfill.getStart())
                         .previousNextExecutionDate(this.getNextExecutionDate())
-                        .build())
+                        .build()
+                )
                 .build();
         }
         return updated;

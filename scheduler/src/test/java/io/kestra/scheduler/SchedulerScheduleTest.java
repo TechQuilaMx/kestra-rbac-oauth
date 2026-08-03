@@ -1,42 +1,46 @@
 package io.kestra.scheduler;
 
-import com.devskiller.friendly_id.FriendlyId;
-import io.kestra.core.junit.annotations.FlakyTest;
-import io.kestra.core.models.executions.TaskRun;
-import io.kestra.core.models.flows.FlowWithSource;
-import io.kestra.core.models.flows.PluginDefault;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.flows.GenericFlow;
-import io.kestra.core.repositories.FlowRepositoryInterface;
-import io.kestra.core.runners.SchedulerTriggerStateInterface;
-import io.kestra.core.utils.TestsUtils;
-import io.kestra.jdbc.runner.JdbcScheduler;
-import io.kestra.plugin.core.condition.Expression;
-import io.kestra.core.models.executions.Execution;
-import io.kestra.core.models.executions.LogEntry;
-import io.kestra.core.models.flows.State;
-import io.kestra.core.models.triggers.Backfill;
-import io.kestra.core.models.triggers.Trigger;
-import io.kestra.core.models.triggers.RecoverMissedSchedules;
-import io.kestra.plugin.core.trigger.Schedule;
-import io.kestra.core.queues.QueueFactoryInterface;
-import io.kestra.core.queues.QueueInterface;
-import io.kestra.core.runners.FlowListeners;
-import io.kestra.core.utils.Await;
-import jakarta.inject.Inject;
-import jakarta.inject.Named;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
-import reactor.core.publisher.Flux;
-
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
+
+import com.devskiller.friendly_id.FriendlyId;
+
+import io.kestra.core.junit.annotations.FlakyTest;
+import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.executions.LogEntry;
+import io.kestra.core.models.executions.TaskRun;
+import io.kestra.core.models.flows.FlowWithSource;
+import io.kestra.core.models.flows.GenericFlow;
+import io.kestra.core.models.flows.PluginDefault;
+import io.kestra.core.models.flows.State;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.triggers.Backfill;
+import io.kestra.core.models.triggers.RecoverMissedSchedules;
+import io.kestra.core.models.triggers.Trigger;
+import io.kestra.core.queues.QueueFactoryInterface;
+import io.kestra.core.queues.QueueInterface;
+import io.kestra.core.repositories.FlowRepositoryInterface;
+import io.kestra.core.runners.FlowListeners;
+import io.kestra.core.runners.SchedulerTriggerStateInterface;
+import io.kestra.core.utils.Await;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.jdbc.runner.JdbcScheduler;
+import io.kestra.plugin.core.condition.Expression;
+import io.kestra.plugin.core.trigger.Schedule;
+
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import lombok.SneakyThrows;
+import reactor.core.publisher.Flux;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,9 +72,11 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
             .type(Schedule.class.getName())
             .cron(cron)
             .timezone(zone)
-            .inputs(Map.of(
-                "testInputs", "test-inputs"
-            ));
+            .inputs(
+                Map.of(
+                    "testInputs", "test-inputs"
+                )
+            );
     }
 
     private FlowWithSource createScheduleFlow(String tenantId, String zone, String triggerId, boolean invalid) {
@@ -85,11 +91,18 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
             .truncatedTo(ChronoUnit.HOURS);
     }
 
-    protected AbstractScheduler scheduler(FlowListeners flowListenersServiceSpy, SchedulerExecutionStateInterface executionStateSpy) {
+    protected AbstractScheduler scheduler(FlowListeners flowListenersServiceSpy) {
         return new JdbcScheduler(
             applicationContext,
             flowListenersServiceSpy
-        );
+        ) {
+            @SneakyThrows
+            @Override
+            public void close() {
+                super.close();
+                flowListenersServiceSpy.close();
+            }
+        };
     }
 
     @BeforeEach
@@ -111,7 +124,7 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         // Create a flow with a backfill of 5 hours
         // then flow should be executed 6 times
         FlowWithSource invalid = createScheduleFlow(this.tenantId, "Asia/Delhi", "schedule", true);
-        FlowWithSource flow = createScheduleFlow(this.tenantId,"Europe/Paris", "schedule", false);
+        FlowWithSource flow = createScheduleFlow(this.tenantId, "Europe/Paris", "schedule", false);
 
         flowRepository.create(GenericFlow.of(flow));
         doReturn(List.of(invalid, flow))
@@ -139,9 +152,10 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         triggerState.create(trigger.toBuilder().triggerId("schedule-invalid").flowId(invalid.getId()).build());
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionStateSpy)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             // wait for execution
-            Flux<Execution> receiveExecutions = TestsUtils.receive(executionQueue, throwConsumer(either -> {
+            Flux<Execution> receiveExecutions = TestsUtils.receive(executionQueue, throwConsumer(either ->
+            {
                 Execution execution = either.getLeft();
                 assertThat(execution.getInputs().get("testInputs")).isEqualTo("test-inputs");
                 assertThat(execution.getInputs().get("def")).isEqualTo("awesome");
@@ -156,7 +170,8 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
                 queueCount.countDown();
             }));
 
-            Flux<LogEntry> receiveLogs = TestsUtils.receive(logQueue, e -> {
+            Flux<LogEntry> receiveLogs = TestsUtils.receive(logQueue, e ->
+            {
                 if (e.getLeft().getMessage().contains("Unknown time-zone ID: Asia/Delhi")) {
                     invalidLogCount.countDown();
                 }
@@ -182,7 +197,7 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         // mock flow listeners
         FlowListeners flowListenersServiceSpy = spy(this.flowListenersService);
 
-        FlowWithSource flow = createScheduleFlow(this.tenantId,"Europe/Paris", "retroSchedule", false);
+        FlowWithSource flow = createScheduleFlow(this.tenantId, "Europe/Paris", "retroSchedule", false);
 
         doReturn(List.of(flow))
             .when(flowListenersServiceSpy)
@@ -200,10 +215,11 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         triggerState.create(trigger);
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionState)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             scheduler.run();
 
-            Await.until(() -> {
+            Await.until(() ->
+            {
                 Optional<Trigger> optionalTrigger = this.triggerState.findLast(trigger);
                 return optionalTrigger.filter(value -> value.getNextExecutionDate() != null).isPresent();
             }, Duration.ofSeconds(1), Duration.ofSeconds(60));
@@ -216,7 +232,7 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
     void recoverALLMissing() throws Exception {
         // mock flow listeners
         FlowListeners flowListenersServiceSpy = spy(this.flowListenersService);
-        FlowWithSource flow = createScheduleFlow(this.tenantId,null, "recoverALLMissing", false);
+        FlowWithSource flow = createScheduleFlow(this.tenantId, null, "recoverALLMissing", false);
         doReturn(List.of(flow))
             .when(flowListenersServiceSpy)
             .flows();
@@ -235,9 +251,10 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         CountDownLatch queueCount = new CountDownLatch(1);
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionState)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             // wait for execution
-            Flux<Execution> receive = TestsUtils.receive(executionQueue, either -> {
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, either ->
+            {
                 Execution execution = either.getLeft();
                 assertThat(execution.getFlowId()).isEqualTo(flow.getId());
                 queueCount.countDown();
@@ -281,9 +298,10 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         CountDownLatch queueCount = new CountDownLatch(1);
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionState)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             // wait for execution
-            Flux<Execution> receive = TestsUtils.receive(executionQueue, either -> {
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, either ->
+            {
                 Execution execution = either.getLeft();
                 assertThat(execution.getFlowId()).isEqualTo(flow.getId());
                 queueCount.countDown();
@@ -309,7 +327,7 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         Schedule schedule = createScheduleTrigger(null, "0 * * * *", "recoverNONEMissing", false)
             .recoverMissedSchedules(RecoverMissedSchedules.NONE)
             .build();
-        FlowWithSource flow = createFlow(this.tenantId,List.of(schedule));
+        FlowWithSource flow = createFlow(this.tenantId, List.of(schedule));
         doReturn(List.of(flow))
             .when(flowListenersServiceSpy)
             .flows();
@@ -326,7 +344,7 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         triggerState.create(lastTrigger);
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionState)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             scheduler.run();
 
             Await.until(() -> scheduler.isReady(), Duration.ofMillis(100), Duration.ofSeconds(5));
@@ -342,7 +360,7 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         FlowListeners flowListenersServiceSpy = spy(this.flowListenersService);
         String triggerId = "backfill";
 
-        FlowWithSource flow = createScheduleFlow(this.tenantId,"Europe/Paris", triggerId, false);
+        FlowWithSource flow = createScheduleFlow(this.tenantId, "Europe/Paris", triggerId, false);
 
         doReturn(List.of(flow))
             .when(flowListenersServiceSpy)
@@ -358,10 +376,11 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
             .build();
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionState)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             scheduler.run();
 
-            Await.until(() -> {
+            Await.until(() ->
+            {
                 Optional<Trigger> optionalTrigger = this.triggerState.findLast(trigger);
                 return optionalTrigger.filter(value -> value.getNextExecutionDate() != null).isPresent();
             }, Duration.ofSeconds(1), Duration.ofSeconds(15));
@@ -370,18 +389,20 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
 
             assertThat(lastTrigger.getNextExecutionDate()).isAfterOrEqualTo(ZonedDateTime.now().plusHours(1).truncatedTo(ChronoUnit.HOURS));
 
-            triggerState.update(lastTrigger.toBuilder()
-                .backfill(
-                    Backfill.builder()
-                        .start(date(5))
-                        .end(ZonedDateTime.now().truncatedTo(ChronoUnit.HOURS))
-                        .currentDate(date(5))
-                        .previousNextExecutionDate(lastTrigger.getNextExecutionDate().truncatedTo(ChronoUnit.HOURS))
-                        .build()
-                ).build()
+            triggerState.update(
+                lastTrigger.toBuilder()
+                    .backfill(
+                        Backfill.builder()
+                            .start(date(5))
+                            .end(ZonedDateTime.now().truncatedTo(ChronoUnit.HOURS))
+                            .currentDate(date(5))
+                            .previousNextExecutionDate(lastTrigger.getNextExecutionDate().truncatedTo(ChronoUnit.HOURS))
+                            .build()
+                    ).build()
             );
 
-            Await.until(() -> {
+            Await.until(() ->
+            {
                 Optional<Trigger> optionalTrigger = this.triggerState.findLast(lastTrigger);
                 return optionalTrigger.filter(value -> value.getBackfill() != null).isPresent();
             }, Duration.ofSeconds(1), Duration.ofSeconds(15));
@@ -399,7 +420,7 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         FlowListeners flowListenersServiceSpy = spy(this.flowListenersService);
         String triggerId = "disabled";
 
-        FlowWithSource flow = createScheduleFlow(this.tenantId,"Europe/Paris", triggerId, false);
+        FlowWithSource flow = createScheduleFlow(this.tenantId, "Europe/Paris", triggerId, false);
 
         doReturn(List.of(flow))
             .when(flowListenersServiceSpy)
@@ -422,7 +443,7 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         triggerState.create(trigger);
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionState)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             scheduler.run();
 
             // Wait 3s to see if things happen
@@ -442,7 +463,7 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         Schedule schedule = createScheduleTrigger("Europe/Paris", "* * * * *", "stopAfter", false)
             .stopAfter(List.of(State.Type.SUCCESS))
             .build();
-        FlowWithSource flow = createFlow(this.tenantId,Collections.singletonList(schedule));
+        FlowWithSource flow = createFlow(this.tenantId, Collections.singletonList(schedule));
         doReturn(List.of(flow))
             .when(flowListenersServiceSpy)
             .flows();
@@ -462,9 +483,10 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         CountDownLatch queueCount = new CountDownLatch(2);
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionState)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             // wait for execution
-            Flux<Execution> receive = TestsUtils.receive(executionQueue, throwConsumer(either -> {
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, throwConsumer(either ->
+            {
                 Execution execution = either.getLeft();
                 assertThat(execution.getInputs().get("testInputs")).isEqualTo("test-inputs");
                 assertThat(execution.getInputs().get("def")).isEqualTo("awesome");
@@ -489,6 +511,7 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
             Await.until(() -> this.triggerState.findLast(trigger).map(t -> t.getDisabled()).orElse(false).booleanValue(), Duration.ofMillis(100), Duration.ofSeconds(10));
         }
     }
+
     @Test
     void failedEvaluationFromFailedCondition() {
         // mock flow listeners
@@ -503,7 +526,7 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
                 )
             )
             .build();
-        FlowWithSource flow = createFlow(this.tenantId,Collections.singletonList(schedule));
+        FlowWithSource flow = createFlow(this.tenantId, Collections.singletonList(schedule));
         doReturn(List.of(flow))
             .when(flowListenersServiceSpy)
             .flows();
@@ -522,9 +545,10 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         CountDownLatch queueCount = new CountDownLatch(1);
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionState)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             // wait for execution
-            Flux<Execution> receive = TestsUtils.receive(executionQueue, either -> {
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, either ->
+            {
                 Execution execution = either.getLeft();
                 assertThat(execution).isNotNull();
                 assertThat(execution.getFlowId()).isEqualTo(flow.getId());
@@ -544,20 +568,22 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
             throw new RuntimeException(e);
         }
     }
+
     @Test
     void failedEvaluationFromInvalidExpression() {
         // mock flow listeners
         FlowListeners flowListenersServiceSpy = spy(this.flowListenersService);
         Schedule schedule = createScheduleTrigger("Europe/Paris", "* * * * *", "failedEvaluation", false)
             .inputs(
-                Map.of("invalidExpressionInput", Expression.builder()
-                    .type(Expression.class.getName())
-                    .expression(Property.ofExpression("{{ now().hour == 0 ? 3 : 2 }}"))
-                    .build()
+                Map.of(
+                    "invalidExpressionInput", Expression.builder()
+                        .type(Expression.class.getName())
+                        .expression(Property.ofExpression("{{ now().hour == 0 ? 3 : 2 }}"))
+                        .build()
                 )
             )
             .build();
-        FlowWithSource flow = createFlow(this.tenantId,Collections.singletonList(schedule));
+        FlowWithSource flow = createFlow(this.tenantId, Collections.singletonList(schedule));
         doReturn(List.of(flow))
             .when(flowListenersServiceSpy)
             .flows();
@@ -576,9 +602,10 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         CountDownLatch queueCount = new CountDownLatch(1);
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionState)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             // wait for execution
-            Flux<Execution> receive = TestsUtils.receive(executionQueue, either -> {
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, either ->
+            {
                 Execution execution = either.getLeft();
                 assertThat(execution).isNotNull();
                 assertThat(execution.getFlowId()).isEqualTo(flow.getId());
@@ -635,26 +662,38 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         CountDownLatch queueCount = new CountDownLatch(1);
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionState)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             // wait for execution
-            Flux<Execution> receive = TestsUtils.receive(executionQueue, throwConsumer(either -> {
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, throwConsumer(either ->
+            {
                 Execution execution = either.getLeft();
                 assertThat(execution.getFlowId()).isEqualTo(flow.getId());
 
                 if (execution.getState().getCurrent() == State.Type.CREATED) {
                     Thread.sleep(11000);
-                    executionQueue.emit(execution.withState(State.Type.SUCCESS)
-                        .toBuilder()
-                        .taskRunList(List.of(TaskRun.builder()
-                            .id("test")
-                            .executionId(execution.getId())
-                            .state(State.of(State.Type.SUCCESS,
-                                List.of(new State.History(
-                                    State.Type.SUCCESS,
-                                    lastTrigger.getNextExecutionDate().plusMinutes(3).toInstant()
-                                ))))
-                            .build()))
-                        .build()
+                    executionQueue.emit(
+                        execution.withState(State.Type.SUCCESS)
+                            .toBuilder()
+                            .taskRunList(
+                                List.of(
+                                    TaskRun.builder()
+                                        .id("test")
+                                        .executionId(execution.getId())
+                                        .state(
+                                            State.of(
+                                                State.Type.SUCCESS,
+                                                List.of(
+                                                    new State.History(
+                                                        State.Type.SUCCESS,
+                                                        lastTrigger.getNextExecutionDate().plusMinutes(3).toInstant()
+                                                    )
+                                                )
+                                            )
+                                        )
+                                        .build()
+                                )
+                            )
+                            .build()
                     );
                 }
                 queueCount.countDown();
@@ -668,7 +707,10 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
             assertThat(queueCount.getCount()).isEqualTo(0L);
 
             Trigger trigger = Trigger.of(flow, schedule);
-            Await.until(() -> this.triggerState.findLast(trigger).map(t -> t.getNextExecutionDate().isAfter(lastTrigger.getNextExecutionDate().plusSeconds(10))).orElse(false).booleanValue(), Duration.ofMillis(100), Duration.ofSeconds(20));
+            Await.until(
+                () -> this.triggerState.findLast(trigger).map(t -> t.getNextExecutionDate().isAfter(lastTrigger.getNextExecutionDate().plusSeconds(10))).orElse(false).booleanValue(),
+                Duration.ofMillis(100), Duration.ofSeconds(20)
+            );
         }
     }
 
@@ -708,23 +750,34 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
         CountDownLatch queueCount = new CountDownLatch(1);
 
         // scheduler
-        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy, executionState)) {
+        try (AbstractScheduler scheduler = scheduler(flowListenersServiceSpy)) {
             // wait for execution
-            Flux<Execution> receive = TestsUtils.receive(executionQueue, throwConsumer(either -> {
+            Flux<Execution> receive = TestsUtils.receive(executionQueue, throwConsumer(either ->
+            {
                 Execution execution = either.getLeft();
                 assertThat(execution.getFlowId()).isEqualTo(flow.getId());
 
                 if (execution.getState().getCurrent() == State.Type.CREATED) {
                     Thread.sleep(11000);
-                    Execution terminated = execution.withTaskRunList(List.of(TaskRun.builder()
-                        .id("test")
-                        .executionId(execution.getId())
-                        .state(State.of(State.Type.SUCCESS,
-                            List.of(new State.History(
-                                State.Type.SUCCESS,
-                                lastTrigger.getNextExecutionDate().plusMinutes(3).toInstant()
-                            ))))
-                        .build()));
+                    Execution terminated = execution.withTaskRunList(
+                        List.of(
+                            TaskRun.builder()
+                                .id("test")
+                                .executionId(execution.getId())
+                                .state(
+                                    State.of(
+                                        State.Type.SUCCESS,
+                                        List.of(
+                                            new State.History(
+                                                State.Type.SUCCESS,
+                                                lastTrigger.getNextExecutionDate().plusMinutes(3).toInstant()
+                                            )
+                                        )
+                                    )
+                                )
+                                .build()
+                        )
+                    );
                     terminateExecution(terminated, lastTrigger, flow);
                 }
                 queueCount.countDown();
@@ -738,7 +791,10 @@ public class SchedulerScheduleTest extends AbstractSchedulerTest {
             assertThat(queueCount.getCount()).isEqualTo(0L);
 
             Trigger trigger = Trigger.of(flow, schedule);
-            Await.until(() -> this.triggerState.findLast(trigger).map(t -> t.getNextExecutionDate().isAfter(lastTrigger.getNextExecutionDate().plusSeconds(10))).orElse(false).booleanValue(), Duration.ofMillis(100), Duration.ofSeconds(20));
+            Await.until(
+                () -> this.triggerState.findLast(trigger).map(t -> t.getNextExecutionDate().isAfter(lastTrigger.getNextExecutionDate().plusSeconds(10))).orElse(false).booleanValue(),
+                Duration.ofMillis(100), Duration.ofSeconds(20)
+            );
         }
     }
 }

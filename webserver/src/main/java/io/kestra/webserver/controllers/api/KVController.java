@@ -1,21 +1,28 @@
 package io.kestra.webserver.controllers.api;
 
+import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.*;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+
 import io.kestra.core.exceptions.ResourceExpiredException;
 import io.kestra.core.models.QueryFilter;
 import io.kestra.core.models.kv.KVType;
+import io.kestra.core.models.namespaces.NamespaceInterface;
 import io.kestra.core.repositories.KvMetadataRepositoryInterface;
 import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.storages.kv.*;
 import io.kestra.core.tenant.TenantService;
-import io.kestra.core.utils.NamespaceUtils;
 import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.converters.QueryFilterFormat;
 import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.PageableUtils;
+
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.Pageable;
@@ -30,10 +37,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import jakarta.inject.Inject;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.util.*;
 
 @Validated
 @Controller("/api/v1/{tenant}")
@@ -56,36 +59,33 @@ public class KVController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get("/kv")
+    @Operation(tags = { "KV" }, summary = "List all keys")
     @RequirePermission(Permission.KV_VIEW)
-    @Operation(tags = {"KV"}, summary = "List all keys")
     public PagedResults<KVEntry> listAllKeys(
         @Parameter(description = "The current page") @QueryValue(value = "page", defaultValue = "1") int page,
         @Parameter(description = "The current page size") @QueryValue(value = "size", defaultValue = "10") int size,
         @Parameter(description = "The sort of current page") @Nullable @QueryValue(value = "sort") List<String> sort,
-        @Parameter(description = "Filters") @QueryFilterFormat List<QueryFilter> filters
-        ) throws IOException {
+        @Parameter(description = "Filters") @QueryFilterFormat List<QueryFilter> filters) throws IOException {
         return PagedResults.of(globalKvStore().list(PageableUtils.from(page, size, sort, this::sortMapper), filters));
     }
 
     @ExecuteOn(TaskExecutors.IO)
     @Get("/namespaces/{namespace}/kv")
+    @Operation(tags = { "KV" }, summary = "List all keys for a namespace")
     @RequirePermission(Permission.KV_VIEW)
-    @Operation(tags = {"KV"}, summary = "List all keys for a namespace")
     @Deprecated
     public List<KVEntry> listKeys(
-        @Parameter(description = "The namespace id") @PathVariable String namespace
-    ) throws IOException {
+        @Parameter(description = "The namespace id") @PathVariable String namespace) throws IOException {
         return kvStore(namespace).list();
     }
 
     @ExecuteOn(TaskExecutors.IO)
     @Get("/namespaces/{namespace}/kv/inheritance")
+    @Operation(tags = { "KV" }, summary = "List all keys for inherited namespaces")
     @RequirePermission(Permission.KV_VIEW)
-    @Operation(tags = {"KV"}, summary = "List all keys for inherited namespaces")
     public List<KVEntry> listKeysWithInheritence(
-        @Parameter(description = "The namespace id") @PathVariable String namespace
-    ) throws IOException {
-        List<String> namespaces = NamespaceUtils.asTree(namespace).stream()
+        @Parameter(description = "The namespace id") @PathVariable String namespace) throws IOException {
+        List<String> namespaces = NamespaceInterface.asTree(namespace).stream()
             .filter(ns -> !ns.equals(namespace))
             .toList();
         return getKvEntriesWithInheritance(namespaces);
@@ -99,7 +99,8 @@ public class KVController {
             .toList();
         for (String ns : sortedNamespaces) {
             List<KVEntry> entries = kvStore(ns).list(Pageable.UNPAGED);
-            entries.forEach(key -> {
+            entries.forEach(key ->
+            {
                 if (!keys.contains(key.key())) {
                     keys.add(key.key());
                     kvEntries.add(key);
@@ -111,32 +112,35 @@ public class KVController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/namespaces/{namespace}/kv/{key}")
+    @Operation(tags = { "KV" }, summary = "Get value for a key")
     @RequirePermission(Permission.KV_VIEW)
-    @Operation(tags = {"KV"}, summary = "Get value for a key")
-    public TypedValue getKeyValue(
+    public KvDetail getKeyValue(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
-        @Parameter(description = "The key") @PathVariable String key
-    ) throws IOException, ResourceExpiredException {
-        KVValue wrapper = kvStore(namespace)
+        @Parameter(description = "The key") @PathVariable String key) throws IOException, ResourceExpiredException {
+        KVStore nsKvStore = kvStore(namespace);
+        KVValue wrapper = nsKvStore
             .getValue(key)
             .orElseThrow(() -> new NoSuchElementException("No value found for key '" + key + "' in namespace '" + namespace + "'"));
         Object value = wrapper.value();
         if (value instanceof byte[] bytesValue) {
             value = new String(bytesValue);
         }
-        return new TypedValue(KVType.from(value), value);
+
+        // Should never throw as the above verifies the KV entry existence
+        KVEntry kvEntry = nsKvStore.get(key).orElseThrow();
+
+        return new KvDetail(KVType.from(value), value, kvEntry.version(), kvEntry.updateDate());
     }
 
     @ExecuteOn(TaskExecutors.IO)
-    @Put(uri = "/namespaces/{namespace}/kv/{key}", consumes = {MediaType.TEXT_PLAIN})
-    @Operation(tags = {"KV"}, summary = "Puts a key-value pair in store")
-    @RequirePermission({Permission.KV_CREATE, Permission.KV_EDIT})
+    @Put(uri = "/namespaces/{namespace}/kv/{key}", consumes = { MediaType.TEXT_PLAIN })
+    @Operation(tags = { "KV" }, summary = "Puts a key-value pair in store")
+    @RequirePermission(Permission.KV_EDIT)
     public void setKeyValue(
         HttpHeaders httpHeaders,
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @Parameter(description = "The key") @PathVariable String key,
-        @RequestBody(description = "The value of the key") @Body String value
-    ) throws IOException {
+        @RequestBody(description = "The value of the key") @Body String value) throws IOException {
         String description = httpHeaders.get("description");
         String ttl = httpHeaders.get("ttl");
         KVMetadata metadata = new KVMetadata(description, ttl == null ? null : Duration.parse(ttl));
@@ -151,34 +155,33 @@ public class KVController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Delete(uri = "/namespaces/{namespace}/kv/{key}")
-    @Operation(tags = {"KV"}, summary = "Delete a key-value pair")
+    @Operation(tags = { "KV" }, summary = "Delete a key-value pair")
     @RequirePermission(Permission.KV_DELETE)
     public boolean deleteKeyValue(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
-        @Parameter(description = "The key") @PathVariable String key
-    ) throws IOException {
+        @Parameter(description = "The key") @PathVariable String key) throws IOException {
         return kvStore(namespace).delete(key);
     }
 
     @ExecuteOn(TaskExecutors.IO)
     @Delete("/namespaces/{namespace}/kv")
-    @Operation(tags = {"KV"}, summary = "Bulk-delete multiple key/value pairs from the given namespace.")
+    @Operation(tags = { "KV" }, summary = "Bulk-delete multiple key/value pairs from the given namespace.")
     @RequirePermission(Permission.KV_DELETE)
     public HttpResponse<ApiDeleteBulkResponse> deleteKeyValues(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
-        @RequestBody(description = "The keys") @Body ApiDeleteBulkRequest request
-    ) {
+        @RequestBody(description = "The keys") @Body ApiDeleteBulkRequest request) {
         KVStore kvStore = kvStore(namespace);
         List<String> deletedKeys = request.keys().stream()
-            .map(key -> {
+            .map(key ->
+            {
                 try {
                     if (kvStore.delete(key)) {
                         return Optional.of(key);
                     }
-                    return Optional.<String>empty();
+                    return Optional.<String> empty();
                 } catch (IOException e) {
                     // Ignore deletion error for bulk-operation
-                    return Optional.<String>empty();
+                    return Optional.<String> empty();
                 }
             })
             .flatMap(Optional::stream)
@@ -193,9 +196,7 @@ public class KVController {
      */
     @Introspected
     public record ApiDeleteBulkResponse(
-        @Parameter(description = "The list of keys deleted")
-        List<String> keys
-    ) {
+        @Parameter(description = "The list of keys deleted") List<String> keys) {
 
         public List<String> keys() {
             return Optional.ofNullable(keys).orElse(List.of());
@@ -208,9 +209,7 @@ public class KVController {
      * @param keys
      */
     public record ApiDeleteBulkRequest(
-        @Parameter(description = "The list of keys to delete")
-        List<String> keys
-    ) {
+        @Parameter(description = "The list of keys to delete") List<String> keys) {
 
         public List<String> keys() {
             return Optional.ofNullable(keys).orElse(List.of());
@@ -231,12 +230,13 @@ public class KVController {
         return new InternalKVStore(tenantService.resolveTenant(), namespace, storageInterface, kvMetadataRepository);
     }
 
-    public record TypedValue(
-        @Parameter(description = "The type of the KV entry.")
-        KVType type,
+    public record KvDetail(
+        @Parameter(description = "The type of the KV entry.") KVType type,
 
-        @Parameter(description = "The value of the KV entry.")
-        Object value
-    ) {
+        @Parameter(description = "The value of the KV entry.") Object value,
+
+        @Parameter(description = "The revision of the KV entry.") Integer revision,
+
+        @Parameter(description = "The last time the KV entry was updated.") Instant updated) {
     }
 }

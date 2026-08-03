@@ -1,8 +1,13 @@
 package io.kestra.cli.listeners;
 
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
+
 import io.kestra.core.server.LocalServiceState;
 import io.kestra.core.server.Service;
 import io.kestra.core.server.ServiceRegistry;
+
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ShutdownEvent;
@@ -11,10 +16,6 @@ import io.micronaut.core.order.Ordered;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ForkJoinPool;
 
 /**
  * Global application shutdown handler.

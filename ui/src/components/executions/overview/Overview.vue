@@ -118,6 +118,13 @@
                     :key="cIdx"
                     v-bind="cascader"
                     :execution
+                    @debug-path="onDebugPath"
+                />
+
+                <DebugPanel
+                    :property="debugProperty"
+                    :execution
+                    :path="debugPath"
                 />
 
                 <div id="chart">
@@ -164,6 +171,7 @@
 
 <script setup lang="ts">
     import {onMounted, computed, ref} from "vue";
+    import {watchDebounced} from "@vueuse/core";
 
     import {useRoute} from "vue-router";
     const route = useRoute();
@@ -193,6 +201,7 @@
     import ErrorAlert from "./components/main/ErrorAlert.vue";
     import Id from "../../Id.vue";
     import Cascader, {type Element} from "./components/main/cascaders/Cascader.vue";
+    import DebugPanel from "./components/main/cascaders/DebugPanel.vue";
     import TimeSeries from "../../dashboard/sections/TimeSeries.vue";
     import PrevNext from "./components/main/PrevNext.vue";
 
@@ -340,9 +349,7 @@
                             )?.value ?? "-",
                     },
                 ]),
-            ...(execution.value.trigger?.type ===
-                "io.kestra.plugin.core.flow.Subflow" &&
-                execution.value.trigger?.variables?.executionId
+            ...(execution.value.trigger?.variables?.executionId
                 ? [
                     {
                         icon: History,
@@ -404,6 +411,13 @@
                 (label) => label.key === key && String(label.value) === "true",
             ) ?? false
         );
+    };
+
+    const debugProperty = ref<"outputs" | "trigger" | undefined>(undefined);
+    const debugPath = ref<string | undefined>(undefined);
+    const onDebugPath = (property: string, path: string) => {
+        debugProperty.value = property as "outputs" | "trigger";
+        debugPath.value = path;
     };
 
     const cascaders: Element[] = [
@@ -471,6 +485,17 @@
         if (!route.params.id) return;
         loadExecution(route.params.id as string);
     });
+
+    // Refresh the chart when execution ID or timerange changes.
+    // Debounce to avoid flooding the dashboard generator on rapid SSE updates.
+    watchDebounced(
+        () => [execution.value?.id, timerange.value],
+        () => {
+            if (!chartRef.value || !execution.value) return;
+            chartRef.value?.refresh(filters.value as any);
+        },
+        {debounce: 500, maxWait: 1000}
+    );
 
     defineOptions({inheritAttrs: false});
 </script>

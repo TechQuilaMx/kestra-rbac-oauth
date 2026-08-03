@@ -1,18 +1,5 @@
 package io.kestra.core.models.triggers.multipleflows;
 
-import com.google.common.collect.ImmutableMap;
-import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.utils.TestsUtils;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
-import org.apache.commons.lang3.tuple.Pair;
-import org.junit.jupiter.api.Test;
-import io.kestra.plugin.core.condition.ExecutionFlow;
-import io.kestra.plugin.core.condition.MultipleCondition;
-import io.kestra.core.models.flows.Flow;
-import io.kestra.core.models.triggers.TimeWindow;
-import io.kestra.core.models.triggers.TimeWindow.Type;
-
 import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
@@ -21,6 +8,21 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.junit.jupiter.api.Test;
+
+import com.google.common.collect.ImmutableMap;
+
+import io.kestra.core.models.flows.Flow;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.triggers.TimeWindow;
+import io.kestra.core.models.triggers.TimeWindow.Type;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.core.condition.ExecutionFlow;
+import io.kestra.plugin.core.condition.MultipleCondition;
+
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -245,16 +247,18 @@ public abstract class AbstractMultipleConditionStorageTest {
     private static Pair<Flow, MultipleCondition> mockFlow(String tenantId, TimeWindow sla) {
         var multipleCondition = MultipleCondition.builder()
             .id("condition-multiple-%s".formatted(tenantId))
-            .conditions(ImmutableMap.of(
-                "flow-a", ExecutionFlow.builder()
-                    .flowId(Property.ofValue("flow-a"))
-                    .namespace(Property.ofValue(NAMESPACE))
-                    .build(),
-                "flow-b", ExecutionFlow.builder()
-                    .flowId(Property.ofValue("flow-b"))
-                    .namespace(Property.ofValue(NAMESPACE))
-                    .build()
-            ))
+            .conditions(
+                ImmutableMap.of(
+                    "flow-a", ExecutionFlow.builder()
+                        .flowId(Property.ofValue("flow-a"))
+                        .namespace(Property.ofValue(NAMESPACE))
+                        .build(),
+                    "flow-b", ExecutionFlow.builder()
+                        .flowId(Property.ofValue("flow-b"))
+                        .namespace(Property.ofValue(NAMESPACE))
+                        .build()
+                )
+            )
             .timeWindow(sla)
             .build();
 
@@ -263,10 +267,14 @@ public abstract class AbstractMultipleConditionStorageTest {
             .id("multiple-flow")
             .tenantId(tenantId)
             .revision(1)
-            .triggers(Collections.singletonList(io.kestra.plugin.core.trigger.Flow.builder()
-                .id("trigger-flow")
-                .conditions(Collections.singletonList(multipleCondition))
-                .build()))
+            .triggers(
+                Collections.singletonList(
+                    io.kestra.plugin.core.trigger.Flow.builder()
+                        .id("trigger-flow")
+                        .conditions(Collections.singletonList(multipleCondition))
+                        .build()
+                )
+            )
             .build();
 
         return Pair.of(flow, multipleCondition);

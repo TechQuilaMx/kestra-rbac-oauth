@@ -1,18 +1,20 @@
 package io.kestra.plugin.core.kv;
 
+import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import io.kestra.core.storages.kv.KVEntry;
 import io.kestra.core.storages.kv.KVStore;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-
-import java.io.IOException;
-import java.time.Instant;
-import java.util.List;
 
 @SuperBuilder
 @Getter
@@ -24,7 +26,8 @@ public class Key extends KvPurgeBehavior {
     protected String type = "key";
 
     @Schema(
-        title = "Delete only expired keys"
+        title = "Delete only expired keys",
+        description = "When true (default), purge removes entries whose `expirationDate` is in the past; otherwise all matched keys are purged."
     )
     @Builder.Default
     private boolean expiredOnly = true;

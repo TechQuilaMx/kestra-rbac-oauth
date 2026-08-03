@@ -67,6 +67,7 @@ export function registerPebbleAutocompletion(
 
             const startOfWordColumn = position.column - rootPebbleVariableMatcher.matches[1].length;
             return {
+                incomplete: true,
                 suggestions: (await (autoCompletion.rootFieldAutoCompletion()))
                     .map(s => propertySuggestion(s, {
                         lineNumber: position.lineNumber,
@@ -99,6 +100,7 @@ export function registerFunctionParametersAutoCompletion(
                 ?? 0;
             const startOfWordColumn = position.column - wordStartOffset;
             return {
+                incomplete: true,
                 suggestions: (await autoCompletion.functionAutoCompletion(
                         parsed,
                         functionMatcher.matches[1],
@@ -146,12 +148,51 @@ export function registerNestedValueAutoCompletion(
 
             const startOfWordColumn = position.column - parentFieldMatcher.matches[2].length;
             return {
-                suggestions: (await autoCompletion.nestedFieldAutoCompletion(source, parsed, parentFieldMatcher.matches[1]))
+                incomplete: true,
+                suggestions: (await autoCompletion.nestedFieldAutoCompletion(source, parsed, parentFieldMatcher.matches[1], model.getOffsetAt(position)))
                     .map(s => propertySuggestion(s, {
                         lineNumber: position.lineNumber,
                         startColumn: startOfWordColumn,
                         endColumn: endOfWordColumn(position, model)
                     }))
+            };
+        }
+    }));
+}
+
+export function registerFilterAutoCompletion(
+    autoCompletionProviders: IDisposable[],
+    autoCompletion: PebbleAutoCompletion,
+    languages: string[]
+) {
+    autoCompletionProviders.push(monaco.languages.registerCompletionItemProvider(languages, {
+        triggerCharacters: ["|"],
+        async provideCompletionItems(model, position) {
+            const lineContent = model.getLineContent(position.lineNumber);
+            const textBeforeCursor = lineContent.substring(0, position.column - 1);
+
+            const openBraces = (textBeforeCursor.match(/\{\{/g) || []).length;
+            const closeBraces = (textBeforeCursor.match(/\}\}/g) || []).length;
+
+            if (openBraces <= closeBraces) {
+                return NO_SUGGESTIONS;
+            }
+
+            const match = /\|\s*(\w*)$/.exec(textBeforeCursor);
+            if (!match) {
+                return NO_SUGGESTIONS;
+            }
+            const startOfWordColumn = position.column - match[1].length;
+            const endColumn = position.column;
+
+            return {
+                incomplete: true,
+                suggestions: (await autoCompletion.filterAutoCompletion())
+                    .map(s => propertySuggestion(s, {
+                        lineNumber: position.lineNumber,
+                        startColumn: startOfWordColumn,
+                        endColumn: endColumn
+                    }, monaco.languages.CompletionItemKind.Function))
             };
         }
     }));
@@ -240,6 +281,8 @@ export class PebbleLanguageConfigurator extends AbstractLanguageConfigurator {
         registerFunctionParametersAutoCompletion(autoCompletionProviders, autoCompletion, [this.language]);
 
         registerNestedValueAutoCompletion(autoCompletionProviders, autoCompletion, [this.language], completionSource);
+
+        registerFilterAutoCompletion(autoCompletionProviders, autoCompletion, [this.language]);
 
         return autoCompletionProviders;
     }

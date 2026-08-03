@@ -2,6 +2,7 @@ package io.kestra.cli.commands.sys.statestore;
 
 import io.kestra.cli.AbstractCommand;
 import io.kestra.cli.App;
+
 import lombok.SneakyThrows;
 import picocli.CommandLine;
 
@@ -19,6 +20,6 @@ public class StateStoreCommand extends AbstractCommand {
     public Integer call() throws Exception {
         super.call();
 
-        return App.runCli(new String[]{"sys", "state-store", "--help"});
+        return App.runCli(new String[] { "sys", "state-store", "--help" });
     }
 }

@@ -4,7 +4,7 @@ import HomeIcon from "vue-material-design-icons/Home.vue";
 import ContentCopy from "vue-material-design-icons/ContentCopy.vue";
 import PlayOutline from "vue-material-design-icons/PlayOutline.vue";
 import CogOutline from "vue-material-design-icons/CogOutline.vue";
-import ViewDashboardVariantOutline from "vue-material-design-icons/ViewDashboardVariantOutline.vue";
+import ChartLineVariant from "vue-material-design-icons/ChartLineVariant.vue";
 import ChartBoxOutline from "vue-material-design-icons/ChartBoxOutline.vue";
 import ShieldCheckOutline from "vue-material-design-icons/ShieldCheckOutline.vue";
 import ServerOutline from "vue-material-design-icons/ServerOutline.vue";
@@ -12,32 +12,32 @@ import ShieldLockOutline from "vue-material-design-icons/ShieldLockOutline.vue"
 
 import SideBar from "../../../src/components/layout/SideBar.vue";
 
-
 export default {
   title: "Layout/SideBar",
   component: SideBar,
   decorators: [
     vueRouter([
-        {
-            path: "/",
-            name: "home",
-            component: {template: "<div>home</div>"}
-        },
-          {
-            path: "/dashboard",
-            name: "dashboard",
-            component: {template: "<div>dashboard</div>"}
-          },{
-            path: "/dashboard/:menu",
-            name: "dashboard/menu",
-            component: {template: "<div>/dashboard sub</div>"}
-          },
-          {
-            path: "/:graball/:menu?",
-            name: "graball",
-            component: {template: "<div>/dashboard sub</div>"}
-          },
-        ])
+      {
+          path: "/welcome",
+          name: "welcome",
+          component: {template: "<div>welcome</div>"}
+      },
+      {
+        path: "/dashboard",
+        name: "dashboard",
+        component: {template: "<div>dashboard</div>"}
+      },
+      {
+        path: "/dashboard/:menu",
+        name: "dashboard/menu",
+        component: {template: "<div>/dashboard sub</div>"}
+      },
+      {
+        path: "/:graball/:menu?",
+        name: "graball",
+        component: {template: "<div>/dashboard sub</div>"}
+      },
+    ])
   ]
 };
 
@@ -78,7 +78,7 @@ Default.args = {
       title: "Dashboard",
       href: "/dashboard",
       icon: {
-        element: shallowRef(ViewDashboardVariantOutline),
+        element: shallowRef(ChartLineVariant),
         class: "menu-icon"
       },
       child: [
