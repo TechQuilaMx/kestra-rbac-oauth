@@ -145,10 +145,17 @@ public class AuthenticationFilter implements HttpServerFilter {
     }
     
     private Optional<String> fromBearerToken(HttpRequest<?> request) {
-        return request.getHeaders()
+        Optional<String> fromHeader = request.getHeaders()
             .getAuthorization()
             .filter(auth -> auth.toLowerCase().startsWith(PREFIX_BEARER.toLowerCase()))
             .map(token -> token.substring(PREFIX_BEARER.length() + 1).trim());
+        if (fromHeader.isPresent()) {
+            return fromHeader;
+        }
+
+        // EventSource/worker requests cannot always set Authorization headers.
+        return Optional.ofNullable(request.getParameters().get("token"))
+            .filter(token -> !token.isBlank());
     }
 
     @SuppressWarnings("rawtypes")

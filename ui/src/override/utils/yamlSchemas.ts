@@ -1,5 +1,8 @@
 import {apiUrlWithoutTenants} from "override/utils/route";
 import {SchemasSettings} from "monaco-yaml";
+import InitialFlowSchema from "../../stores/flow-schema.json";
+
+const LOCAL_FLOW_SCHEMA_URI = `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(InitialFlowSchema))}`;
 
 const withAccessToken = (uri: string): string => {
     try {
@@ -24,7 +27,7 @@ const withAccessToken = (uri: string): string => {
 export const yamlSchemas: () => SchemasSettings[] = () => [
     {
         fileMatch: ["flow-*.yaml"],
-        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/flow`)
+        uri: LOCAL_FLOW_SCHEMA_URI
     },
     {
         fileMatch: ["task-*.yaml"],

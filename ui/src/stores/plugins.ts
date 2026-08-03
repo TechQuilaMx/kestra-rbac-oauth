@@ -266,6 +266,12 @@ export const usePluginsStore = defineStore("plugins", () => {
     }
 
     function loadSchemaType(options: {type: string}) {
+        if (options.type === "flow") {
+            schemaType.value = schemaType.value || {};
+            schemaType.value.flow = InitialFlowSchema;
+            return Promise.resolve(InitialFlowSchema);
+        }
+
         return axios.get(`${apiUrlWithoutTenants()}/plugins/schemas/${options.type}`, {}).then(response => {
             schemaType.value = schemaType.value || {};
             schemaType.value[options.type] = response.data;
