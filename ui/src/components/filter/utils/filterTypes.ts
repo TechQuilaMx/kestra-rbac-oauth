@@ -21,6 +21,11 @@ export const TEXT_COMPARATORS = [
     Comparators.STARTS_WITH, 
 ];
 
+export interface DateFilterOption {
+    value: string;
+    label: string;
+}
+
 export interface FilterKeyConfig {
     key: string;
     label: string;
@@ -31,11 +36,17 @@ export interface FilterKeyConfig {
     valueProvider?: () => Promise<FilterValue[]>;
     valueType: "text" | "select" | "date" | "multi-select" | "key-value" | "radio";
     visibleByDefault?: boolean;
+    defaultValue?: AppliedFilter["value"] | (() => AppliedFilter["value"]);
+    /** When set, renders an "Apply to" segmented selector inside the timeRange popover. */
+    dateFilterOptions?: DateFilterOption[];
+    /** Overrides the chip's keyLabel based on the active dateFilter meta value. */
+    keyLabelProvider?: (meta?: Record<string, string>) => string;
 }
 
 export interface FilterValue {
     label: string;
     value: string;
+    color?: string;
     description?: string;
 }
 
@@ -48,6 +59,8 @@ export interface AppliedFilter {
     comparator: Comparators;
     comparatorLabel: string;
     value: string | string[] | Date | {startDate: Date; endDate: Date};
+    /** Extra key-value metadata (e.g. dateFilter for timeRange filters). */
+    meta?: Record<string, string>;
 }
 
 export interface SavedFilter {
@@ -56,7 +69,6 @@ export interface SavedFilter {
     createdAt: Date;
     global?: boolean;
     description?: string;
-    searchQuery?: string;
     filters: AppliedFilter[];
 }
 
@@ -102,7 +114,7 @@ export const COMPARATOR_LABELS: Record<Comparators, string> = {
     [Comparators.ENDS_WITH]: "Ends With",
     [Comparators.CONTAINS]: "Contains",
     [Comparators.REGEX]: "Matches Pattern",
-    [Comparators.PREFIX]: "Hierarchy",
+    [Comparators.PREFIX]: "Prefix",
 };
 
 export const COMPARATOR_DESCRIPTIONS: Record<Comparators, string> = {

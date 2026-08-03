@@ -1,0 +1,18 @@
+id: python_plugin_test
+namespace: com.tech.quila.kestra.test
+
+description: Verify Python plugin execution and log output.
+
+labels:
+  purpose: plugin-test
+  plugin: python
+
+tasks:
+  - id: run_python
+    type: io.kestra.plugin.scripts.python.Script
+    script: |
+      from datetime import datetime
+
+      print("Python plugin test started")
+      print(f"UTC now: {datetime.utcnow().isoformat()}Z")
+      print("Python plugin test finished successfully")

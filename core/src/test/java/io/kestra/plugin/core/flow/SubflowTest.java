@@ -1,5 +1,20 @@
 package io.kestra.plugin.core.flow;
 
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.executions.TaskRun;
@@ -9,36 +24,25 @@ import io.kestra.core.models.flows.State;
 import io.kestra.core.models.flows.State.History;
 import io.kestra.core.runners.DefaultRunContext;
 import io.kestra.core.runners.InputAndOutput;
+import io.kestra.core.runners.Services;
 import io.kestra.core.runners.SubflowExecutionResult;
 import io.kestra.core.services.VariablesService;
-import io.micronaut.context.ApplicationContext;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import io.micronaut.context.ApplicationContext;
+import lombok.extern.slf4j.Slf4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
+@Slf4j
 class SubflowTest {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SubflowTest.class);
-
-    private static final State DEFAULT_SUCCESS_STATE = State.of(State.Type.SUCCESS, List.of(new State.History(State.Type.CREATED, Instant.now()), new State.History(State.Type.RUNNING, Instant.now()), new State.History(State.Type.SUCCESS, Instant.now())));
+    private static final State DEFAULT_SUCCESS_STATE = State.of(
+        State.Type.SUCCESS,
+        List.of(new State.History(State.Type.CREATED, Instant.now()), new State.History(State.Type.RUNNING, Instant.now()), new State.History(State.Type.SUCCESS, Instant.now()))
+    );
     public static final String EXECUTION_ID = "executionId";
 
     @Mock
@@ -53,9 +57,12 @@ class SubflowTest {
     @BeforeEach
     void beforeEach() {
         Mockito.when(applicationContext.getBean(VariablesService.class)).thenReturn(new VariablesService());
-        Mockito.when(runContext.logger()).thenReturn(LOG);
-        Mockito.when(runContext.getApplicationContext()).thenReturn(applicationContext);
+        Mockito.when(runContext.logger()).thenReturn(log);
         Mockito.when(runContext.inputAndOutput()).thenReturn(inputAndOutput);
+
+        Services services = Mockito.mock(Services.class);
+        Mockito.when(services.variablesService()).thenReturn(new VariablesService());
+        Mockito.when(runContext.services()).thenReturn(services);
     }
 
     @Test

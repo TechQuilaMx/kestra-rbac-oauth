@@ -1,21 +1,5 @@
 package io.kestra.core.plugins.serdes;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.type.TypeFactory;
-import io.kestra.core.contexts.KestraContext;
-import io.kestra.core.models.Plugin;
-import io.kestra.core.models.dashboards.charts.DataChart;
-import io.kestra.core.plugins.DefaultPluginRegistry;
-import io.kestra.core.plugins.PluginRegistry;
-import io.kestra.core.serializers.JacksonMapper;
-import io.micronaut.context.exceptions.NoSuchBeanException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -23,15 +7,31 @@ import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.Optional;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.type.TypeFactory;
+
+import io.kestra.core.contexts.KestraContext;
+import io.kestra.core.models.Plugin;
+import io.kestra.core.models.dashboards.charts.DataChart;
+import io.kestra.core.plugins.DefaultPluginRegistry;
+import io.kestra.core.plugins.PluginRegistry;
+import io.kestra.core.serializers.JacksonMapper;
+
+import io.micronaut.context.exceptions.NoSuchBeanException;
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * Specific {@link JsonDeserializer} for deserializing classes that implements the {@link Plugin} interface.
  * <p>
  * The {@link PluginDeserializer} uses the {@link PluginRegistry} to found the plugin class corresponding to
  * a plugin type.
  */
+@Slf4j
 public class PluginDeserializer<T extends Plugin> extends JsonDeserializer<T> {
-
-    private static final Logger log = LoggerFactory.getLogger(PluginDeserializer.class);
 
     private static final String TYPE = "type";
     private static final String VERSION = "version";
@@ -83,13 +83,14 @@ public class PluginDeserializer<T extends Plugin> extends JsonDeserializer<T> {
 
     @SuppressWarnings("unchecked")
     private T fromObjectNode(JsonParser jp,
-                             JsonNode node,
-                             DeserializationContext context) throws IOException {
+        JsonNode node,
+        DeserializationContext context) throws IOException {
         Class<? extends Plugin> pluginType = null;
 
         final String identifier = extractPluginRawIdentifier(node, pluginRegistry.isVersioningSupported());
         if (identifier != null) {
-            log.trace("Looking for Plugin for: {}",
+            log.trace(
+                "Looking for Plugin for: {}",
                 identifier
             );
             pluginType = pluginRegistry.findClassByIdentifier(identifier);
@@ -103,7 +104,8 @@ public class PluginDeserializer<T extends Plugin> extends JsonDeserializer<T> {
             String type = Optional.ofNullable(identifier).orElse("<null>");
             throwInvalidTypeException(context, type);
         } else if (Plugin.class.isAssignableFrom(pluginType)) {
-            log.trace("Read plugin for: {}",
+            log.trace(
+                "Read plugin for: {}",
                 pluginType.getName()
             );
 
@@ -113,19 +115,23 @@ public class PluginDeserializer<T extends Plugin> extends JsonDeserializer<T> {
                 Type dataFieldsEnum = genericDataFilterClass.getActualTypeArguments()[0];
                 TypeFactory typeFactory = JacksonMapper.ofJson().getTypeFactory();
                 Type chartAwareColumnDescriptorClass = ((ParameterizedType) ((WildcardType) ((ParameterizedType) ((TypeVariable<?>)
-                    // DataChart generic class
-                    ((ParameterizedType) pluginType.getGenericSuperclass())
-                        // DataFilter generic class
-                        .getActualTypeArguments()[1]).getBounds()[0]
-                    // ColumnDescriptor implementation class
+                // DataChart generic class
+                ((ParameterizedType) pluginType.getGenericSuperclass())
+                    // DataFilter generic class
+                    .getActualTypeArguments()[1]).getBounds()[0]
+                // ColumnDescriptor implementation class
                 ).getActualTypeArguments()[1]).getUpperBounds()[0]).getRawType();
 
-                return JacksonMapper.ofJson().convertValue(node, typeFactory.constructParametricType(
-                    pluginType,
-                    typeFactory.constructType(dataFieldsEnum),
-                    typeFactory.constructParametricType(dataFilterClass,
-                        typeFactory.constructParametricType((Class<?>) chartAwareColumnDescriptorClass, (Class<?>) dataFieldsEnum)
-                    )));
+                return JacksonMapper.ofJson().convertValue(
+                    node, typeFactory.constructParametricType(
+                        pluginType,
+                        typeFactory.constructType(dataFieldsEnum),
+                        typeFactory.constructParametricType(
+                            dataFilterClass,
+                            typeFactory.constructParametricType((Class<?>) chartAwareColumnDescriptorClass, (Class<?>) dataFieldsEnum)
+                        )
+                    )
+                );
             }
 
             // Note that if the provided plugin is not annotated with `@JsonDeserialize()` then
@@ -139,7 +145,7 @@ public class PluginDeserializer<T extends Plugin> extends JsonDeserializer<T> {
     }
 
     private static void throwInvalidTypeException(final DeserializationContext context,
-                                                  final String type) throws JsonMappingException {
+        final String type) throws JsonMappingException {
         throw context.invalidTypeIdException(
             context.constructType(Plugin.class),
             type,

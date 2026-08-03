@@ -1,22 +1,22 @@
 package io.kestra.jdbc.runner;
 
-import org.junit.jupiter.api.Test;
-
 import java.time.Duration;
 import java.util.List;
+
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class JdbcQueueConfigurationTest {
     @Test
-    void shouldFailWenMaxPollLessThanMinPoll() {
+    void shouldFailWhenMaxPollLessThanMinPoll() {
         var configuration = new JdbcQueue.Configuration();
         configuration.minPollInterval = Duration.ofSeconds(2);
         configuration.maxPollInterval = Duration.ofSeconds(1);
 
         var exception = assertThrows(IllegalArgumentException.class, () -> configuration.computeSteps());
-        assertThat(exception.getMessage()).isEqualTo("'maxPollInterval' (PT1S) must be greater than 'minPollInterval' (PT2S)");
+        assertThat(exception.getMessage()).isEqualTo("'maxPollInterval' (PT1S) must be greater than or equal to 'minPollInterval' (PT2S)");
     }
 
     @Test
@@ -54,6 +54,19 @@ public class JdbcQueueConfigurationTest {
             new JdbcQueue.Configuration.Step(Duration.ofSeconds(15), Duration.ofSeconds(15)),
             new JdbcQueue.Configuration.Step(Duration.ofSeconds(30), Duration.ofSeconds(30)),
             new JdbcQueue.Configuration.Step(Duration.ofSeconds(60), Duration.ofSeconds(60))
+        );
+    }
+
+    @Test
+    void shouldComputeSingleStepWhenMinEqualsMax() {
+        var configuration = new JdbcQueue.Configuration();
+        configuration.maxPollInterval = Duration.ofSeconds(1);
+        configuration.minPollInterval = Duration.ofSeconds(1);
+
+        List<JdbcQueue.Configuration.Step> steps = configuration.computeSteps();
+        assertThat(steps.size()).isEqualTo(1);
+        assertThat(steps).contains(
+            new JdbcQueue.Configuration.Step(Duration.ofSeconds(1), Duration.ZERO)
         );
     }
 }

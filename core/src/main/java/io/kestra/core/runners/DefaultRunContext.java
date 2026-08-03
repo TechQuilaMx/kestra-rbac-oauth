@@ -1,36 +1,5 @@
 package io.kestra.core.runners;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.google.common.base.CaseFormat;
-import com.google.common.collect.ImmutableMap;
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.metrics.MetricRegistry;
-import io.kestra.core.models.assets.AssetsDeclaration;
-import io.kestra.core.models.Plugin;
-import io.kestra.core.models.executions.AbstractMetricEntry;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.Task;
-import io.kestra.core.models.triggers.AbstractTrigger;
-import io.kestra.core.assets.AssetManagerFactory;
-import io.kestra.core.plugins.PluginConfigurations;
-import io.kestra.core.services.KVStoreService;
-import io.kestra.core.storages.Storage;
-import io.kestra.core.storages.StorageInterface;
-import io.kestra.core.storages.kv.KVStore;
-import io.kestra.core.utils.ListUtils;
-import io.kestra.core.utils.VersionProvider;
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.core.annotation.Introspected;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.ConstraintViolationException;
-import jakarta.validation.Validator;
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
-import lombok.With;
-import org.apache.commons.lang3.RandomStringUtils;
-import org.slf4j.Logger;
-
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -40,7 +9,39 @@ import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import org.slf4j.Logger;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.google.common.base.CaseFormat;
+import com.google.common.collect.ImmutableMap;
+
+import io.kestra.core.assets.AssetManagerFactory;
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.metrics.MetricRegistry;
+import io.kestra.core.models.Plugin;
+import io.kestra.core.models.executions.AbstractMetricEntry;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.Task;
+import io.kestra.core.models.triggers.AbstractTrigger;
+import io.kestra.core.plugins.PluginConfigurations;
+import io.kestra.core.services.KVStoreService;
+import io.kestra.core.storages.Storage;
+import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.storages.kv.KVStore;
+import io.kestra.core.utils.ListUtils;
+import io.kestra.core.utils.VersionProvider;
+
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
+import lombok.With;
 
 import static io.kestra.core.utils.MapUtils.mergeWithNullableValues;
 import static io.kestra.core.utils.Rethrow.throwFunction;
@@ -61,6 +62,7 @@ public class DefaultRunContext extends RunContext {
     private WorkingDir workingDir;
     private Validator validator;
     private LocalPath localPath;
+    private SDK sdk;
 
     private Map<String, Object> variables;
     private List<AbstractMetricEntry<?>> metrics = new ArrayList<>();
@@ -80,11 +82,11 @@ public class DefaultRunContext extends RunContext {
 
     private final AtomicBoolean isInitialized = new AtomicBoolean(false);
 
-
     /**
      * Creates a new {@link DefaultRunContext} instance.
      */
-    public DefaultRunContext() {}
+    public DefaultRunContext() {
+    }
 
     /**
      * {@inheritDoc}
@@ -167,6 +169,7 @@ public class DefaultRunContext extends RunContext {
             this.validator = applicationContext.getBean(Validator.class);
             this.localPath = applicationContext.getBean(LocalPathFactory.class).createLocalPath(this);
             this.assetManagerFactory = applicationContext.getBean(AssetManagerFactory.class);
+            this.sdk = applicationContext.getBean(RunContextSDKFactory.class).create(applicationContext, this);
         }
     }
 
@@ -339,14 +342,18 @@ public class DefaultRunContext extends RunContext {
         }
 
         Map<String, Object> allVariables = mergeWithNullableValues(this.variables, decryptVariables(variables));
-        return inline
-            .entrySet()
-            .stream()
-            .map(throwFunction(entry -> new AbstractMap.SimpleEntry<>(
-                this.render(entry.getKey(), allVariables),
-                this.render(entry.getValue(), allVariables)
-            )))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        Map<String, String> rendered = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : inline.entrySet()) {
+            String renderedKey = this.render(entry.getKey(), allVariables);
+            if (renderedKey == null) {
+                throw new IllegalVariableEvaluationException("Unable to render map: key rendered to null");
+            }
+            String renderedValue = this.render(entry.getValue(), allVariables);
+            if (renderedValue != null) {
+                rendered.put(renderedKey, renderedValue);
+            }
+        }
+        return rendered;
     }
 
     @Override
@@ -527,7 +534,7 @@ public class DefaultRunContext extends RunContext {
             logger().warn("Unable to cleanup worker task", ex);
         }
 
-        if (logger != null){
+        if (logger != null) {
             logger.resetMDC();
         }
     }
@@ -577,8 +584,8 @@ public class DefaultRunContext extends RunContext {
     @Override
     @SuppressWarnings("unchecked")
     public <T> Optional<T> pluginConfiguration(final String name) {
-        Objects.requireNonNull(name,"Cannot get plugin configuration from null name");
-        return Optional.ofNullable((T)pluginConfiguration.get(name));
+        Objects.requireNonNull(name, "Cannot get plugin configuration from null name");
+        return Optional.ofNullable((T) pluginConfiguration.get(name));
     }
 
     /**
@@ -620,8 +627,7 @@ public class DefaultRunContext extends RunContext {
                     this.assetEmitter = assetManagerFactory.of(
                         Optional.ofNullable(task).map(Task::getAssets)
                             .or(() -> Optional.ofNullable(trigger).map(AbstractTrigger::getAssets))
-                            .flatMap(throwFunction(asset -> this.render(asset).as(AssetsDeclaration.class)))
-                            .map(AssetsDeclaration::isEnableAuto)
+                            .flatMap(throwFunction(assets -> render(assets.getEnableAuto()).as(Boolean.class)))
                             .orElse(false)
                     );
                 }
@@ -639,6 +645,19 @@ public class DefaultRunContext extends RunContext {
     @Override
     public InputAndOutput inputAndOutput() {
         return new InputAndOutputImpl(this.applicationContext, this);
+    }
+
+    @Override
+    public SDK sdk() {
+        return this.sdk;
+    }
+
+    /**
+     * Get access to Kestra internal services.
+     * WARNING: this should only be used for very specific needs, plugins should try to avoid using an Kestra internal service.
+     */
+    public Services services() {
+        return new Services(this.applicationContext);
     }
 
     /**
@@ -661,6 +680,7 @@ public class DefaultRunContext extends RunContext {
         private String triggerExecutionId;
         private RunContextLogger logger;
         private KVStoreService kvStoreService;
+        private AssetManagerFactory assetManagerFactory;
         private List<String> secretInputs;
         private Task task;
         private AbstractTrigger trigger;
@@ -683,6 +703,7 @@ public class DefaultRunContext extends RunContext {
             context.storage = storage;
             context.triggerExecutionId = triggerExecutionId;
             context.kvStoreService = kvStoreService;
+            context.assetManagerFactory = assetManagerFactory;
             context.secretInputs = secretInputs;
             context.task = task;
             context.trigger = trigger;

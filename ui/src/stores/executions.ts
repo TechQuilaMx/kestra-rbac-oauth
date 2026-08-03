@@ -7,6 +7,7 @@ import throttle from "lodash/throttle";
 import {useRoute} from "vue-router";
 import {CLUSTER_PREFIX} from "@kestra-io/ui-libs/src/utils/constants.ts";
 import {useAxios} from "../utils/axios";
+import {useOAuth2Store} from "./oauth2";
 
 interface LogsState {
     total: number;
@@ -33,6 +34,7 @@ export interface Execution{
         taskId: string,
         value?: string
         executionId?: string
+        outputs?: Record<string, any>
     }[]
     state: {
         current: string;
@@ -388,7 +390,9 @@ export const useExecutionsStore = defineStore("executions", () => {
             execution.value = undefined;
             closeSSE();
         }
-        const serverSentEventSource = new EventSource(`${apiUrl()}/executions/${options.id}/follow`, {withCredentials: true});
+        const token = useOAuth2Store().accessToken;
+        const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+        const serverSentEventSource = new EventSource(`${apiUrl()}/executions/${options.id}/follow${tokenParam}`, {withCredentials: true});
         if (options.rawSSE) {
             return Promise.resolve(serverSentEventSource);
         }
@@ -414,13 +418,17 @@ export const useExecutionsStore = defineStore("executions", () => {
                 coreStore.message = {
                     variant: "error",
                     title: translate("error"),
-                    message: translate("errors.404.flow or execution"),
+                    content: {
+                        message: translate("errors.404.flow or execution"),
+                    }
                 };
             } else {
                 coreStore.message = {
                     variant: "error",
-                    title: translate("error"),
-                    message: translate("something_went_wrong.loading_execution"),
+                    title: translate("something_went_wrong.connection_lost.title"),
+                    content: {
+                        message: translate("something_went_wrong.connection_lost.message"),
+                    }
                 };
             }
         }
@@ -429,11 +437,15 @@ export const useExecutionsStore = defineStore("executions", () => {
     }
 
     function followExecutionDependencies(options: { id: string; expandAll?: boolean }) {
-        return new EventSource(`${apiUrl()}/executions/${options.id}/follow-dependencies${options.expandAll ? "?expandAll=true" : ""}`, {withCredentials: true});
+        const token = useOAuth2Store().accessToken;
+        const tokenParam = token ? `${options.expandAll ? "&" : "?"}token=${encodeURIComponent(token)}` : "";
+        return new EventSource(`${apiUrl()}/executions/${options.id}/follow-dependencies${options.expandAll ? "?expandAll=true" : ""}${tokenParam}`, {withCredentials: true});
     }
 
     const followLogs = (options: { id: string }) => {
-        return Promise.resolve(new EventSource(`${apiUrl()}/logs/${options.id}/follow`, {withCredentials: true}));
+        const token = useOAuth2Store().accessToken;
+        const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+        return Promise.resolve(new EventSource(`${apiUrl()}/logs/${options.id}/follow${tokenParam}`, {withCredentials: true}));
     }
 
     const loadLogs = (options: { executionId: string; params?: Record<string, any>; store?: boolean }) => {

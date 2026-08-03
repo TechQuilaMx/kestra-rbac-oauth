@@ -1,5 +1,27 @@
 package io.kestra.webserver.controllers.api;
 
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
 import io.kestra.core.exceptions.ResourceExpiredException;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.kv.KVType;
@@ -11,6 +33,7 @@ import io.kestra.core.utils.TestsUtils;
 import io.kestra.webserver.controllers.api.KVController.ApiDeleteBulkRequest;
 import io.kestra.webserver.controllers.api.KVController.ApiDeleteBulkResponse;
 import io.kestra.webserver.responses.PagedResults;
+
 import io.micronaut.core.type.Argument;
 import io.micronaut.data.model.Pageable;
 import io.micronaut.http.HttpRequest;
@@ -21,25 +44,6 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.reactor.http.client.ReactorHttpClient;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.net.URI;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -85,7 +89,10 @@ class KVControllerTest {
         // Expired key, should not be listed
         kvStore.put("z-expired-key", new KVValueAndMetadata(new KVMetadata(null, Instant.now().minus(1, ChronoUnit.HOURS)), "expired-value"));
         String secondNamespaceKey = "another-namespace-key";
-        secondKvStore.put(secondNamespaceKey, new KVValueAndMetadata(new KVMetadata("anotherNamespaceDescription", Instant.now().plus(Duration.ofMinutes(10)).truncatedTo(ChronoUnit.MILLIS)), "another-namespace-value"));
+        secondKvStore.put(
+            secondNamespaceKey,
+            new KVValueAndMetadata(new KVMetadata("anotherNamespaceDescription", Instant.now().plus(Duration.ofMinutes(10)).truncatedTo(ChronoUnit.MILLIS)), "another-namespace-value")
+        );
 
         PagedResults<KVEntry> res = client.toBlocking().retrieve(HttpRequest.GET("/api/v1/main/kv?size=1&page=1&sort=key:desc"), Argument.of(PagedResults.class, KVEntry.class));
 
@@ -123,7 +130,8 @@ class KVControllerTest {
         kvStore().put("my-second-key", new KVValueAndMetadata(new KVMetadata(secondKvDescription, mySecondKeyExpirationDate), "my-second-value"));
 
         List<KVEntry> res = client.toBlocking().retrieve(HttpRequest.GET("/api/v1/main/namespaces/" + NAMESPACE + "/kv"), Argument.of(List.class, KVEntry.class));
-        res.forEach(entry -> {
+        res.forEach(entry ->
+        {
             assertThat(entry.creationDate()).isCloseTo(Instant.now(), within(1, ChronoUnit.SECONDS));
             assertThat(entry.updateDate()).isCloseTo(Instant.now(), within(1, ChronoUnit.SECONDS));
         });
@@ -152,8 +160,12 @@ class KVControllerTest {
         assertThat(res).hasSize(2);
         Map<String, String> keyDescriptions = res.stream()
             .collect(Collectors.toMap(KVEntry::key, KVEntry::description));
-        assertThat(keyDescriptions).isEqualTo(Map.of("shared-key", namespaceParentDescription,
-            "parent-key", namespaceParentDescription));
+        assertThat(keyDescriptions).isEqualTo(
+            Map.of(
+                "shared-key", namespaceParentDescription,
+                "parent-key", namespaceParentDescription
+            )
+        );
 
     }
 
@@ -175,16 +187,35 @@ class KVControllerTest {
     @ParameterizedTest
     @MethodSource("kvGetKeyValueArgs")
     void getKeyValue(Object value, KVType expectedType, String expectedValue) throws IOException {
+        Instant beforeInsertion = Instant.now();
         kvStore().put("my-key", new KVValueAndMetadata(new KVMetadata(null, Instant.now().plus(Duration.ofMinutes(5))), value));
+        Instant afterInsertion = Instant.now();
 
         String res = client.toBlocking().retrieve(HttpRequest.GET("/api/v1/main/namespaces/" + NAMESPACE + "/kv/my-key"), String.class);
         assertThat(res).contains("\"type\":\"" + expectedType + "\"");
         assertThat(res).contains("\"value\":" + expectedValue);
+        assertThat(res).contains("\"revision\":" + 1);
+        Pattern updatedDateFinder = Pattern.compile("\"updated\":\\s*\"([^\"]+)\"");
+        Matcher matcher = updatedDateFinder.matcher(res);
+        matcher.find();
+        assertThat(Instant.parse(matcher.group(1))).isBetween(beforeInsertion, afterInsertion);
+
+        beforeInsertion = Instant.now();
+        // Test that revision and update date are properly updated
+        kvStore().put("my-key", new KVValueAndMetadata(new KVMetadata("some description", Instant.now().plus(Duration.ofMinutes(5))), value));
+        afterInsertion = Instant.now();
+
+        res = client.toBlocking().retrieve(HttpRequest.GET("/api/v1/main/namespaces/" + NAMESPACE + "/kv/my-key"), String.class);
+        assertThat(res).contains("\"revision\":" + 2);
+        matcher = updatedDateFinder.matcher(res);
+        matcher.find();
+        assertThat(Instant.parse(matcher.group(1))).isBetween(beforeInsertion, afterInsertion);
     }
 
     @Test
     void getKeyValueNotFound() {
-        HttpClientResponseException httpClientResponseException = Assertions.assertThrows(HttpClientResponseException.class, () -> client.toBlocking().retrieve(HttpRequest.GET("/api/v1/main/namespaces/" + NAMESPACE + "/kv/my-key")));
+        HttpClientResponseException httpClientResponseException = Assertions
+            .assertThrows(HttpClientResponseException.class, () -> client.toBlocking().retrieve(HttpRequest.GET("/api/v1/main/namespaces/" + NAMESPACE + "/kv/my-key")));
         assertThat(httpClientResponseException.getStatus().getCode()).isEqualTo(HttpStatus.NOT_FOUND.getCode());
         assertThat(httpClientResponseException.getMessage()).isEqualTo("Not Found: No value found for key 'my-key' in namespace '" + NAMESPACE + "'");
     }
@@ -193,7 +224,8 @@ class KVControllerTest {
     void getKeyValueExpired() throws IOException {
         kvStore().put("my-key", new KVValueAndMetadata(new KVMetadata(null, Instant.now().minus(Duration.ofMinutes(5))), "value"));
 
-        HttpClientResponseException httpClientResponseException = Assertions.assertThrows(HttpClientResponseException.class, () -> client.toBlocking().retrieve(HttpRequest.GET("/api/v1/main/namespaces/" + NAMESPACE + "/kv/my-key")));
+        HttpClientResponseException httpClientResponseException = Assertions
+            .assertThrows(HttpClientResponseException.class, () -> client.toBlocking().retrieve(HttpRequest.GET("/api/v1/main/namespaces/" + NAMESPACE + "/kv/my-key")));
         assertThat(httpClientResponseException.getStatus().getCode()).isEqualTo(HttpStatus.GONE.getCode());
         assertThat(httpClientResponseException.getMessage()).isEqualTo("Resource has expired: The requested value has expired");
     }
@@ -217,7 +249,8 @@ class KVControllerTest {
     @MethodSource("kvSetKeyValueArgs")
     void setKeyValue(MediaType mediaType, String value, Class<?> expectedClass) throws IOException, ResourceExpiredException {
         String myDescription = "myDescription";
-        client.toBlocking().exchange(HttpRequest.PUT("/api/v1/main/namespaces/" + NAMESPACE + "/kv/my-key", value).contentType(mediaType).header("ttl", "PT5M").header("description", myDescription));
+        client.toBlocking()
+            .exchange(HttpRequest.PUT("/api/v1/main/namespaces/" + NAMESPACE + "/kv/my-key", value).contentType(mediaType).header("ttl", "PT5M").header("description", myDescription));
 
         KVStore kvStore = kvStore();
         Class<?> valueClazz = kvStore.getValue("my-key").get().value().getClass();
@@ -288,15 +321,20 @@ class KVControllerTest {
     void illegalKey() {
         String expectedErrorMessage = "Illegal argument: Key must start with an alphanumeric character (uppercase or lowercase) and can contain alphanumeric characters (uppercase or lowercase), dots (.), underscores (_), and hyphens (-) only.";
 
-        HttpClientResponseException httpClientResponseException = Assertions.assertThrows(HttpClientResponseException.class, () -> client.toBlocking().retrieve(HttpRequest.GET("/api/v1/main/namespaces/" + NAMESPACE + "/kv/bad$key")));
+        HttpClientResponseException httpClientResponseException = Assertions
+            .assertThrows(HttpClientResponseException.class, () -> client.toBlocking().retrieve(HttpRequest.GET("/api/v1/main/namespaces/" + NAMESPACE + "/kv/bad$key")));
         assertThat(httpClientResponseException.getStatus().getCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY.getCode());
         assertThat(httpClientResponseException.getMessage()).isEqualTo(expectedErrorMessage);
 
-        httpClientResponseException = Assertions.assertThrows(HttpClientResponseException.class, () -> client.toBlocking().exchange(HttpRequest.PUT("/api/v1/main/namespaces/" + NAMESPACE + "/kv/bad$key", "\"content\"").contentType(MediaType.TEXT_PLAIN)));
+        httpClientResponseException = Assertions.assertThrows(
+            HttpClientResponseException.class,
+            () -> client.toBlocking().exchange(HttpRequest.PUT("/api/v1/main/namespaces/" + NAMESPACE + "/kv/bad$key", "\"content\"").contentType(MediaType.TEXT_PLAIN))
+        );
         assertThat(httpClientResponseException.getStatus().getCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY.getCode());
         assertThat(httpClientResponseException.getMessage()).isEqualTo(expectedErrorMessage);
 
-        httpClientResponseException = Assertions.assertThrows(HttpClientResponseException.class, () -> client.toBlocking().retrieve(HttpRequest.DELETE("/api/v1/main/namespaces/" + NAMESPACE + "/kv/bad$key")));
+        httpClientResponseException = Assertions
+            .assertThrows(HttpClientResponseException.class, () -> client.toBlocking().retrieve(HttpRequest.DELETE("/api/v1/main/namespaces/" + NAMESPACE + "/kv/bad$key")));
         assertThat(httpClientResponseException.getStatus().getCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY.getCode());
         assertThat(httpClientResponseException.getMessage()).isEqualTo(expectedErrorMessage);
     }
@@ -305,8 +343,8 @@ class KVControllerTest {
     void jsonFallback() throws IOException, ResourceExpiredException {
 
         client.toBlocking().exchange(
-                HttpRequest.PUT("/api/v1/main/namespaces/" + NAMESPACE + "/kv/my-key", "1.2.3")
-                        .contentType(MediaType.TEXT_PLAIN)
+            HttpRequest.PUT("/api/v1/main/namespaces/" + NAMESPACE + "/kv/my-key", "1.2.3")
+                .contentType(MediaType.TEXT_PLAIN)
         );
 
         KVStore kvStore = kvStore();
@@ -314,7 +352,6 @@ class KVControllerTest {
         assertThat(stored).isInstanceOf(String.class);
         assertThat(stored).isEqualTo("1.2.3");
     }
-
 
     private URI toKVUri(String namespace, String key) {
         String slashLedKey;

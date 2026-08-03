@@ -11,6 +11,10 @@ export class Me {
         this.oauth2Store = useOAuth2Store();
     }
 
+    hasAny(_permission: any, _namespace?: any) {
+        return true;
+    }
+
     /**
      * Map old permission enum to new RBAC permissions
      */
@@ -208,7 +212,7 @@ export class Me {
 
 export const useAuthStore = defineStore("auth", {
     state: () => ({
-        user: new Me(),
+        user: new Me() as Me | undefined,
         isLogged: true,
     }),
     getters: {
@@ -225,7 +229,7 @@ export const useAuthStore = defineStore("auth", {
             const oauth2Store = useOAuth2Store();
             return oauth2Store.logout();
         },
-        correction() {
+        correction(){
             return Promise.resolve(true)
         }
     },

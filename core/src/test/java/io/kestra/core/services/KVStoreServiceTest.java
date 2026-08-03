@@ -1,19 +1,21 @@
 package io.kestra.core.services;
 
-import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.repositories.KvMetadataRepositoryInterface;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.storages.kv.*;
+
 import io.micronaut.test.annotation.MockBean;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.time.Duration;
-import java.util.Optional;
+import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 
 @KestraTest
 class KVStoreServiceTest {
@@ -52,7 +54,7 @@ class KVStoreServiceTest {
     }
 
     @MockBean(NamespaceService.class)
-    public static class MockNamespaceService extends NamespaceService {
+    public static class MockNamespaceService extends DefaultNamespaceService {
 
         public MockNamespaceService() {
             super(Optional.empty());

@@ -3,6 +3,7 @@
 
     <section id="filter" :class="{filterPadding: padding}">
         <KSFilter
+            :key="`dashboard__${dashboard.id}`"
             :prefix="`dashboard__${dashboard.id}`"
             :configuration="filterConfiguration"
             :tableOptions="{
@@ -11,6 +12,7 @@
                 refresh: {shown: true, callback: () => refreshCharts()}
             }"
             :showSearchInput="false"
+            :defaultDuration="dashboard.timeWindow?.default"
         />
     </section>
 
@@ -43,7 +45,6 @@
         if (props.isFlow) return flowDashboardFilter.value;
         return dashboardFilter.value;
     });
-
 
     import YAML_MAIN from "./assets/default_main_definition.yaml?raw";
     import YAML_FLOW from "./assets/default_flow_definition.yaml?raw";
@@ -89,17 +90,12 @@
         }
 
         if (!props.isFlow && !props.isNamespace) {
-            // Preserve timeRange filter when switching dashboards
-            const preservedQuery = Object.fromEntries(
-                Object.entries(route.query).filter(([key]) => 
-                    key.includes("timeRange")
-                )
-            );
-
-            router.replace({
-                params: {...route.params, dashboard: id},
-                query: route.params.dashboard !== id ? preservedQuery : {...route.query},
-            });
+            if (route.params.dashboard !== id) {
+                await router.replace({
+                    params: {...route.params, dashboard: id},
+                });
+                return;
+            }
         }
 
         dashboard.value = id === "default" ? {id, charts: [], ...parse(defaultYAML)} : await dashboardStore.load(id);
@@ -113,6 +109,8 @@
             load(ID, processFlowYaml(YAML_FLOW, route.params.namespace as string, route.params.id as string));
         } else if (props.isNamespace) {
             load(ID, YAML_NAMESPACE);
+        } else {
+            load(ID, YAML_MAIN);
         }
     });
 

@@ -1,7 +1,17 @@
 package io.kestra.core.repositories;
 
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.event.Level;
+
 import io.kestra.core.exceptions.InvalidQueryFiltersException;
-import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.QueryFilter;
 import io.kestra.core.models.QueryFilter.Field;
 import io.kestra.core.models.QueryFilter.Op;
@@ -10,20 +20,11 @@ import io.kestra.core.models.triggers.Trigger;
 import io.kestra.core.repositories.ExecutionRepositoryInterface.ChildFilter;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
+
 import io.micronaut.data.model.Pageable;
 import io.micronaut.data.model.Sort;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.slf4j.event.Level;
-
-import java.time.ZonedDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Stream;
 
 import static io.kestra.core.models.flows.FlowScope.USER;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,7 +47,7 @@ public abstract class AbstractTriggerRepositoryTest {
             .date(ZonedDateTime.now());
     }
 
-    protected static Trigger generateDefaultTrigger(String tenantId){
+    protected static Trigger generateDefaultTrigger(String tenantId) {
         Trigger trigger = Trigger.builder()
             .tenantId(tenantId)
             .triggerId("triggerId")
@@ -60,7 +61,7 @@ public abstract class AbstractTriggerRepositoryTest {
 
     @ParameterizedTest
     @MethodSource("filterCombinations")
-    void should_find_all(QueryFilter filter){
+    void should_find_all(QueryFilter filter) {
         String tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
         triggerRepository.save(generateDefaultTrigger(tenant));
 
@@ -71,7 +72,7 @@ public abstract class AbstractTriggerRepositoryTest {
 
     @ParameterizedTest
     @MethodSource("filterCombinations")
-    void should_find_all_async(QueryFilter filter){
+    void should_find_all_async(QueryFilter filter) {
         String tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
         triggerRepository.save(generateDefaultTrigger(tenant));
 
@@ -95,7 +96,7 @@ public abstract class AbstractTriggerRepositoryTest {
 
     @ParameterizedTest
     @MethodSource("errorFilterCombinations")
-    void should_fail_to_find_all(QueryFilter filter){
+    void should_fail_to_find_all(QueryFilter filter) {
         assertThrows(InvalidQueryFiltersException.class, () -> triggerRepository.find(Pageable.UNPAGED, TestsUtils.randomTenant(this.getClass().getSimpleName()), List.of(filter)));
     }
 
@@ -133,7 +134,6 @@ public abstract class AbstractTriggerRepositoryTest {
 
         assertThat(findLast.isPresent()).isTrue();
         assertThat(findLast.get().getExecutionId()).isEqualTo(save.getExecutionId());
-
 
         triggerRepository.save(trigger(tenant).build());
         triggerRepository.save(trigger(tenant).build());
@@ -184,13 +184,14 @@ public abstract class AbstractTriggerRepositoryTest {
     void shouldCountForNullTenant() {
         // Given
         String tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
-        triggerRepository.save(Trigger
-            .builder()
-            .tenantId(tenant)
-            .triggerId(IdUtils.create())
-            .flowId(IdUtils.create())
-            .namespace("io.kestra.unittest")
-            .build()
+        triggerRepository.save(
+            Trigger
+                .builder()
+                .tenantId(tenant)
+                .triggerId(IdUtils.create())
+                .flowId(IdUtils.create())
+                .namespace("io.kestra.unittest")
+                .build()
         );
         // When
         long count = triggerRepository.countAll(tenant);
@@ -214,11 +215,13 @@ public abstract class AbstractTriggerRepositoryTest {
             assertThat(all.stream().map(Trigger::getTriggerId).toList())
                 .containsExactlyInAnyOrder(savedA.getTriggerId(), savedB.getTriggerId());
 
-            List<QueryFilter> filters = List.of(QueryFilter.builder()
-                .field(QueryFilter.Field.FLOW_ID)
-                .operation(QueryFilter.Op.EQUALS)
-                .value("flowA")
-                .build());
+            List<QueryFilter> filters = List.of(
+                QueryFilter.builder()
+                    .field(QueryFilter.Field.FLOW_ID)
+                    .operation(QueryFilter.Op.EQUALS)
+                    .value("flowA")
+                    .build()
+            );
 
             List<Trigger> filtered = triggerRepository.findAsync(tenant, filters).collectList().block();
             assertThat(filtered).hasSize(1);
@@ -227,5 +230,44 @@ public abstract class AbstractTriggerRepositoryTest {
             triggerRepository.delete(savedA);
             triggerRepository.delete(savedB);
         }
+    }
+
+    @Test
+    void should_find_exact_prefix_suffix() {
+        String tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        Trigger trigger = generateDefaultTrigger(tenant).toBuilder().flowId("some_search_trigger").build();
+        triggerRepository.save(trigger);
+
+        // exact match
+        ArrayListTotal<Trigger> entries = triggerRepository.find(
+            Pageable.UNPAGED,
+            tenant,
+            List.of(QueryFilter.builder().field(Field.QUERY).value("some_search_trigger").operation(Op.EQUALS).build())
+        );
+        assertThat(entries).hasSize(1);
+
+        // prefix match
+        entries = triggerRepository.find(
+            Pageable.UNPAGED,
+            tenant,
+            List.of(QueryFilter.builder().field(Field.QUERY).value("some_search").operation(Op.EQUALS).build())
+        );
+        assertThat(entries).hasSize(1);
+
+        // suffix match
+        entries = triggerRepository.find(
+            Pageable.UNPAGED,
+            tenant,
+            List.of(QueryFilter.builder().field(Field.QUERY).value("search_trigger").operation(Op.EQUALS).build())
+        );
+        assertThat(entries).hasSize(1);
+
+        // no match
+        entries = triggerRepository.find(
+            Pageable.UNPAGED,
+            tenant,
+            List.of(QueryFilter.builder().field(Field.QUERY).value("nothing").operation(Op.EQUALS).build())
+        );
+        assertThat(entries).hasSize(0);
     }
 }

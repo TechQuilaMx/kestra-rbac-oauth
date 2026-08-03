@@ -1,23 +1,24 @@
 package io.kestra.jdbc.repository;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.jooq.*;
+import org.jooq.impl.DSL;
+
 import io.kestra.core.events.CrudEvent;
 import io.kestra.core.events.CrudEventType;
 import io.kestra.core.models.templates.Template;
 import io.kestra.core.queues.QueueException;
 import io.kestra.core.queues.QueueFactoryInterface;
 import io.kestra.core.queues.QueueInterface;
-import io.kestra.core.queues.QueueService;
 import io.kestra.core.repositories.ArrayListTotal;
 import io.kestra.core.repositories.TemplateRepositoryInterface;
+
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.data.model.Pageable;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import org.jooq.*;
-import org.jooq.impl.DSL;
-
-import java.util.List;
-import java.util.Optional;
 import jakarta.annotation.Nullable;
 import jakarta.validation.ConstraintViolationException;
 
@@ -26,8 +27,8 @@ public abstract class AbstractJdbcTemplateRepository extends AbstractJdbcCrudRep
     private final ApplicationEventPublisher<CrudEvent<Template>> eventPublisher;
 
     @SuppressWarnings("unchecked")
-    public AbstractJdbcTemplateRepository(io.kestra.jdbc.AbstractJdbcRepository<Template> jdbcRepository, QueueService queueService, ApplicationContext applicationContext) {
-        super(jdbcRepository, queueService);
+    public AbstractJdbcTemplateRepository(io.kestra.jdbc.AbstractJdbcRepository<Template> jdbcRepository, ApplicationContext applicationContext) {
+        super(jdbcRepository);
         this.eventPublisher = applicationContext.getBean(ApplicationEventPublisher.class);
         this.templateQueue = applicationContext.getBean(QueueInterface.class, Qualifiers.byName(QueueFactoryInterface.TEMPLATE_NAMED));
     }
@@ -49,8 +50,7 @@ public abstract class AbstractJdbcTemplateRepository extends AbstractJdbcCrudRep
         Pageable pageable,
         @Nullable String query,
         @Nullable String tenantId,
-        @Nullable String namespace
-    ) {
+        @Nullable String namespace) {
         Condition condition = computeCondition(query, namespace);
 
         return findPage(pageable, tenantId, condition);
@@ -70,7 +70,7 @@ public abstract class AbstractJdbcTemplateRepository extends AbstractJdbcCrudRep
             condition = condition.and(this.findCondition(query));
         }
         if (namespace != null) {
-            condition = condition.and(DSL.or(field("namespace").eq(namespace), field("namespace").likeIgnoreCase(namespace + ".%")));
+            condition = condition.and(DSL.or(field("namespace").eq(namespace), field("namespace").startsWith(namespace + ".")));
         }
 
         return condition;
@@ -96,14 +96,14 @@ public abstract class AbstractJdbcTemplateRepository extends AbstractJdbcCrudRep
         }
     }
 
-
     public Template update(Template template, Template previous) throws ConstraintViolationException {
         this
             .findById(previous.getTenantId(), previous.getNamespace(), previous.getId())
             .map(current -> current.validateUpdate(template))
             .filter(Optional::isPresent)
             .map(Optional::get)
-            .ifPresent(s -> {
+            .ifPresent(s ->
+            {
                 throw s;
             });
 
@@ -141,14 +141,15 @@ public abstract class AbstractJdbcTemplateRepository extends AbstractJdbcCrudRep
     public List<String> findDistinctNamespace(String tenantId) {
         return this.jdbcRepository
             .getDslContextWrapper()
-            .transactionResult(configuration -> DSL
-                .using(configuration)
-                .select(field("namespace"))
-                .from(this.jdbcRepository.getTable())
-                .where(this.defaultFilter(tenantId))
-                .groupBy(field("namespace"))
-                .fetch()
-                .map(record -> record.getValue("namespace", String.class))
+            .transactionResult(
+                configuration -> DSL
+                    .using(configuration)
+                    .select(field("namespace"))
+                    .from(this.jdbcRepository.getTable())
+                    .where(this.defaultFilter(tenantId))
+                    .groupBy(field("namespace"))
+                    .fetch()
+                    .map(record -> record.getValue("namespace", String.class))
             );
     }
 }

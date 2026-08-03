@@ -1,5 +1,11 @@
 package io.kestra.webserver.filter;
 
+import java.util.Base64;
+import java.util.Collection;
+import java.util.Optional;
+
+import org.reactivestreams.Publisher;
+
 import io.kestra.core.utils.AuthUtils;
 import io.kestra.webserver.services.BasicAuthService;
 import io.kestra.webserver.services.OAuth2Service;
@@ -17,13 +23,8 @@ import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.RouteMatchUtils;
 import jakarta.inject.Inject;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-
-import java.util.Base64;
-import java.util.Collection;
-import java.util.Optional;
 
 //We want to authenticate only Kestra endpoints
 @Filter("/api/v1/**")
@@ -52,12 +53,12 @@ public class AuthenticationFilter implements HttpServerFilter {
         return Mono.fromCallable(() -> basicAuthService.configuration())
             .subscribeOn(Schedulers.boundedElastic())
             .flux()
-            .flatMap(basicAuthConfiguration -> {
-                boolean isConfigEndpoint = request.getPath().endsWith("/configs")
-                    || (
-                    (request.getPath().endsWith("/basicAuth") || request.getPath().endsWith("/basicAuthValidationErrors"))
-                        && !basicAuthService.isBasicAuthInitialized()
-                );
+            .flatMap(basicAuthConfiguration ->
+            {
+                String normalizedPath = normalizePath(request.getPath());
+                boolean isConfigEndpoint = "/api/v1/configs".equals(normalizedPath)
+                    || ((normalizedPath.matches("/api/v1(/[^/]+)?/basicAuth") || "/api/v1/basicAuthValidationErrors".equals(normalizedPath))
+                        && !basicAuthService.isBasicAuthInitialized());
 
                 boolean isOpenUrl = Optional.ofNullable(basicAuthConfiguration.openUrls())
                     .map(Collection::stream)
@@ -75,9 +76,11 @@ public class AuthenticationFilter implements HttpServerFilter {
                 if (isConfigEndpoint || isOpenUrl || isOAuth2OpenUrl || isManagementEndpoint(request)) {
                     return chain.proceed(request);
                 }
+
+                boolean oauth2Enabled = oauth2Service.isPresent() && oauth2Service.get().isEnabled();
                 
                 // Try OAuth2 Bearer token authentication first
-                if (oauth2Service.isPresent() && oauth2Service.get().isEnabled()) {
+                if (oauth2Enabled) {
                     var bearerToken = fromBearerToken(request);
                     if (bearerToken.isPresent()) {
                         // Validate OAuth2 token
@@ -98,23 +101,28 @@ public class AuthenticationFilter implements HttpServerFilter {
                     .or(() -> fromAuthorizationHeader(request))
                     .map(BasicAuth::from);
 
-                if (basicAuth.isEmpty() || basicAuthConfiguration.credentials() == null ||
-                    !basicAuth.get().username().equals(basicAuthConfiguration.credentials().getUsername()) ||
-                    !AuthUtils.encodePassword(basicAuthConfiguration.credentials().getSalt(),
-                        basicAuth.get().password()).equals(basicAuthConfiguration.credentials().getPassword())
+                if (
+                    basicAuth.isEmpty() || basicAuthConfiguration.credentials() == null ||
+                        !basicAuth.get().username().equals(basicAuthConfiguration.credentials().getUsername()) ||
+                        !AuthUtils.encodePassword(
+                            basicAuthConfiguration.credentials().getSalt(),
+                            basicAuth.get().password()
+                        ).equals(basicAuthConfiguration.credentials().getPassword())
                 ) {
                     Boolean isFromLoginPage = Optional.ofNullable(request.getHeaders().get("Referer")).map(referer -> referer.split("\\?")[0].endsWith("/login")).orElse(false);
-
-                    // Avoid sending a WWW-Authenticate: Basic header for API calls that expect JSON
-                    // (the browser will show a native credentials prompt when that header is present).
                     boolean acceptsHtml = Optional.ofNullable(request.getHeaders().get("Accept")).map(a -> a.contains("text/html")).orElse(false);
+                    boolean shouldChallengeWithBasic = !oauth2Enabled && !isFromLoginPage && acceptsHtml;
 
                     return Mono.just(HttpResponse.unauthorized())
-                        .map(response -> (isFromLoginPage || !acceptsHtml) ? response : response.header("WWW-Authenticate", "Basic"));
+                        .map(response -> shouldChallengeWithBasic ? response.header("WWW-Authenticate", "Basic") : response);
                 }
 
                 return chain.proceed(request);
             });
+    }
+
+    private static String normalizePath(String path) {
+        return path.replaceAll("/+", "/");
     }
 
     private Optional<String> fromCookie(HttpRequest<?> request) {
@@ -137,10 +145,17 @@ public class AuthenticationFilter implements HttpServerFilter {
     }
     
     private Optional<String> fromBearerToken(HttpRequest<?> request) {
-        return request.getHeaders()
+        Optional<String> fromHeader = request.getHeaders()
             .getAuthorization()
             .filter(auth -> auth.toLowerCase().startsWith(PREFIX_BEARER.toLowerCase()))
             .map(token -> token.substring(PREFIX_BEARER.length() + 1).trim());
+        if (fromHeader.isPresent()) {
+            return fromHeader;
+        }
+
+        // EventSource/worker requests cannot always set Authorization headers.
+        return Optional.ofNullable(request.getParameters().get("token"))
+            .filter(token -> !token.isBlank());
     }
 
     @SuppressWarnings("rawtypes")

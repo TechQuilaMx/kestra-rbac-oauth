@@ -2,6 +2,7 @@
     <div class="edit-popper">
         <FilterHeader
             :label="filterKey.label"
+            :description="filterKey.description"
             @close="emits('close')"
         />
         <FilterComparatorSelect
@@ -49,6 +50,9 @@
     import FilterMultiSelect from "./FilterMultiSelect.vue";
     import FilterComparatorSelect from "./FilterComparatorSelect.vue";
 
+    import {useI18n} from "vue-i18n";
+    const {t} = useI18n({useScope: "global"});
+
     const props = defineProps<{
         filter: AppliedFilter;
         filterKey: FilterKeyConfig;
@@ -74,7 +78,8 @@
         valueOptions: [] as FilterValue[],
         startDateValue: null as Date | null,
         selectedComparator: props.filter.comparator,
-        timeRangeMode: "predefined" as "predefined" | "custom"
+        timeRangeMode: "predefined" as "predefined" | "custom",
+        dateFilterMode: (props.filter.meta?.dateFilter ?? props.filterKey?.dateFilterOptions?.[0]?.value ?? "") as string,
     });
 
     const shouldShowComparator = computed(
@@ -119,7 +124,8 @@
                     filterKey: props.filterKey,
                     timeRangeMode: state.timeRangeMode,
                     startDateValue: state.startDateValue,
-                    endDateValue: state.endDateValue
+                    endDateValue: state.endDateValue,
+                    dateFilterMode: state.dateFilterMode,
                 },
                 events: {
                     "update:modelValue": (value: string) => (state.selectValue = value),
@@ -127,8 +133,9 @@
                         (state.timeRangeMode = value),
                     "update:start-date-value": (value: Date | null) =>
                         (state.startDateValue = value),
-                    "update:end-date-value": (value: Date | null) => (state.endDateValue = value)
-                }
+                    "update:end-date-value": (value: Date | null) => (state.endDateValue = value),
+                    "update:date-filter-mode": (value: string) => (state.dateFilterMode = value),
+                },
             },
             text: {
                 component: FilterText,
@@ -183,11 +190,8 @@
     const footerText = computed(() => {
         if (isTextOp.value) return state.textValue ?? "";
 
-        if (isKVPairFilter.value) {
-            const label = props.filterKey?.label || "key/value";
-            return state.keyValuePair.length > 1
-                ? `${state.keyValuePair.length} ${label} pairs`
-                : state.keyValuePair[0] ?? "";
+        if (isKVPairFilter.value && props.filterKey?.key === "labels") {
+            return t("filter.kv_pair_selected", {count: state.keyValuePair.length});
         }
 
         switch (props.filterKey?.valueType) {
@@ -224,7 +228,8 @@
             dateValue: null,
             timeRangeMode: "predefined",
             startDateValue: null,
-            endDateValue: null
+            endDateValue: null,
+            dateFilterMode: props.filterKey?.dateFilterOptions?.[0]?.value ?? "",
         });
     };
 
@@ -249,14 +254,18 @@
                         startDate: state.startDateValue!,
                         endDate: state.endDateValue!
                     },
-                    label: `${state.startDateValue!.toLocaleDateString()} - ${state.endDateValue!.toLocaleDateString()}`
+                    label: `${state.startDateValue!.toLocaleDateString()} - ${state.endDateValue!.toLocaleDateString()}`,
+                    meta: state.dateFilterMode ? {dateFilter: state.dateFilterMode} : undefined,
                 };
             }
             return {
                 value: state.selectValue,
                 label:
                     state.valueOptions?.find(opt => opt.value === state.selectValue)
-                        ?.label || state.selectValue
+                        ?.label || state.selectValue,
+                meta: props.filterKey?.key === "timeRange" && state.dateFilterMode
+                    ? {dateFilter: state.dateFilterMode}
+                    : undefined,
             };
         case "multi-select":
             return {
@@ -290,18 +299,36 @@
             return;
         }
 
-        emits("update", {
+        const updatedFilter: any = {
             ...props.filter,
             comparator: state.selectedComparator,
             comparatorLabel: COMPARATOR_LABELS[state.selectedComparator],
             value: filterData.value,
-            valueLabel: filterData.label
-        });
+            valueLabel: filterData.label,
+        };
+
+        if (filterData.meta !== undefined) {
+            updatedFilter.meta = filterData.meta;
+        } else if (props.filterKey?.key !== "timeRange") {
+            delete updatedFilter.meta;
+        }
+
+        if (props.filterKey?.keyLabelProvider) {
+            updatedFilter.keyLabel = props.filterKey.keyLabelProvider(filterData.meta);
+        }
+
+        emits("update", updatedFilter);
         emits("close");
     };
 
     const initializeStateFromFilter = (filter: AppliedFilter) => {
         state.selectedComparator = filter.comparator;
+
+        if (props.filterKey?.dateFilterOptions?.length) {
+            state.dateFilterMode = filter.meta?.dateFilter
+                ?? props.filterKey.dateFilterOptions[0]?.value
+                ?? ""
+        }
 
         if (
             props.filterKey?.key === "timeRange" &&

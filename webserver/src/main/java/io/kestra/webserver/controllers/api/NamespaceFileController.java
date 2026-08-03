@@ -1,33 +1,5 @@
 package io.kestra.webserver.controllers.api;
 
-import io.kestra.core.exceptions.FlowProcessingException;
-import io.kestra.core.models.FetchVersion;
-import io.kestra.core.models.QueryFilter;
-import io.kestra.core.models.namespaces.files.NamespaceFileMetadata;
-import io.kestra.core.repositories.ArrayListTotal;
-import io.kestra.core.repositories.NamespaceFileMetadataRepositoryInterface;
-import io.kestra.core.services.FlowService;
-import io.kestra.core.storages.*;
-import io.kestra.core.tenant.TenantService;
-import io.kestra.webserver.annotations.RequirePermission;
-import io.kestra.webserver.models.auth.Permission;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.data.model.Pageable;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
-import io.micronaut.http.multipart.CompletedFileUpload;
-import io.micronaut.http.server.types.files.StreamedFile;
-import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.annotation.ExecuteOn;
-import io.micronaut.validation.Validated;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import jakarta.inject.Inject;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.tuple.Pair;
-
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -43,6 +15,36 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
+
+import org.apache.commons.lang3.tuple.Pair;
+
+import io.kestra.core.exceptions.FlowProcessingException;
+import io.kestra.core.models.FetchVersion;
+import io.kestra.core.models.QueryFilter;
+import io.kestra.core.models.namespaces.files.NamespaceFileMetadata;
+import io.kestra.core.repositories.ArrayListTotal;
+import io.kestra.core.repositories.NamespaceFileMetadataRepositoryInterface;
+import io.kestra.core.services.FlowService;
+import io.kestra.core.storages.*;
+import io.kestra.core.tenant.TenantService;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
+
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.data.model.Pageable;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.server.types.files.StreamedFile;
+import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.validation.Validated;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.inject.Inject;
+import lombok.extern.slf4j.Slf4j;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -68,24 +70,22 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files/search")
+    @Operation(tags = { "Files" }, summary = "Find files which path contain the given string in their URI")
     @RequirePermission(Permission.NAMESPACES_VIEW)
-    @Operation(tags = {"Files"}, summary = "Find files which path contain the given string in their URI")
     public List<String> searchNamespaceFiles(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
-        @Parameter(description = "The string the file path should contain") @QueryValue String q
-    ) throws IOException {
-        return namespaceFactory.of(tenantService.resolveTenant(), namespace, storageInterface).all(q).stream().map(namespaceFile -> namespaceFile.path(true).toString()).toList();
+        @Parameter(description = "The string the file path should contain") @QueryValue String q) throws IOException {
+        return namespaceFactory.of(tenantService.resolveTenant(), namespace, storageInterface).all(q).stream().map(namespaceFile -> namespaceFile.filePath().toString()).toList();
     }
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files", produces = MediaType.APPLICATION_OCTET_STREAM)
+    @Operation(tags = { "Files" }, summary = "Get namespace file content")
     @RequirePermission(Permission.NAMESPACES_VIEW)
-    @Operation(tags = {"Files"}, summary = "Get namespace file content")
     public HttpResponse<StreamedFile> getFileContent(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @Parameter(description = "The internal storage uri") @QueryValue String path,
-        @Nullable @Parameter(description = "The revision, if not provided, the latest revision will be returned") @QueryValue Integer revision
-    ) throws IOException, URISyntaxException {
+        @Nullable @Parameter(description = "The revision, if not provided, the latest revision will be returned") @QueryValue Integer revision) throws IOException, URISyntaxException {
         URI encodedPath = null;
         if (path != null) {
             encodedPath = new URI(URLEncoder.encode(path, StandardCharsets.UTF_8));
@@ -100,12 +100,11 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files/stats")
+    @Operation(tags = { "Files" }, summary = "Get namespace file stats such as size, creation & modification dates and type")
     @RequirePermission(Permission.NAMESPACES_VIEW)
-    @Operation(tags = {"Files"}, summary = "Get namespace file stats such as size, creation & modification dates and type")
     public FileAttributes getFileMetadatas(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
-        @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path
-    ) throws IOException, URISyntaxException {
+        @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path) throws IOException, URISyntaxException {
         URI encodedPath = null;
         if (path != null) {
             encodedPath = new URI(URLEncoder.encode(path, StandardCharsets.UTF_8));
@@ -127,12 +126,11 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files/revisions")
+    @Operation(tags = { "Files" }, summary = "Get namespace file revisions")
     @RequirePermission(Permission.NAMESPACES_VIEW)
-    @Operation(tags = {"Files"}, summary = "Get namespace file revisions")
     public List<NamespaceFileRevision> getFileRevisions(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
-        @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path
-    ) throws IOException, URISyntaxException {
+        @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path) throws IOException, URISyntaxException {
         URI encodedPath = null;
         if (path != null) {
             encodedPath = new URI(URLEncoder.encode(path, StandardCharsets.UTF_8));
@@ -141,15 +139,19 @@ public class NamespaceFileController {
 
         encodedPath = Optional.ofNullable(encodedPath).orElse(URI.create("/"));
 
-        ArrayListTotal<NamespaceFileMetadata> namespaceFileMetadata = namespaceFileMetadataRepository.find(Pageable.UNPAGED, tenantService.resolveTenant(), List.of(
-            QueryFilter.builder().field(QueryFilter.Field.NAMESPACE).operation(QueryFilter.Op.EQUALS).value(namespace).build(),
-            QueryFilter.builder().field(QueryFilter.Field.PATH).operation(QueryFilter.Op.EQUALS).value(encodedPath.getPath()).build()
-        ), true, FetchVersion.ALL);
+        ArrayListTotal<NamespaceFileMetadata> namespaceFileMetadata = namespaceFileMetadataRepository.find(
+            Pageable.UNPAGED, tenantService.resolveTenant(), List.of(
+                QueryFilter.builder().field(QueryFilter.Field.NAMESPACE).operation(QueryFilter.Op.EQUALS).value(namespace).build(),
+                QueryFilter.builder().field(QueryFilter.Field.PATH).operation(QueryFilter.Op.EQUALS).value(encodedPath.getPath()).build()
+            ), true, FetchVersion.ALL
+        );
 
-        if (namespaceFileMetadata.stream()
-            .filter(NamespaceFileMetadata::isLast)
-            .map(NamespaceFileMetadata::isDeleted).findFirst()
-            .orElse(true)) {
+        if (
+            namespaceFileMetadata.stream()
+                .filter(NamespaceFileMetadata::isLast)
+                .map(NamespaceFileMetadata::isDeleted).findFirst()
+                .orElse(true)
+        ) {
             throw new FileNotFoundException("File not found: " + encodedPath.getPath());
         }
 
@@ -158,12 +160,11 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files/directory")
+    @Operation(tags = { "Files" }, summary = "List directory content")
     @RequirePermission(Permission.NAMESPACES_VIEW)
-    @Operation(tags = {"Files"}, summary = "List directory content")
     public List<FileAttributes> listNamespaceDirectoryFiles(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
-        @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path
-    ) throws IOException, URISyntaxException {
+        @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path) throws IOException, URISyntaxException {
         URI encodedPath = null;
         if (path != null) {
             encodedPath = new URI(URLEncoder.encode(path, StandardCharsets.UTF_8));
@@ -186,12 +187,11 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "{namespace}/files/directory")
-    @Operation(tags = {"Files"}, summary = "Create a directory")
-    @RequirePermission(Permission.NAMESPACES_CREATE)
+    @Operation(tags = { "Files" }, summary = "Create a directory")
+    @RequirePermission(Permission.NAMESPACES_EDIT)
     public void createNamespaceDirectory(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
-        @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path
-    ) throws IOException, URISyntaxException {
+        @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path) throws IOException, URISyntaxException {
         URI encodedPath = null;
         if (path != null) {
             encodedPath = new URI(URLEncoder.encode(path, StandardCharsets.UTF_8));
@@ -204,13 +204,12 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "{namespace}/files", consumes = MediaType.MULTIPART_FORM_DATA)
-    @Operation(tags = {"Files"}, summary = "Create a file")
-    @RequirePermission(Permission.NAMESPACES_CREATE)
+    @Operation(tags = { "Files" }, summary = "Create a file")
+    @RequirePermission(Permission.NAMESPACES_EDIT)
     public void createNamespaceFile(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @Parameter(description = "The internal storage uri") @QueryValue String path,
-        @Parameter(description = "The file to upload") @Part CompletedFileUpload fileContent
-    ) throws Exception {
+        @Parameter(description = "The file to upload") @Part CompletedFileUpload fileContent) throws Exception {
         innerCreateNamespaceFile(namespace, path, fileContent);
     }
 
@@ -269,13 +268,14 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/files/export", produces = MediaType.APPLICATION_OCTET_STREAM)
+    @Operation(tags = { "Files" }, summary = "Export namespace files as a ZIP")
     @RequirePermission(Permission.NAMESPACES_VIEW)
-    @Operation(tags = {"Files"}, summary = "Export namespace files as a ZIP")
     public HttpResponse<byte[]> exportNamespaceFiles(
-        @Parameter(description = "The namespace id") @PathVariable String namespace
-    ) throws IOException {
-        try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
-             ZipOutputStream archive = new ZipOutputStream(bos)) {
+        @Parameter(description = "The namespace id") @PathVariable String namespace) throws IOException {
+        try (
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ZipOutputStream archive = new ZipOutputStream(bos)
+        ) {
 
             String tenantId = tenantService.resolveTenant();
 
@@ -284,7 +284,8 @@ public class NamespaceFileController {
             allNsFiles.stream()
                 .filter(Predicate.not(NamespaceFileMetadata::isDirectory))
                 .map(NamespaceFileMetadata::getPath)
-                .forEach(throwConsumer(path -> {
+                .forEach(throwConsumer(path ->
+                {
                     try (InputStream inputStream = namespaceStorage.getFileContent(Path.of(path))) {
                         archive.putNextEntry(new ZipEntry(path.substring(1))); // remove leading slash
                         archive.write(inputStream.readAllBytes());
@@ -292,7 +293,8 @@ public class NamespaceFileController {
                     }
                 }));
 
-            flowService.findByNamespaceWithSource(tenantId, namespace).forEach(throwConsumer(flowWithSource -> {
+            flowService.findByNamespaceWithSource(tenantId, namespace).forEach(throwConsumer(flowWithSource ->
+            {
                 try {
                     archive.putNextEntry(new ZipEntry(FLOWS_FOLDER + "/" + flowWithSource.getId() + ".yml"));
                     archive.write(flowWithSource.getSource().getBytes());
@@ -310,13 +312,12 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Put(uri = "{namespace}/files")
-    @Operation(tags = {"Files"}, summary = "Move a file or directory")
+    @Operation(tags = { "Files" }, summary = "Move a file or directory")
     @RequirePermission(Permission.NAMESPACES_EDIT)
     public void moveFileDirectory(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @Parameter(description = "The internal storage uri to move from") @QueryValue URI from,
-        @Parameter(description = "The internal storage uri to move to") @QueryValue URI to
-    ) throws Exception {
+        @Parameter(description = "The internal storage uri to move to") @QueryValue URI to) throws Exception {
         innerMoveFileDirectory(namespace, from, to);
     }
 
@@ -332,12 +333,11 @@ public class NamespaceFileController {
 
     @ExecuteOn(TaskExecutors.IO)
     @Delete(uri = "{namespace}/files")
-    @Operation(tags = {"Files"}, summary = "Delete a file or directory")
-    @RequirePermission(Permission.NAMESPACES_DELETE)
+    @Operation(tags = { "Files" }, summary = "Delete a file or directory")
+    @RequirePermission(Permission.NAMESPACES_EDIT)
     public void deleteFileDirectory(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
-        @Parameter(description = "The internal storage uri of the file / directory to delete") @QueryValue String path
-    ) throws IOException, URISyntaxException {
+        @Parameter(description = "The internal storage uri of the file / directory to delete") @QueryValue String path) throws IOException, URISyntaxException {
         innerDeleteFileDirectory(namespace, path);
     }
 
@@ -355,9 +355,13 @@ public class NamespaceFileController {
 
         String zombieAwarePathToDelete = pathWithoutScheme;
         String parentPathToCheck = NamespaceFileMetadata.parentPath(zombieAwarePathToDelete);
-        while (parentPathToCheck != null && !parentPathToCheck.equals("/") && namespaceFileMetadataRepository.find(Pageable.from(1, 2), tenantService.resolveTenant(), List.of(
-            QueryFilter.builder().field(QueryFilter.Field.PARENT_PATH).operation(QueryFilter.Op.EQUALS).value(parentPathToCheck).build()
-        ), false).size() == 1) {
+        while (
+            parentPathToCheck != null && !parentPathToCheck.equals("/") && namespaceFileMetadataRepository.find(
+                Pageable.from(1, 2), tenantService.resolveTenant(), List.of(
+                    QueryFilter.builder().field(QueryFilter.Field.PARENT_PATH).operation(QueryFilter.Op.EQUALS).value(parentPathToCheck).build()
+                ), false
+            ).size() == 1
+        ) {
             zombieAwarePathToDelete = parentPathToCheck;
             parentPathToCheck = NamespaceFileMetadata.parentPath(parentPathToCheck);
         }

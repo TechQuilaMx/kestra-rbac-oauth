@@ -1,0 +1,57 @@
+{
+  "realm": "kestra",
+  "enabled": true,
+  "displayName": "Kestra",
+  "attributes": {
+    "frontendUrl": "http://localhost:8085"
+  },
+  "roles": {
+    "realm": [
+      {"name": "kestra-admin"},
+      {"name": "kestra-operator"}
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "kestra-app",
+      "name": "Kestra App",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "secret": "kestra-dev-secret-change-me",
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "http://localhost:8080/ui/oauth2-callback"
+      ],
+      "webOrigins": [
+        "http://localhost:8080"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:8080/ui/login"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "kestra",
+      "enabled": true,
+      "email": "kestra@example.com",
+      "emailVerified": true,
+      "firstName": "Kestra",
+      "lastName": "Admin",
+      "realmRoles": [
+        "kestra-admin",
+        "kestra-operator"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "kestra123",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

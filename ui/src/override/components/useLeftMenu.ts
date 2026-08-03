@@ -1,4 +1,4 @@
-import {computed} from "vue";
+import {computed, onMounted, ref} from "vue";
 
 import {useRoute, useRouter} from "vue-router";
 import type {
@@ -12,8 +12,10 @@ import {useI18n} from "vue-i18n";
 import {useMiscStore} from "override/stores/misc";
 
 import {getDashboard} from "../../components/dashboard/composables/useDashboards";
+import {shouldShowWelcome} from "../../utils/welcomeGuard";
 
 // Main icons
+import AiMenuIcon from "../../components/ai/AiMenuIcon.vue";
 import ChartLineVariant from "vue-material-design-icons/ChartLineVariant.vue";
 import FileTreeOutline from "vue-material-design-icons/FileTreeOutline.vue";
 import LayersTripleOutline from "vue-material-design-icons/LayersTripleOutline.vue";
@@ -40,6 +42,7 @@ import Battery40 from "vue-material-design-icons/Battery40.vue";
 import ShieldAccount from "vue-material-design-icons/ShieldAccount.vue";
 
 export type MenuItem = {
+    id?: string; // Generated at the end of menu computation
     title: string;
     routes?: RouteRecordNameGeneric[];
     href?: RouteLocationRaw;
@@ -52,6 +55,8 @@ export type MenuItem = {
         locked?: boolean;
     };
     hidden?: boolean;
+    disabled?: boolean;
+    "class"?: string;
 };
 
 export function useLeftMenu() {
@@ -61,6 +66,19 @@ export function useLeftMenu() {
     const {t} = useI18n({useScope: "global"});
 
     const configs = useMiscStore().configs;
+    const showWelcomeLink = ref(false);
+
+    const loadWelcomeLink = async () => {
+        try {
+            showWelcomeLink.value = await shouldShowWelcome();
+        } catch {
+            showWelcomeLink.value = false;
+        }
+    };
+
+    onMounted(() => {
+        void loadWelcomeLink();
+    });
 
     /**
      * Returns the names of all registered routes whose name starts with the given prefix.
@@ -95,11 +113,25 @@ export function useLeftMenu() {
     const menu = computed<MenuItem[]>(() => {
         const generated = [
             {
+                title: t("ai.flow.title"),
+                routes: routeStartWith("welcome"),
+                href: {
+                    name: "welcome",
+                },
+                icon: {
+                    element: AiMenuIcon,
+                },
+            },
+            {
                 title: t("dashboards.labels.plural"),
+                routes: routeStartWith("home"),
                 href: {
                     name: "home",
                     params: {
-                        dashboard: getDashboard($route, "id"),
+                        dashboard: getDashboard({
+                            ...$route,
+                            name: "home"
+                        }, "id"),
                     },
                 },
                 icon: {
@@ -374,6 +406,8 @@ export function useLeftMenu() {
         ];
 
         flatten(generated).forEach((item: MenuItem) => {
+            item.id = item.title.toLowerCase().replaceAll(" ", "-");
+
             if (item.icon?.element) item.icon.class = "menu-icon";
 
             if (item.href && typeof item.href !== "string") {
@@ -388,7 +422,7 @@ export function useLeftMenu() {
                 }
 
                 // Convert object href to string path
-                item.href = $router.resolve(rObject).path;
+                item.href = $router.resolve(rObject).fullPath;
             }
         });
 

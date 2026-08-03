@@ -1,18 +1,18 @@
 package io.kestra.plugin.core.state;
 
+import java.util.Map;
+
+import org.apache.commons.lang3.tuple.Pair;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.commons.lang3.tuple.Pair;
-
-import java.net.URI;
-import java.util.Map;
 
 @SuperBuilder
 @ToString
@@ -20,15 +20,11 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Set a state in the state store (Deprecated, use KV store instead).",
-    description = "Values will be merged: \n" +
-        "* If you provide a new key, the new key will be added.\n" +
-        "* If you provide an existing key, the previous key will be overwrite.\n" +
-        "\n" +
-        "::alert{type=\"warning\"}\n" +
-        "This method is not concurrency safe. If many executions for the same flow are concurrent, there is no guarantee on isolation on the value.\n" +
-        "The value can be overwritten by other executions.\n" +
-        "::\n"
+    title = "Set state in the legacy state store (deprecated).",
+    description = """
+        Deprecated; use the KV store instead. Merges provided `data` into the named state (default state for the Flow if `name` unset). New keys are added; existing keys are overwritten.
+
+        Not concurrency safe: parallel Flow executions can overwrite each other."""
 )
 @Plugin(
     examples = {

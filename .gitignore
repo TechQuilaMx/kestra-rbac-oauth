@@ -17,8 +17,7 @@ prettierrc.js
 .attach*
 **/*.class
 **/bin/*
-\.sso/
-cli/src/main/resources/application-*.yml
+!docker/usr/local/bin/docker-entrypoint.sh
 
 ### Configurations
 docker-compose.override.yml
@@ -39,6 +38,7 @@ ui/coverage
 ui/stats.html
 ui/.frontend-gradle-plugin
 ui/test-report.junit.xml
+ui/frontend.*
 *storybook.log
 storybook-static
 
@@ -61,4 +61,7 @@ core/src/main/resources/gradle.properties
 **/allure-results/*
 
 /jmh-benchmarks/src/main/resources/gradle.properties
-*package-lock.json
+
+# Helm chart dependencies (downloaded at build time, not committed)
+charts/kestra/charts/
+charts/kestra-starter/charts/

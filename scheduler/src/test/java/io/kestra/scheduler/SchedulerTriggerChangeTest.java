@@ -1,5 +1,16 @@
 package io.kestra.scheduler;
 
+import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.Test;
+
 import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.executions.ExecutionKilled;
@@ -23,24 +34,15 @@ import io.kestra.core.runners.WorkerTrigger;
 import io.kestra.core.utils.Await;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.worker.DefaultWorker;
 import io.kestra.jdbc.runner.JdbcScheduler;
 import io.kestra.plugin.core.debug.Return;
+import io.kestra.worker.DefaultWorker;
+
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
-
-import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -64,7 +66,6 @@ public class SchedulerTriggerChangeTest extends AbstractSchedulerTest {
     @Inject
     protected FlowRepositoryInterface flowRepository;
 
-
     public static FlowWithSource createFlow(Duration sleep) {
         SleepTriggerTest schedule = SleepTriggerTest.builder()
             .id("sleep")
@@ -77,11 +78,14 @@ public class SchedulerTriggerChangeTest extends AbstractSchedulerTest {
             .namespace("io.kestra.unittest")
             .revision(1)
             .triggers(List.of(schedule))
-            .tasks(Collections.singletonList(Return.builder()
-                .id("test")
-                .type(Return.class.getName())
-                .format(Property.ofExpression("{{ inputs.testInputs }}"))
-                .build())
+            .tasks(
+                Collections.singletonList(
+                    Return.builder()
+                        .id("test")
+                        .type(Return.class.getName())
+                        .format(Property.ofExpression("{{ inputs.testInputs }}"))
+                        .build()
+                )
             )
             .build();
 
@@ -94,14 +98,16 @@ public class SchedulerTriggerChangeTest extends AbstractSchedulerTest {
         CountDownLatch executionKilledCount = new CountDownLatch(1);
 
         // wait for execution
-        Flux<Execution> receiveExecutions = TestsUtils.receive(executionQueue, either -> {
+        Flux<Execution> receiveExecutions = TestsUtils.receive(executionQueue, either ->
+        {
             if (either.getLeft().getFlowId().equals(SchedulerTriggerChangeTest.class.getSimpleName())) {
                 executionQueueCount.countDown();
             }
         });
 
         // wait for killed
-        Flux<ExecutionKilled> receiveKilled = TestsUtils.receive(killedQueue, either -> {
+        Flux<ExecutionKilled> receiveKilled = TestsUtils.receive(killedQueue, either ->
+        {
             executionKilledCount.countDown();
         });
 

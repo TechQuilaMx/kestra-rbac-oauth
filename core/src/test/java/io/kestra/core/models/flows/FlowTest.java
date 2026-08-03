@@ -1,5 +1,13 @@
 package io.kestra.core.models.flows;
 
+import java.io.File;
+import java.net.URL;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
 import io.kestra.core.exceptions.InternalException;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.flows.input.StringInput;
@@ -10,15 +18,9 @@ import io.kestra.core.serializers.YamlParser;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.core.debug.Return;
 import io.kestra.plugin.core.log.Log;
+
 import jakarta.inject.Inject;
 import jakarta.validation.ConstraintViolationException;
-import org.junit.jupiter.api.Test;
-
-import java.io.File;
-import java.net.URL;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -74,7 +76,6 @@ class FlowTest {
         assertThat(validate.get().getMessage()).contains("Illegal flow id update");
     }
 
-
     @Test
     void switchTaskInvalid() {
         Flow flow = this.parse("flows/invalids/switch-invalid.yaml");
@@ -112,11 +113,12 @@ class FlowTest {
     void updateTask() throws InternalException {
         Flow flow = this.parse("flows/valids/each-sequential-nested.yaml");
 
-        Flow updated = flow.updateTask("1-2-2_return", Return.builder()
-            .id("1-2-2_return")
-            .type(Return.class.getName())
-            .format(Property.ofExpression("{{task.id}}"))
-            .build()
+        Flow updated = flow.updateTask(
+            "1-2-2_return", Return.builder()
+                .id("1-2-2_return")
+                .type(Return.class.getName())
+                .format(Property.ofExpression("{{task.id}}"))
+                .build()
         );
 
         Task findUpdated = updated.findTaskByTaskId("1-2-2_return");
@@ -138,10 +140,19 @@ class FlowTest {
         Optional<ConstraintViolationException> validate = modelValidator.isValid(flow);
 
         assertThat(validate.isPresent()).isTrue();
-        assertThat(validate.get().getConstraintViolations().size()).isEqualTo(2);
+        assertThat(validate.get().getConstraintViolations().size()).isEqualTo(11);
 
         assertThat(validate.get().getMessage()).contains("file: inputs of type 'FILE' only support `defaults` as local files using a file URI");
-        assertThat(validate.get().getMessage()).contains("array: `itemType` cannot be `ARRAY");
+        assertThat(validate.get().getMessage()).contains("array1: `itemType` cannot be ARRAY");
+        assertThat(validate.get().getMessage()).contains("array2: `itemType` cannot be SECRET");
+        assertThat(validate.get().getMessage()).contains("array3: `itemType` cannot be MULTISELECT");
+        assertThat(validate.get().getMessage()).contains("array4: `itemType` cannot be SELECT");
+        assertThat(validate.get().getMessage()).contains("array5: `itemType` cannot be ENUM");
+        assertThat(validate.get().getMessage()).contains("multiselect1: `itemType` cannot be ARRAY");
+        assertThat(validate.get().getMessage()).contains("multiselect2: `itemType` cannot be SECRET");
+        assertThat(validate.get().getMessage()).contains("multiselect3: `itemType` cannot be MULTISELECT");
+        assertThat(validate.get().getMessage()).contains("multiselect4: `itemType` cannot be SELECT");
+        assertThat(validate.get().getMessage()).contains("multiselect5: `itemType` cannot be ENUM");
     }
 
     // This test is done to ensure the equals is checking the right fields and also make sure the Maps orders don't negate the equality even if they are not the same.
@@ -185,6 +196,7 @@ class FlowTest {
 
         return YamlParser.parse(file, Flow.class);
     }
+
     @Test
     void illegalNamespaceUpdate() {
         Flow original = Flow.builder()

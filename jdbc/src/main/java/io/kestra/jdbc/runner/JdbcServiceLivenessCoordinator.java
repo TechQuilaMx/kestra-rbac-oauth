@@ -1,6 +1,13 @@
 package io.kestra.jdbc.runner;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
+
 import com.google.common.annotations.VisibleForTesting;
+
 import io.kestra.core.server.AbstractServiceLivenessCoordinator;
 import io.kestra.core.server.ServerConfig;
 import io.kestra.core.server.Service.ServiceState;
@@ -9,19 +16,13 @@ import io.kestra.core.server.ServiceRegistry;
 import io.kestra.core.server.ServiceType;
 import io.kestra.core.server.WorkerTaskRestartStrategy;
 import io.kestra.jdbc.repository.AbstractJdbcServiceInstanceRepository;
+
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.scheduling.annotation.Scheduled;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
 
 import static io.kestra.core.server.Service.ServiceState.allRunningStates;
 
@@ -31,11 +32,10 @@ import static io.kestra.core.server.Service.ServiceState.allRunningStates;
  * @see ServiceInstance
  */
 @Singleton
+@Slf4j
 @JdbcRunnerEnabled
 @Requires(property = "kestra.server-type", pattern = "(EXECUTOR|STANDALONE)")
 public final class JdbcServiceLivenessCoordinator extends AbstractServiceLivenessCoordinator {
-
-    private final static Logger log = LoggerFactory.getLogger(JdbcServiceLivenessCoordinator.class);
 
     private final AtomicReference<JdbcExecutor> executor = new AtomicReference<>();
     private final AbstractJdbcServiceInstanceRepository serviceInstanceRepository;
@@ -45,13 +45,13 @@ public final class JdbcServiceLivenessCoordinator extends AbstractServiceLivenes
      * Creates a new {@link JdbcServiceLivenessCoordinator} instance.
      *
      * @param serviceInstanceRepository The {@link AbstractJdbcServiceInstanceRepository}.
-     * @param serverConfig              The server liveness configuration.
+     * @param serverConfig The server liveness configuration.
      */
     @Inject
     public JdbcServiceLivenessCoordinator(final AbstractJdbcServiceInstanceRepository serviceInstanceRepository,
-                                          final ServiceRegistry serviceRegistry,
-                                          final ServerConfig serverConfig,
-                                          @Value("${kestra.server.service.purge.retention}") final Duration purgeRetention) {
+        final ServiceRegistry serviceRegistry,
+        final ServerConfig serverConfig,
+        @Value("${kestra.server.service.purge.retention}") final Duration purgeRetention) {
         super(serviceInstanceRepository, serviceRegistry, serverConfig);
         this.serviceInstanceRepository = serviceInstanceRepository;
         this.purgeRetention = purgeRetention;
@@ -62,7 +62,8 @@ public final class JdbcServiceLivenessCoordinator extends AbstractServiceLivenes
      **/
     @Override
     protected void onSchedule(final Instant now) throws Exception {
-        if (executor.get() == null) return; // only True during startup
+        if (executor.get() == null)
+            return; // only True during startup
         super.onSchedule(now);
     }
 
@@ -71,7 +72,8 @@ public final class JdbcServiceLivenessCoordinator extends AbstractServiceLivenes
      **/
     @Override
     protected void handleAllWorkersForUncleanShutdown(Instant now) {
-        serviceInstanceRepository.transaction(configuration -> {
+        serviceInstanceRepository.transaction(configuration ->
+        {
             final List<ServiceInstance> nonRunningWorkers = serviceInstanceRepository
                 .findAllNonRunningInstances(configuration, true)
                 .stream()
@@ -93,11 +95,27 @@ public final class JdbcServiceLivenessCoordinator extends AbstractServiceLivenes
                 }
             }
 
+            // Re-emit all realtime triggers for TERMINATED_GRACEFULLY workers
+            List<ServiceInstance> terminatedGracefully = nonRunningWorkers.stream()
+                .filter(nonRunning -> nonRunning.is(ServiceState.TERMINATED_GRACEFULLY))
+                .toList();
+            if (!terminatedGracefully.isEmpty()) {
+                List<String> ids = terminatedGracefully.stream()
+                    .filter(instance -> instance.config().workerTaskRestartStrategy().isRestartable())
+                    .map(ServiceInstance::uid)
+                    .toList();
+                if (!ids.isEmpty()) {
+                    log.info("Trigger realtime trigger restart for terminated gracefully worker: {}.", ids);
+                    executor.get().reEmitRealtimeTriggerForWorker(configuration, ids);
+                }
+            }
+
             // Transit all GRACEFUL AND UNCLEAN SHUTDOWN workers to NOT_RUNNING.
             Stream<ServiceInstance> cleanShutdownWorkers = nonRunningWorkers.stream()
                 .filter(nonRunning -> nonRunning.is(ServiceState.TERMINATED_GRACEFULLY));
             Stream.concat(cleanShutdownWorkers, uncleanShutdownWorkers.stream()).forEach(
-                instance -> serviceInstanceRepository.mayTransitServiceTo(configuration,
+                instance -> serviceInstanceRepository.mayTransitServiceTo(
+                    configuration,
                     instance,
                     ServiceState.NOT_RUNNING,
                     DEFAULT_REASON_FOR_NOT_RUNNING
@@ -119,7 +137,8 @@ public final class JdbcServiceLivenessCoordinator extends AbstractServiceLivenes
      **/
     @Override
     protected void handleAllNonRespondingServices(Instant now) {
-        serviceInstanceRepository.transaction(configuration -> {
+        serviceInstanceRepository.transaction(configuration ->
+        {
             // Retrieves all services that are supposed to be running.
             List<ServiceInstance> allRunningInstances = serviceInstanceRepository.findAllInstancesInStates(configuration, allRunningStates(), true);
 
@@ -127,12 +146,14 @@ public final class JdbcServiceLivenessCoordinator extends AbstractServiceLivenes
             List<ServiceInstance> nonRespondingServices = filterAllNonRespondingServices(allRunningInstances, now);
 
             // Attempt to transit all non-responding services to DISCONNECTED.
-            nonRespondingServices.forEach(instance -> serviceInstanceRepository.mayTransitServiceTo(
-                configuration,
-                instance,
-                ServiceState.DISCONNECTED,
-                DEFAULT_REASON_FOR_DISCONNECTED
-            ));
+            nonRespondingServices.forEach(
+                instance -> serviceInstanceRepository.mayTransitServiceTo(
+                    configuration,
+                    instance,
+                    ServiceState.DISCONNECTED,
+                    DEFAULT_REASON_FOR_DISCONNECTED
+                )
+            );
 
             // Eventually restart workers tasks
             List<String> workerIdsHavingTasksToRestart = nonRespondingServices.stream()
@@ -153,7 +174,6 @@ public final class JdbcServiceLivenessCoordinator extends AbstractServiceLivenes
         int purged = serviceInstanceRepository.purgeEmptyInstances(Instant.now().minus(purgeRetention));
         log.info("Purged {} service instances", purged);
     }
-
 
     synchronized void setExecutor(final JdbcExecutor executor) {
         this.executor.set(executor);

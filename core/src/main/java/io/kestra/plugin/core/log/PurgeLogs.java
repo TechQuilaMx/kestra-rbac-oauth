@@ -1,5 +1,10 @@
 package io.kestra.plugin.core.log;
 
+import java.time.ZonedDateTime;
+import java.util.List;
+
+import org.slf4j.event.Level;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
@@ -8,6 +13,7 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.DefaultRunContext;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.services.ExecutionLogService;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.EqualsAndHashCode;
@@ -15,10 +21,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import org.slf4j.event.Level;
-
-import java.time.ZonedDateTime;
-import java.util.List;
 
 @SuperBuilder
 @ToString
@@ -26,27 +28,44 @@ import java.util.List;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Purge flow execution logs and trigger-related logs.",
-    description = "This task can be used to purge flow execution and trigger logs for all flows, for a specific namespace, or for a specific flow."
+    title = "Purge execution and trigger logs.",
+    description = """
+        Deletes logs in bulk by namespace/flow/execution filters and optional level/date ranges. Requires namespace authorization when targeting other namespaces.
+
+        For performance, use this instead of per-execution deletions; consider keeping ERROR logs by filtering `logLevels`."""
 )
 @Plugin(
     examples = {
         @Example(
             title = "Purge all logs that has been created more than one month ago.",
-            code = {
-                "endDate: \"{{ now() | dateAdd(-1, 'MONTHS') }}\""
-            }
+            full = true,
+            code = """
+                    id: purge
+                    namespace: system
+
+                    tasks:
+                      - id: purge_logs
+                        type: io.kestra.plugin.core.log.PurgeLogs
+                        endDate: "{{ now() | dateAdd(-1, 'MONTHS') }}"
+                """
         ),
         @Example(
             title = "Purge all logs that has been created more than one month ago, but keep error logs.",
-            code = {
-                "endDate: \"{{ now() | dateAdd(-1, 'MONTHS') }}\"",
-                "logLevels:",
-                "  - TRACE",
-                "  - DEBUG",
-                "  - INFO",
-                "  - WARN",
-            }
+            full = true,
+            code = """
+                    id: purge
+                    namespace: system
+
+                    tasks:
+                      - id: purge
+                        type: io.kestra.plugin.core.log.PurgeLogs
+                        endDate: "{{ now() | dateAdd(-1, 'MONTHS') }}"
+                        logLevels:
+                          - TRACE
+                          - DEBUG
+                          - INFO
+                          - WARN
+                """
         )
     }
 )
@@ -89,11 +108,11 @@ public class PurgeLogs extends Task implements RunnableTask<PurgeLogs.Output> {
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        ExecutionLogService logService = ((DefaultRunContext)runContext).getApplicationContext().getBean(ExecutionLogService.class);
+        ExecutionLogService logService = ((DefaultRunContext) runContext).services().additionalService(ExecutionLogService.class);
 
         // validate that this namespace is authorized on the target namespace / all namespaces
         var flowInfo = runContext.flowInfo();
-        if (namespace == null){
+        if (namespace == null) {
             runContext.acl().allowAllNamespaces().check();
         } else if (!flowInfo.namespace().equals(runContext.render(namespace).as(String.class).orElse(null))) {
             runContext.acl().allowNamespace(runContext.render(namespace).as(String.class).orElse(null)).check();
@@ -113,7 +132,6 @@ public class PurgeLogs extends Task implements RunnableTask<PurgeLogs.Output> {
 
         return Output.builder().count(deleted).build();
     }
-
 
     @SuperBuilder(toBuilder = true)
     @Getter

@@ -1,12 +1,16 @@
 package io.kestra.core.services;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.Test;
+
 import io.kestra.core.exceptions.FlowProcessingException;
 import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.models.flows.Flow;
-import io.kestra.core.models.flows.FlowInterface;
-import io.kestra.core.models.flows.FlowWithSource;
-import io.kestra.core.models.flows.GenericFlow;
-import io.kestra.core.models.flows.Type;
+import io.kestra.core.models.flows.*;
 import io.kestra.core.models.flows.check.Check;
 import io.kestra.core.models.flows.input.StringInput;
 import io.kestra.core.models.property.Property;
@@ -14,14 +18,8 @@ import io.kestra.core.models.validations.ValidateConstraintViolation;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.plugin.core.debug.Echo;
 import io.kestra.plugin.core.debug.Return;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Stream;
+import jakarta.inject.Inject;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -46,11 +44,15 @@ class FlowServiceTest {
             .namespace(namespace)
             .tenantId(tenantId)
             .revision(revision)
-            .tasks(Collections.singletonList(Return.builder()
-                .id(taskId)
-                .type(Return.class.getName())
-                .format(Property.ofValue("test"))
-                .build()))
+            .tasks(
+                Collections.singletonList(
+                    Return.builder()
+                        .id(taskId)
+                        .type(Return.class.getName())
+                        .format(Property.ofValue("test"))
+                        .build()
+                )
+            )
             .build();
 
         return flow.toBuilder().source(flow.sourceOrGenerateIfNull()).build();
@@ -75,11 +77,37 @@ class FlowServiceTest {
                   uri: https://kestra.io
             """;
         // When
-        List<ValidateConstraintViolation> results = flowService.validate("my-tenant", source);
+        List<ValidateConstraintViolation> results = flowService.validate("my-tenant", List.of(new FlowSource(null, source)));
 
         // Then
         assertThat(results).hasSize(1);
-        assertThat(results.getFirst()).isEqualTo(new ValidateConstraintViolation("test", "io.kestra.unittest", 0, null, false, List.of(), List.of(), List.of()));
+        assertThat(results.getFirst()).isEqualTo(new ValidateConstraintViolation(0, null, "io.kestra.unittest", "test", null, false, List.of(), List.of(), List.of()));
+    }
+
+    @Test
+    void shouldReturnTrueWhenValidatingFlowWithFilenameGivenDefaults() {
+        // Given
+        String source = """
+            id: test
+            namespace: io.kestra.unittest
+            tasks:
+              - id: download
+                type: io.kestra.plugin.core.http.Download
+              - id: log
+                type: io.kestra.plugin.core.log.Log
+                message: This is a message
+            pluginDefaults:
+              - type: io.kestra.plugin.core
+                values:
+                  level: WARN
+                  uri: https://kestra.io
+            """;
+        // When
+        List<ValidateConstraintViolation> results = flowService.validate("my-tenant", List.of(new FlowSource("flow.yaml", source)));
+
+        // Then
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst()).isEqualTo(new ValidateConstraintViolation(0, "flow.yaml", "io.kestra.unittest", "test", null, false, List.of(), List.of(), List.of()));
     }
 
     @Test
@@ -225,18 +253,22 @@ class FlowServiceTest {
     void warnings() {
         FlowWithSource flow = create("test", "test", 1).toBuilder()
             .namespace("system")
-            .triggers(List.of(
-                io.kestra.plugin.core.trigger.Flow.builder()
-                    .id("flow-trigger")
-                    .type(io.kestra.plugin.core.trigger.Flow.class.getName())
-                    .build()
-            ))
+            .triggers(
+                List.of(
+                    io.kestra.plugin.core.trigger.Flow.builder()
+                        .id("flow-trigger")
+                        .type(io.kestra.plugin.core.trigger.Flow.class.getName())
+                        .build()
+                )
+            )
             .build();
 
         List<String> warnings = flowService.warnings(flow, null);
 
         assertThat(warnings.size()).isEqualTo(1);
-        assertThat(warnings).containsExactlyInAnyOrder("This flow will be triggered for EVERY execution of EVERY flow on your instance. We recommend adding the preconditions property to the Flow trigger 'flow-trigger'.");
+        assertThat(warnings).containsExactlyInAnyOrder(
+            "This flow will be triggered for EVERY execution of EVERY flow on your instance. We recommend adding the preconditions property to the Flow trigger 'flow-trigger'."
+        );
     }
 
     @Test
@@ -274,21 +306,27 @@ class FlowServiceTest {
         FlowWithSource flow = FlowWithSource.builder()
             .id("flowId")
             .namespace(TEST_NAMESPACE)
-            .inputs(List.of(
-                StringInput.builder()
-                    .id("inputWithId")
-                    .type(Type.STRING)
-                    .build(),
-                StringInput.builder()
-                    .name("inputWithName")
-                    .type(Type.STRING)
-                    .build()
-            ))
-            .tasks(Collections.singletonList(Echo.builder()
-                .id("taskId")
-                .type(Return.class.getName())
-                .format(Property.ofValue("test"))
-                .build()))
+            .inputs(
+                List.of(
+                    StringInput.builder()
+                        .id("inputWithId")
+                        .type(Type.STRING)
+                        .build(),
+                    StringInput.builder()
+                        .name("inputWithName")
+                        .type(Type.STRING)
+                        .build()
+                )
+            )
+            .tasks(
+                Collections.singletonList(
+                    Echo.builder()
+                        .id("taskId")
+                        .type(Return.class.getName())
+                        .format(Property.ofValue("test"))
+                        .build()
+                )
+            )
             .build();
 
         assertThat(flowService.deprecationPaths(flow)).containsExactlyInAnyOrder("inputs[1].name", "tasks[0]");
@@ -305,9 +343,24 @@ class FlowServiceTest {
 
     @Test
     void findByNamespacePrefix() {
-        FlowWithSource flow = create(null, "some.namespace","findByTest", "test", 1);
-        flowRepository.create(GenericFlow.of(flow));
-        assertThat(flowService.findByNamespacePrefix(null, "some.namespace").size()).isEqualTo(1);
+        FlowWithSource exactMatch = create(null, "prefix.namespace", "prefixExact", "test", 1);
+        flowRepository.create(GenericFlow.of(exactMatch));
+
+        FlowWithSource childMatch = create(null, "prefix.namespace.child", "prefixChild", "test", 1);
+        flowRepository.create(GenericFlow.of(childMatch));
+
+        FlowWithSource similarPrefix = create(null, "prefix.namespace2", "prefixSimilar", "test", 1);
+        flowRepository.create(GenericFlow.of(similarPrefix));
+
+        FlowWithSource differentNs = create(null, "other.namespace", "prefixOther", "test", 1);
+        flowRepository.create(GenericFlow.of(differentNs));
+
+        List<Flow> results = flowService.findByNamespacePrefix(null, "prefix.namespace");
+
+        assertThat(results)
+            .hasSize(2)
+            .extracting(Flow::getId)
+            .containsExactlyInAnyOrder("prefixExact", "prefixChild");
     }
 
     @Test
@@ -320,14 +373,16 @@ class FlowServiceTest {
     @Test
     void checkSubflowNotFound() {
         FlowWithSource flow = create("mainFlow", "task", 1).toBuilder()
-            .tasks(List.of(
-                io.kestra.plugin.core.flow.Subflow.builder()
-                    .id("subflowTask")
-                    .type(io.kestra.plugin.core.flow.Subflow.class.getName())
-                    .namespace(TEST_NAMESPACE)
-                    .flowId("nonExistentSubflow")
-                    .build()
-            ))
+            .tasks(
+                List.of(
+                    io.kestra.plugin.core.flow.Subflow.builder()
+                        .id("subflowTask")
+                        .type(io.kestra.plugin.core.flow.Subflow.class.getName())
+                        .namespace(TEST_NAMESPACE)
+                        .flowId("nonExistentSubflow")
+                        .build()
+                )
+            )
             .build();
 
         List<String> exceptions = flowService.checkValidSubflows(flow, null);
@@ -342,14 +397,16 @@ class FlowServiceTest {
         flowRepository.create(GenericFlow.of(subflow));
 
         FlowWithSource flow = create("mainFlow", "task", 1).toBuilder()
-            .tasks(List.of(
-                io.kestra.plugin.core.flow.Subflow.builder()
-                    .id("subflowTask")
-                    .type(io.kestra.plugin.core.flow.Subflow.class.getName())
-                    .namespace(TEST_NAMESPACE)
-                    .flowId("existingSubflow")
-                    .build()
-            ))
+            .tasks(
+                List.of(
+                    io.kestra.plugin.core.flow.Subflow.builder()
+                        .id("subflowTask")
+                        .type(io.kestra.plugin.core.flow.Subflow.class.getName())
+                        .namespace(TEST_NAMESPACE)
+                        .flowId("existingSubflow")
+                        .build()
+                )
+            )
             .build();
 
         List<String> exceptions = flowService.checkValidSubflows(flow, null);
@@ -385,7 +442,7 @@ class FlowServiceTest {
             """;
 
         // When
-        List<ValidateConstraintViolation> results = flowService.validate("my-tenant", source);
+        List<ValidateConstraintViolation> results = flowService.validate("my-tenant", List.of(new FlowSource(null, source)));
 
         // Then
         assertThat(results).hasSize(1);
@@ -401,15 +458,15 @@ class FlowServiceTest {
     void shouldReturnValidationErrorForReservedFlowId() {
         // Given
         String source = """
-        id: pause
-        namespace: io.kestra.unittest
-        tasks:
-          - id: task
-            type: io.kestra.plugin.core.log.Log
-            message: Reserved id test
-        """;
+            id: pause
+            namespace: io.kestra.unittest
+            tasks:
+              - id: task
+                type: io.kestra.plugin.core.log.Log
+                message: Reserved id test
+            """;
         // When
-        List<ValidateConstraintViolation> results = flowService.validate("my-tenant", source);
+        List<ValidateConstraintViolation> results = flowService.validate("my-tenant", List.of(new FlowSource(null, source)));
 
         // Then
         assertThat(results).hasSize(1);
@@ -513,9 +570,11 @@ class FlowServiceTest {
         assertThat(result).hasSize(2);
         assertThat(result).contains(failCheck);
         assertThat(result)
-            .anyMatch(c -> c.getMessage().contains("Failed to evaluate check condition") &&
-                c.getBehavior() == Check.Behavior.BLOCK_EXECUTION &&
-                c.getStyle() == Check.Style.ERROR);
+            .anyMatch(
+                c -> c.getMessage().contains("Failed to evaluate check condition") &&
+                    c.getBehavior() == Check.Behavior.BLOCK_EXECUTION &&
+                    c.getStyle() == Check.Style.ERROR
+            );
     }
 
     @Test
