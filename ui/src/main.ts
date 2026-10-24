@@ -19,6 +19,8 @@ import {useCoreStore} from "./stores/core"
 import {useLayoutStore} from "./stores/layout"
 import {useUnsavedChangesStore} from "./stores/unsavedChanges"
 import {useMiscStore} from "override/stores/misc"
+import {useOAuth2Store} from "./stores/oauth2"
+import {vPermission, vRole, vAdmin} from "./directives/permissions"
 import {TASK_ICON_INJECTION_KEY} from "@kestra-io/design-system"
 import TaskIcon from "./components/plugins/TaskIcon.vue"
 import {registerServiceWorker} from "./utils/serviceWorker"
@@ -28,6 +30,11 @@ void registerServiceWorker()
 initPwaInstallCapture()
 
 const app = createApp(App)
+
+// Register RBAC permission directives
+app.directive("permission", vPermission)
+app.directive("role", vRole)
+app.directive("admin", vAdmin)
 
 // lets KsEditor and the topology package render real plugin icons without
 // the design system depending on the app's plugin-icon API
@@ -58,7 +65,6 @@ function setupAxios(router: Router) {
         BasicAuth.logout()
     }
 
-
     httpClient = setupKestraHttp({}, {
         coreStore,
         router,
@@ -66,13 +72,27 @@ function setupAxios(router: Router) {
         isLoggedIn: () => !!BasicAuth.isLoggedIn(),
     })
 
-    // Add CSRF token to every request - covers both generated-endpoint calls and
-    // useClient() ad-hoc calls, since they share client.interceptors under the hood.
-    httpClient.interceptors.request.use((request) => {
-        const csrfToken = getCsrfToken()
-        if (!csrfToken) return request
+    // Add Bearer token and CSRF token to every outgoing request
+    httpClient.interceptors.request.use(async (request) => {
         const headers = new Headers(request.headers)
-        headers.set("X-CSRF-TOKEN", csrfToken)
+
+        // Inject OAuth2 Bearer token if present
+        try {
+            const oauth2Store = useOAuth2Store()
+            if (oauth2Store.hasTokens) {
+                const token = await oauth2Store.getAccessToken()
+                if (token) {
+                    headers.set("Authorization", `Bearer ${token}`)
+                }
+            }
+        } catch (e) {
+            console.warn("Could not inject OAuth2 token into request", e)
+        }
+
+        const csrfToken = getCsrfToken()
+        if (csrfToken) {
+            headers.set("X-CSRF-TOKEN", csrfToken)
+        }
         return new Request(request, {headers})
     })
 
@@ -92,6 +112,33 @@ async function beforeResolve(router: Router, to: any, from: any): Promise<unknow
         }
         const loginConfig = await miscStore.loadLoginConfig()
 
+        // Initialize OAuth2 from pre-auth login configuration if configured
+        const oauth2Store = useOAuth2Store()
+        if (loginConfig.oauth2ClientId && !oauth2Store.isInitialized) {
+            oauth2Store.initialize(loginConfig)
+        }
+
+        // Handle OAuth2 authentication flow
+        if (loginConfig.oauth2ClientId && oauth2Store.isInitialized) {
+            if ((to as {meta?: {anonymous?: boolean}}).meta?.anonymous === true) {
+                return
+            }
+
+            if (!oauth2Store.isAuthenticated && !oauth2Store.hasTokens) {
+                const fromPath = to.fullPath !== "/ui/login" ? to.fullPath : undefined
+                return {name: "login", query: fromPath ? {from: fromPath} : {}}
+            }
+
+            if (oauth2Store.hasTokens && !oauth2Store.isAuthenticated) {
+                oauth2Store.isAuthenticated = true
+                void oauth2Store.getAccessToken().then(() => oauth2Store.fetchUserInfo())
+            }
+
+            await miscStore.loadConfigs()
+            return
+        }
+
+        // Fall back to Basic Auth handling
         if(!loginConfig.isBasicAuthInitialized) {
             // Since, Configs takes preference
             // we need to check if any regex validation error in BE.
@@ -144,7 +191,6 @@ async function beforeResolve(router: Router, to: any, from: any): Promise<unknow
 }
 
 initApp(app, routes, null, en as Record<string, unknown>, {}, {beforeResolve: beforeResolve as (...args: unknown[]) => unknown}).then(({router, piniaStore}) => {
-
 
     // Setup tenant router
     setupTenantRouter(router, app)

@@ -13,13 +13,18 @@
         </template>
 
         <template #label>
-            {{ $t("kestra") }}
+            {{ userLabel }}
         </template>
 
         <template #header>
             <div class="menu-item">
                 <img :src="KS_LOGO" width="40" alt="Kestra">
                 {{ $t("kestra") }}
+            </div>
+            <div class="user-info">
+                <div class="user-name">{{ userLabel }}</div>
+                <div v-if="userDetails" class="user-details">{{ userDetails }}</div>
+                <div v-if="userRoles" class="user-roles">{{ userRoles }}</div>
             </div>
         </template>
 
@@ -60,12 +65,14 @@
 
     import KS_LOGO from "../../../assets/ks-logo-small.svg"
     import * as BasicAuth from "../../../utils/basicAuth"
+    import {useOAuth2Store} from "../../../stores/oauth2"
 
     const SLACK_URL = "https://kestra.io/slack?utm_source=app&utm_medium=referral&utm_campaign=top-auth"
 
     const route = useRoute()
     const router = useRouter()
     const axios = useClient()
+    const oauth2Store = useOAuth2Store()
 
     const startTutorial = computed(() => ({
         name: "ai",
@@ -73,8 +80,36 @@
         params: {tenant: route.params.tenant},
     }))
 
+    const userLabel = computed(() => {
+        return oauth2Store.userInfo?.name
+            || oauth2Store.userInfo?.username
+            || oauth2Store.userInfo?.email
+            || "Anonymous"
+    })
+
+    const userDetails = computed(() => {
+        if (!oauth2Store.userInfo) {
+            return undefined
+        }
+        const email = oauth2Store.userInfo.email
+        const username = oauth2Store.userInfo.username
+        if (email && username && email !== username) {
+            return `${username} • ${email}`
+        }
+        return email || username
+    })
+
+    const userRoles = computed(() => {
+        const roles = oauth2Store.userInfo?.roles ?? []
+        if (!roles.length) {
+            return undefined
+        }
+        return roles.map((role) => role.toUpperCase()).join(" • ")
+    })
+
     const logout = () => {
         BasicAuth.logout()
+        oauth2Store.logout()
         delete axios.defaults.headers.common["Authorization"]
         router.push({name: "login"})
     }
@@ -91,6 +126,24 @@
             color: var(--ks-text-dim);
             font-size: var(--ks-font-size-xl);
         }
+    }
+
+    .user-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 6px 16px 8px 16px;
+        color: var(--ks-text-primary);
+    }
+
+    .user-name {
+        font-weight: var(--ks-font-weight-bold);
+    }
+
+    .user-details,
+    .user-roles {
+        font-size: var(--ks-font-size-xs);
+        color: var(--ks-text-dim);
     }
 
     :deep(.kel-select__wrapper) {

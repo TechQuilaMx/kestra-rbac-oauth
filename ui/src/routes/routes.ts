@@ -104,7 +104,9 @@ const routes: KestraRouteRecord[] = [
     // ossOnly: posts to /api/v1/{tenant}/basicAuth, which EE does not implement.
     {name: "setup", path: "/:tenant?/setup", component: () => import("../components/basicauth/BasicAuthSetup.vue"), meta: {layout: FullScreenLayout, anonymous: true}, ossOnly: true},
     //Login
-    {name: "login", path: "/:tenant?/login", component: () => import("../components/basicauth/BasicAuthLogin.vue"), meta: {layout: FullScreenLayout, anonymous: true}},
+    {name: "login", path: "/:tenant?/login", component: () => import("../components/basicauth/OAuth2Login.vue"), meta: {layout: FullScreenLayout, anonymous: true}},
+    {name: "basic-login", path: "/:tenant?/basic-login", component: () => import("../components/basicauth/BasicAuthLogin.vue"), meta: {layout: FullScreenLayout, anonymous: true}},
+    {name: "oauth2-callback", path: "/:tenant?/oauth2-callback", component: () => import("../components/basicauth/OAuth2Callback.vue"), meta: {layout: FullScreenLayout, anonymous: true}},
 
     //Errors
     {name: "errors/404-wildcard", path: "/:tenant?/:pathMatch(.*)", component: Errors, props: {code: 404}},
