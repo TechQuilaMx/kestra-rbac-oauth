@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -56,6 +59,7 @@ public class BlueprintController {
         description = "Community blueprints are served by an external API, so complex query filters are not supported. "
             + "Only top-level `QUERY` and `TAGS` conditions are honored; logical (AND/OR) and nested filter groups are rejected with a 400."
     )
+    @RequirePermission(Permission.FLOWS_VIEW)
     public PagedResults<ApiBlueprintItem> searchBlueprints(
         @Parameter(description = "The sort of current page") @Nullable @QueryValue(value = "sort") Optional<String> sort,
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) Integer page,
@@ -75,6 +79,7 @@ public class BlueprintController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(value = "/{kind}/{id}/source", produces = "application/yaml")
     @Operation(tags = { "Blueprints" }, summary = "Get a blueprint flow")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public String getBlueprintSource(
         @Parameter(description = "The blueprint id") String id,
         @Parameter(description = "The blueprint kind") Kind kind,
@@ -85,6 +90,7 @@ public class BlueprintController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(value = "/{kind}/{id}/graph")
     @Operation(tags = { "Blueprints" }, summary = "Get a blueprint graph")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public Map<String, Object> getBlueprintGraph(
         @Parameter(description = "The blueprint id") String id,
         @Parameter(description = "The blueprint kind") Kind kind,
@@ -95,6 +101,7 @@ public class BlueprintController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(value = "/{kind}/{id}")
     @Operation(tags = { "Blueprints" }, summary = "Get a blueprint")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public ApiBlueprintItemWithSource getBlueprint(
         @Parameter(description = "The blueprint id") String id,
         @Parameter(description = "The blueprint kind") Kind kind,
@@ -111,6 +118,7 @@ public class BlueprintController {
         description = "Community blueprints are served by an external API, so complex query filters are not supported. "
             + "Only top-level `QUERY` and `TAGS` conditions are honored; logical (AND/OR) and nested filter groups are rejected with a 400."
     )
+    @RequirePermission(Permission.FLOWS_VIEW)
     public List<ApiBlueprintTagItem> listBlueprintTags(
         @Parameter(description = "The blueprint kind") Kind kind,
         @Parameter(

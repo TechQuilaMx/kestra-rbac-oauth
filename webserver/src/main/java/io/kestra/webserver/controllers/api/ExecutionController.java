@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -305,6 +308,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/search")
     @Operation(tags = { "Executions" }, summary = "Search for executions")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public PagedResults<ApiLightExecution> searchExecutions(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
         @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) @Max(PageableUtils.MAX_PAGE_SIZE) int size,
@@ -361,6 +365,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{executionId}/graph")
     @Operation(tags = { "Executions" }, summary = "Generate a graph for an execution")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public FlowGraph getExecutionFlowGraph(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "The subflow tasks to display") @Nullable @QueryValue List<String> subflows) throws Exception {
@@ -389,6 +394,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/{executionId}/actions/eval", consumes = MediaType.TEXT_PLAIN)
     @Operation(tags = { "Executions" }, summary = "Evaluate a variable expression for this execution")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public EvalResult evalExpression(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @RequestBody(description = "The Pebble expression that should be evaluated") @Body String expression) {
@@ -413,6 +419,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/{executionId}/actions/eval/{taskRunId}", consumes = MediaType.TEXT_PLAIN)
     @Operation(tags = { "Executions" }, summary = "Evaluate a variable expression for this taskrun")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public EvalResult evalTaskRunExpression(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "The taskrun id") @PathVariable String taskRunId,
@@ -470,6 +477,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{executionId}")
     @Operation(tags = { "Executions" }, summary = "Get an execution")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public ApiExecution getExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId) {
         return executionRepository
@@ -482,6 +490,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Executions" }, summary = "Delete an execution")
     @ApiResponse(responseCode = "204", description = "On success")
+    @RequirePermission(Permission.EXECUTIONS_KILL)
     public HttpResponse<Void> deleteExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "Whether to delete execution logs", required = false) @QueryValue(defaultValue = "true") Boolean deleteLogs,
@@ -501,6 +510,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Delete a list of executions")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = BulkResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_KILL)
     public MutableHttpResponse<?> deleteExecutionsByIds(
         @RequestBody(description = "The execution id") @Body List<String> executionsId,
         @Parameter(description = "Whether to delete non-terminated executions") @Nullable @QueryValue(defaultValue = "false") Boolean includeNonTerminated,
@@ -535,6 +545,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Delete executions filter by query parameters")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = BulkResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_KILL)
     public HttpResponse<?> deleteExecutionsByQuery(
         @Parameter(
             description = "Filters. PHP-style nested query is used - examples: `filters[timeRange][EQUALS]=PT168H`, `filters[scope][EQUALS]=USER`, `filters[state][IN]=FAILED,CANCELLED`, `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`",
@@ -553,6 +564,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Get
     @Operation(tags = { "Executions" }, summary = "Search for executions for a flow")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public PagedResults<ApiLightExecution> searchExecutionsByFlowId(
         @Parameter(description = "The flow namespace") @QueryValue String namespace,
         @Parameter(description = "The flow id") @QueryValue String flowId,
@@ -904,6 +916,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Validate the creation of a new execution for a flow")
     @ApiResponse(responseCode = "409", description = "if the flow is disabled")
     @SingleResult
+    @RequirePermission(Permission.EXECUTIONS_CREATE)
     public Publisher<ApiValidateExecutionInputsResponse> validateNewExecutionInputs(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id,
@@ -944,6 +957,7 @@ public class ExecutionController {
     @ApiResponse(responseCode = "409", description = "if the flow is disabled")
     @ApiResponse(responseCode = "200", description = "On execution created", content = { @Content(schema = @Schema(implementation = ExecutionResponse.class)) })
     @SingleResult
+    @RequirePermission(Permission.EXECUTIONS_CREATE)
     public Publisher<ExecutionResponse> createExecution(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id,
@@ -1241,6 +1255,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{executionId}/file", produces = { MediaType.APPLICATION_OCTET_STREAM, "application/x-ndjson" })
     @Operation(tags = { "Executions" }, summary = "Download file for an execution")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public HttpResponse<StreamedFile> downloadFileFromExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "The internal storage uri") @QueryValue URI path,
@@ -1306,6 +1321,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{executionId}/file/metas")
     @Operation(tags = { "Executions" }, summary = "Get file meta information for an execution")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public HttpResponse<FileMetas> getFileMetadatasFromExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "The internal storage uri") @QueryValue URI path) throws IOException {
@@ -1342,6 +1358,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Restart a new execution from an old one")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = Execution.class)) })
     @ApiResponse(responseCode = "409", description = "if the execution cannot be restarted")
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public Mono<HttpResponse<Execution>> restartExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "The flow revision to use for new execution") @Nullable @QueryValue Integer revision) throws Exception {
@@ -1367,6 +1384,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Restart a list of executions asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> restartExecutionsByIds(
         @RequestBody(description = "The list of executions id") @Body List<String> executionsId,
         @Parameter(description = "If latest revision should be used") @Nullable @QueryValue(defaultValue = "false") Boolean latestRevision) throws Exception {
@@ -1414,6 +1432,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Restart executions filter by query parameters asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> restartExecutionsByQuery(
         @Parameter(
             description = "Filters. PHP-style nested query is used - examples: `filters[timeRange][EQUALS]=PT168H`, `filters[scope][EQUALS]=USER`, `filters[state][IN]=FAILED,CANCELLED`, `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`",
@@ -1430,6 +1449,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Create a new execution from an old one and start it from a specified task run id")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = Execution.class)) })
     @ApiResponse(responseCode = "409", description = "if the execution cannot be replayed")
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public HttpResponse<Execution> replayExecution(
         @Parameter(description = "the original execution id to clone") @PathVariable String executionId,
         @Parameter(description = "The taskrun id") @Nullable @QueryValue String taskRunId,
@@ -1459,6 +1479,7 @@ public class ExecutionController {
     )
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = Execution.class)) })
     @ApiResponse(responseCode = "409", description = "if the execution cannot be replayed")
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public Mono<HttpResponse<Execution>> replayExecutionWithinputs(
         @Parameter(description = "the original execution id to clone") @PathVariable String executionId,
         @Parameter(description = "The taskrun id") @Nullable @QueryValue String taskRunId,
@@ -1596,6 +1617,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Change state for a taskrun in an execution")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = Execution.class)) })
     @ApiResponse(responseCode = "409", description = "if the task run state cannot be changed")
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public Mono<HttpResponse<Execution>> updateTaskRunState(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @RequestBody(description = "the taskRun id and state to apply") @Body StateRequest stateRequest) throws Exception {
@@ -1623,6 +1645,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Change the state of an execution")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = Execution.class)) })
     @ApiResponse(responseCode = "409", description = "if the execution state cannot be changed")
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public Mono<HttpResponse<Execution>> updateExecutionStatus(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "The new state of the execution") @NotNull @QueryValue State.Type status) throws QueueException {
@@ -1649,6 +1672,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Change executions state by id asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> updateExecutionsStatusByIds(
         @RequestBody(description = "The list of executions id") @Body List<String> executionsId,
         @Parameter(description = "The new state of the executions") @NotNull @QueryValue State.Type newStatus) throws QueueException {
@@ -1691,6 +1715,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Change executions state by query parameters asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> updateExecutionsStatusByQuery(
         @Parameter(
             description = "Filters. PHP-style nested query is used - examples: `filters[timeRange][EQUALS]=PT168H`, `filters[scope][EQUALS]=USER`, `filters[state][IN]=FAILED,CANCELLED`, `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`",
@@ -1709,6 +1734,7 @@ public class ExecutionController {
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = Execution.class)) })
     @ApiResponse(responseCode = "409", description = "if the executions is already finished")
     @ApiResponse(responseCode = "404", description = "if the executions is not found")
+    @RequirePermission(Permission.EXECUTIONS_KILL)
     public Mono<HttpResponse<?>> killExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "Specifies whether killing the execution also kill all subflow executions.") @QueryValue(defaultValue = "true") Boolean isOnKillCascade)
@@ -1754,6 +1780,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Kill a list of executions asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_KILL)
     public MutableHttpResponse<ApiAsyncOperationResponse> killExecutionsByIds(
         @RequestBody(description = "The list of executions id") @Body List<String> executionsId) throws QueueException {
         List<Execution> executions = new ArrayList<>();
@@ -1806,6 +1833,7 @@ public class ExecutionController {
     @ApiResponse(responseCode = "204", description = "On success")
     @ApiResponse(responseCode = "409", description = "if the executions is not paused")
     @SingleResult
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public Publisher<ApiValidateExecutionInputsResponse> validateResumeExecutionInputs(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @RequestBody(description = "The inputs") @Nullable @Body MultipartBody inputs) {
@@ -1832,6 +1860,7 @@ public class ExecutionController {
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = Execution.class)) })
     @ApiResponse(responseCode = "409", description = "if the executions is not paused")
     @SingleResult
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public Publisher<HttpResponse<?>> resumeExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @RequestBody(description = "The inputs") @Nullable @Body MultipartBody inputs) throws InternalException {
@@ -1864,6 +1893,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Resume an execution from a breakpoint (in the 'BREAKPOINT' state).")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = Execution.class)) })
     @ApiResponse(responseCode = "409", description = "If the executions is not in the 'BREAKPOINT' state or has no breakpoint")
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public Mono<HttpResponse<Execution>> resumeExecutionFromBreakpoint(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "\"Set a list of breakpoints at specific tasks 'id.value', separated by a coma.") @QueryValue Optional<String> breakpoints) throws Exception {
@@ -1888,6 +1918,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Resume a list of paused executions asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> resumeExecutionsByIds(
         @RequestBody(description = "The list of executions id") @Body List<String> executionsId) throws Exception {
         List<Execution> executions = new ArrayList<>();
@@ -1929,6 +1960,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Resume executions filter by query parameters asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> resumeExecutionsByQuery(
         @Parameter(
             description = "Filters. PHP-style nested query is used - examples: `filters[timeRange][EQUALS]=PT168H`, `filters[scope][EQUALS]=USER`, `filters[state][IN]=FAILED,CANCELLED`, `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`",
@@ -1944,6 +1976,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Pause a running execution.")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = Execution.class)) })
     @ApiResponse(responseCode = "409", description = "if the executions is not running")
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public Mono<HttpResponse<Execution>> pauseExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId) throws Exception {
         Execution execution = executionRepository.findById(tenantService.resolveTenant(), executionId).orElseThrow(NotFoundException::new);
@@ -1964,6 +1997,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Pause a list of running executions asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> pauseExecutionsByIds(
         @RequestBody(description = "The list of executions id") @Body List<String> executionsId) throws Exception {
         List<Execution> executions = new ArrayList<>();
@@ -2001,6 +2035,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Pause executions filter by query parameters asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> pauseExecutionsByQuery(
         @Parameter(
             description = "Filters. PHP-style nested query is used - examples: `filters[timeRange][EQUALS]=PT168H`, `filters[scope][EQUALS]=USER`, `filters[state][IN]=FAILED,CANCELLED`, `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`",
@@ -2016,6 +2051,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Kill executions filter by query parameters")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_KILL)
     public MutableHttpResponse<ApiAsyncOperationResponse> killExecutionsByQuery(
         @Parameter(
             description = "Filters. PHP-style nested query is used - examples: `filters[timeRange][EQUALS]=PT168H`, `filters[scope][EQUALS]=USER`, `filters[state][IN]=FAILED,CANCELLED`, `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`",
@@ -2031,6 +2067,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Create new executions from old ones filter by query parameters asynchronously. Keep the flow revision")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> replayExecutionsByQuery(
         @Parameter(
             description = "Filters. PHP-style nested query is used - examples: `filters[timeRange][EQUALS]=PT168H`, `filters[scope][EQUALS]=USER`, `filters[state][IN]=FAILED,CANCELLED`, `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`",
@@ -2048,6 +2085,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Create new executions from old ones asynchronously. Keep the flow revision")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> replayExecutionsByIds(
         @RequestBody(description = "The list of executions id") @Body List<String> executionsId,
         @Parameter(description = "If latest revision should be used") @Nullable @QueryValue(defaultValue = "false") Boolean latestRevision) throws Exception {
@@ -2102,6 +2140,7 @@ public class ExecutionController {
             }
         )
     )
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public Flux<Event<Execution>> followExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId) {
         String subscriberId = UUID.randomUUID().toString();
@@ -2180,6 +2219,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{executionId}/file/preview")
     @Operation(tags = { "Executions" }, summary = "Get file preview for an execution")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public HttpResponse<?> previewFileFromExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "The internal storage uri") @QueryValue URI path,
@@ -2238,6 +2278,7 @@ public class ExecutionController {
     @ApiResponse(responseCode = "404", description = "If the execution cannot be found")
     @ApiResponse(responseCode = "400", description = "If the execution is not terminated")
     @ApiResponse(responseCode = "409", description = "If labels cannot be applied")
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public Mono<HttpResponse<?>> setLabelsOnTerminatedExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @RequestBody(description = "The labels to add to the execution") @Body @NotNull @Valid List<Label> labels) throws QueueException {
@@ -2290,6 +2331,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Set labels on a list of executions asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> setLabelsOnTerminatedExecutionsByIds(
         @RequestBody(description = "The request containing a list of labels and a list of executions") @Body @Valid SetLabelsByIdsRequest setLabelsByIds) throws QueueException {
         List<Execution> executions = new ArrayList<>();
@@ -2337,6 +2379,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Set label on executions filter by query parameters asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> setLabelsOnTerminatedExecutionsByQuery(
         @Parameter(
             description = "Filters. PHP-style nested query is used - examples: `filters[timeRange][EQUALS]=PT168H`, `filters[scope][EQUALS]=USER`, `filters[state][IN]=FAILED,CANCELLED`, `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`",
@@ -2354,6 +2397,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Unqueue an execution")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = Execution.class)) })
     @ApiResponse(responseCode = "409", description = "if the execution cannot be unqueued")
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public Mono<HttpResponse<Execution>> unqueueExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "The new state of the execution") @Nullable @QueryValue State.Type state) throws Exception {
@@ -2376,6 +2420,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Unqueue a list of executions asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> unqueueExecutionsByIds(
         @RequestBody(description = "The list of executions id") @Body List<String> executionsId,
         @Parameter(description = "The new state of the unqueued executions") @Nullable @QueryValue State.Type state) throws Exception {
@@ -2414,6 +2459,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Unqueue executions filter by query parameters asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> unqueueExecutionsByQuery(
         @Parameter(
             description = "Filters. PHP-style nested query is used - examples: `filters[timeRange][EQUALS]=PT168H`, `filters[scope][EQUALS]=USER`, `filters[state][IN]=FAILED,CANCELLED`, `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`",
@@ -2431,6 +2477,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Force run an execution")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = Execution.class)) })
     @ApiResponse(responseCode = "409", description = "if the execution cannot be force-run")
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public Mono<HttpResponse<Execution>> forceRunExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId) throws Exception {
         Execution execution = executionRepository.findById(tenantService.resolveTenant(), executionId).orElseThrow(NotFoundException::new);
@@ -2452,6 +2499,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Force run a list of executions asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> forceRunByIds(
         @RequestBody(description = "The list of executions id") @Body List<String> executionsId) throws Exception {
         List<Execution> executions = new ArrayList<>();
@@ -2493,6 +2541,7 @@ public class ExecutionController {
     @Operation(tags = { "Executions" }, summary = "Force run executions filter by query parameters asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
     @ApiResponse(responseCode = "400", description = "Validation errors", content = { @Content(schema = @Schema(implementation = ProblemDetail.class)) })
+    @RequirePermission(Permission.EXECUTIONS_RESTART)
     public MutableHttpResponse<ApiAsyncOperationResponse> forceRunExecutionsByQuery(
         @Parameter(
             description = "Filters. PHP-style nested query is used - examples: `filters[timeRange][EQUALS]=PT168H`, `filters[scope][EQUALS]=USER`, `filters[state][IN]=FAILED,CANCELLED`, `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`",
@@ -2515,6 +2564,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{executionId}/flow")
     @Operation(tags = { "Executions" }, summary = "Get flow information's for an execution")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public FlowForExecution getFlowFromExecutionById(
         @Parameter(description = "The execution that you want flow information") String executionId) {
         Execution execution = executionRepository.findById(tenantService.resolveTenant(), executionId)
@@ -2527,6 +2577,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/flows/{namespace}/{flowId}")
     @Operation(tags = { "Executions" }, summary = "Get flow information's for an execution")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public FlowForExecution getFlowFromExecution(
         @Parameter(description = "The namespace of the flow") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String flowId,
@@ -2539,6 +2590,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/namespaces")
     @Operation(tags = { "Executions" }, summary = "Get all namespaces that have executable flows")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public List<String> listExecutableDistinctNamespaces() {
         return flowRepository.findDistinctNamespaceExecutable(tenantService.resolveTenant());
     }
@@ -2549,6 +2601,7 @@ public class ExecutionController {
         tags = { "Executions" },
         summary = "Get all flow ids for a namespace. Data returned are FlowForExecution containing minimal information about a Flow for when you are allowed to executing but not reading."
     )
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public List<FlowForExecution> listFlowExecutionsByNamespace(
         @Parameter(description = "The namespace") @PathVariable String namespace) {
         return flowRepository.findByNamespaceExecutable(tenantService.resolveTenant(), namespace);
@@ -2614,6 +2667,7 @@ public class ExecutionController {
             }
         )
     )
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public Flux<Event<ExecutionStatusEvent>> followDependenciesExecutions(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "If true, list only destination dependencies, otherwise list also source dependencies") @QueryValue(defaultValue = "false") boolean destinationOnly,
@@ -2722,6 +2776,7 @@ public class ExecutionController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/latest")
     @Operation(tags = { "Executions" }, summary = "Get the latest execution for given flows")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public List<LastExecutionResponse> getLatestExecutions(
         @Parameter(description = "The flow filters") @Body List<ExecutionRepositoryInterface.FlowFilter> flowFilters) {
         return executionRepository.lastExecutions(
@@ -2733,6 +2788,7 @@ public class ExecutionController {
     @Get(uri = "/export/by-query/csv", produces = MediaType.TEXT_CSV)
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Executions" }, summary = "Export all executions as a streamed CSV file")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public MutableHttpResponse<Flux<String>> exportExecutions(
         @Parameter(
             description = "Filters. PHP-style nested query is used - examples: `filters[timeRange][EQUALS]=PT168H`, `filters[scope][EQUALS]=USER`, `filters[state][IN]=FAILED,CANCELLED`, `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`",

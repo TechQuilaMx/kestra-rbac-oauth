@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.io.IOException;
 import java.util.List;
 
@@ -44,6 +47,7 @@ public class SecretController<META extends ApiSecretMeta> {
     @Get
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Secrets" }, summary = "Search secrets of all namespaces")
+    @RequirePermission(Permission.SECRETS_VIEW)
     public HttpResponse<ApiSecretListResponse<META>> listSecrets(
         @Parameter(description = "The current page") @QueryValue(value = "page", defaultValue = "1") int page,
         @Parameter(description = "The current page size") @QueryValue(value = "size", defaultValue = "10") @Max(PageableUtils.MAX_PAGE_SIZE) int size,

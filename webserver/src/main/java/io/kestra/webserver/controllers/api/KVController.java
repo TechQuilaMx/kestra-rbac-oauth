@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
@@ -86,6 +89,7 @@ public class KVController {
     @ExecuteOn(TaskExecutors.IO)
     @Get("/kv")
     @Operation(tags = { "KV" }, summary = "List all keys")
+    @RequirePermission(Permission.KV_VIEW)
     public PagedResults<KVEntry> listAllKeys(
         @Parameter(description = "The current page") @QueryValue(value = "page", defaultValue = "1") int page,
         @Parameter(description = "The current page size") @QueryValue(value = "size", defaultValue = "10") @Max(PageableUtils.MAX_PAGE_SIZE) int size,
@@ -103,6 +107,7 @@ public class KVController {
     @ExecuteOn(TaskExecutors.IO)
     @Get("/namespaces/{namespace}/kv/inheritance")
     @Operation(tags = { "KV" }, summary = "List all keys for inherited namespaces")
+    @RequirePermission(Permission.KV_VIEW)
     public List<KVEntry> listKeysWithInheritence(
         @Parameter(description = "The namespace id") @PathVariable String namespace) throws IOException {
         List<String> namespaces = NamespaceInterface.asTree(namespace).stream()
@@ -133,6 +138,7 @@ public class KVController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/namespaces/{namespace}/kv/{key}")
     @Operation(tags = { "KV" }, summary = "Get value for a key")
+    @RequirePermission(Permission.KV_VIEW)
     public KvDetail getKeyValue(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @Parameter(description = "The key") @PathVariable String key) throws IOException, ResourceExpiredException {
@@ -154,6 +160,7 @@ public class KVController {
     @ExecuteOn(TaskExecutors.IO)
     @Put(uri = "/namespaces/{namespace}/kv/{key}", consumes = { MediaType.TEXT_PLAIN })
     @Operation(tags = { "KV" }, summary = "Puts a key-value pair in store")
+    @RequirePermission(Permission.KV_EDIT)
     public void setKeyValue(
         HttpHeaders httpHeaders,
         @Parameter(description = "The namespace id") @PathVariable String namespace,
@@ -174,6 +181,7 @@ public class KVController {
     @ExecuteOn(TaskExecutors.IO)
     @Delete(uri = "/namespaces/{namespace}/kv/{key}")
     @Operation(tags = { "KV" }, summary = "Delete a key-value pair")
+    @RequirePermission(Permission.KV_DELETE)
     public boolean deleteKeyValue(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @Parameter(description = "The key") @PathVariable String key) throws IOException {
@@ -183,6 +191,7 @@ public class KVController {
     @ExecuteOn(TaskExecutors.IO)
     @Delete("/namespaces/{namespace}/kv")
     @Operation(tags = { "KV" }, summary = "Bulk-delete multiple key/value pairs from the given namespace.")
+    @RequirePermission(Permission.KV_DELETE)
     public HttpResponse<ApiDeleteBulkResponse> deleteKeyValues(
         @Parameter(description = "The namespace id") @PathVariable String namespace,
         @RequestBody(description = "The keys") @Body ApiDeleteBulkRequest request) {

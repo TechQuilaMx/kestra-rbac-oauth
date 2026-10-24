@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.time.ZonedDateTime;
 import java.util.List;
 
@@ -39,6 +42,7 @@ public class MetricController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{executionId}")
     @Operation(tags = { "Metrics" }, summary = "Get metrics for a specific execution")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public PagedResults<MetricEntry> searchByExecution(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
         @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) @Max(PageableUtils.MAX_PAGE_SIZE) int size,
@@ -59,6 +63,7 @@ public class MetricController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/names/{namespace}/{flowId}")
     @Operation(tags = { "Metrics" }, summary = "Get metrics names for a specific flow")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public List<String> listFlowMetrics(
         @Parameter(description = "The namespace") @PathVariable String namespace,
         @Parameter(description = "The flow Id") @PathVariable String flowId) {
@@ -68,6 +73,7 @@ public class MetricController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/names/{namespace}/{flowId}/{taskId}")
     @Operation(tags = { "Metrics" }, summary = "Get metrics names for a specific task in a flow")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public List<String> listTaskMetrics(
         @Parameter(description = "The namespace") @PathVariable String namespace,
         @Parameter(description = "The flow Id") @PathVariable String flowId,
@@ -78,6 +84,7 @@ public class MetricController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/tasks/{namespace}/{flowId}")
     @Operation(tags = { "Metrics" }, summary = "Get tasks id that have metrics for a specific flow, include deleted or renamed tasks")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public List<String> listTasksWithMetrics(
         @Parameter(description = "The namespace") @PathVariable String namespace,
         @Parameter(description = "The flow Id") @PathVariable String flowId) {
@@ -87,6 +94,7 @@ public class MetricController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/aggregates/{namespace}/{flowId}/{metric}")
     @Operation(tags = { "Metrics" }, summary = "Get metrics aggregations for a specific flow")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public MetricAggregations aggregateMetricsFromFlow(
         @Parameter(description = "The namespace") @PathVariable String namespace,
         @Parameter(description = "The flow Id") @PathVariable String flowId,
@@ -111,6 +119,7 @@ public class MetricController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/aggregates/{namespace}/{flowId}/{taskId}/{metric}")
     @Operation(tags = { "Metrics" }, summary = "Get metrics aggregations for a specific flow")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public MetricAggregations aggregateMetricsFromTask(
         @Parameter(description = "The namespace") @PathVariable String namespace,
         @Parameter(description = "The flow Id") @PathVariable String flowId,

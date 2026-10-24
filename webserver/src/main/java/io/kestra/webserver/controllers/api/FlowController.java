@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -131,6 +134,7 @@ public class FlowController {
             )
         }
     )
+    @RequirePermission(Permission.FLOWS_VIEW)
     public FlowGraph generateFlowGraph(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id,
@@ -169,6 +173,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "graph", consumes = MediaType.APPLICATION_YAML)
     @Operation(tags = { "Flows" }, summary = "Generate a graph for a flow source")
+    @RequirePermission(Permission.FLOWS_CREATE)
     public FlowGraph generateFlowGraphFromSource(
         @RequestBody(description = "The flow source code") @Body String flow,
         @Parameter(description = "The subflow tasks to display") @Nullable @QueryValue List<String> subflows)
@@ -192,6 +197,7 @@ public class FlowController {
     @Operation(tags = { "Flows" }, summary = "Get a flow")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = FlowWithSource.class)) })
     //FIXME we return Object instead of Flow as Micronaut, since 4, has an issue with subtypes serialization, see https://github.com/micronaut-projects/micronaut-core/issues/10294.
+    @RequirePermission(Permission.FLOWS_VIEW)
     public Object getFlow(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id,
@@ -209,6 +215,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/{id}/revisions")
     @Operation(tags = { "Flows" }, summary = "Get revisions for a flow")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public List<FlowWithSource> listFlowRevisions(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id,
@@ -221,6 +228,7 @@ public class FlowController {
     @Operation(tags = { "Flows" }, summary = "Get a flow task")
     //FIXME we return Object instead of Task as Micronaut, since 4, has an issue with subtypes serialization, see https://github.com/micronaut-projects/micronaut-core/issues/10294.
     @Schema(implementation = Task.class)
+    @RequirePermission(Permission.FLOWS_VIEW)
     public Object getTaskFromFlow(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id,
@@ -242,6 +250,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/search")
     @Operation(tags = { "Flows" }, summary = "Search for flows")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public PagedResults<Flow> searchFlows(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
         @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) @Max(PageableUtils.MAX_PAGE_SIZE) int size,
@@ -265,6 +274,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{namespace}")
     @Operation(tags = { "Flows" }, summary = "Retrieve all flows from a given namespace")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public List<Flow> listFlowsByNamespace(
         @Parameter(description = "Namespace to filter flows") @PathVariable String namespace) throws HttpStatusException {
         return flowRepository.findByNamespace(tenantService.resolveTenant(), namespace);
@@ -273,6 +283,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/source")
     @Operation(tags = { "Flows" }, summary = "Search for flows source code")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public PagedResults<SourceSearchResult> searchFlowsBySourceCode(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
         @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) @Max(PageableUtils.MAX_PAGE_SIZE) int size,
@@ -362,6 +373,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(consumes = MediaType.APPLICATION_YAML)
     @Operation(tags = { "Flows" }, summary = "Create a flow from yaml source")
+    @RequirePermission(Permission.FLOWS_CREATE)
     public HttpResponse<FlowWithSource> createFlow(
         @RequestBody(description = "The flow source code") @Body String flow,
         @Parameter(description = "Save the flow as a draft. Drafts are not picked up by webhooks, schedules or subflows and are not validated for constraint violations.")
@@ -428,6 +440,7 @@ public class FlowController {
         description = "All flow will be created / updated for this namespace.\n" +
             "Flow that already created but not in `flows` will be deleted if the query delete is `true`"
     )
+    @RequirePermission(Permission.FLOWS_EDIT)
     public List<FlowInterface> updateFlowsInNamespace(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @RequestBody(description = "A list of flows source code") @Body @Nullable String flows,
@@ -450,6 +463,7 @@ public class FlowController {
         description = "All flows will be created / updated for this namespace.\n" +
             "Existing flows missing from `flows` will be deleted if the query delete is `true`"
     )
+    @RequirePermission(Permission.FLOWS_EDIT)
     public List<FlowInterface> updateFlowsInNamespace(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @RequestBody(description = "A list of flow files") @Part("flows") Publisher<CompletedFileUpload> flowsPublisher,
@@ -561,6 +575,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Flows" }, summary = "Update a flow") // force deprecated = false otherwise it is marked as deprecated, dont know why
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = FlowWithSource.class)) })
+    @RequirePermission(Permission.FLOWS_EDIT)
     public HttpResponse<FlowWithSource> updateFlow(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id,
@@ -611,6 +626,7 @@ public class FlowController {
         description = "All flow will be created / updated for this namespace.\n" +
             "Flow that already created but not in `flows` will be deleted if the query delete is `true`"
     )
+    @RequirePermission(Permission.FLOWS_EDIT)
     public List<FlowInterface> bulkUpdateFlows(
         @RequestBody(description = "A list of flows source code split with \"---\"") @Body @Nullable String flows,
         @Parameter(description = "If missing flow should be deleted") @QueryValue(defaultValue = "true") Boolean delete,
@@ -627,6 +643,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Flows" }, summary = "Delete a flow")
     @ApiResponse(responseCode = "204", description = "On success")
+    @RequirePermission(Permission.FLOWS_DELETE)
     public HttpResponse<Void> deleteFlow(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id) throws QueueException {
@@ -642,6 +659,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Delete(uri = "{namespace}/{id}/revisions")
     @Operation(tags = { "Flows" }, summary = "Delete revisions for a flow")
+    @RequirePermission(Permission.FLOWS_DELETE)
     public HttpResponse<Void> deleteRevisions(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id,
@@ -658,6 +676,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "distinct-namespaces")
     @Operation(tags = { "Flows" }, summary = "List all distinct namespaces")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public List<String> listDistinctNamespaces(
         @Parameter(description = "A string filter") @Nullable @QueryValue(value = "q") String query) {
         return flowRepository.findDistinctNamespace(tenantService.resolveTenant(), query);
@@ -666,6 +685,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/{id}/dependencies")
     @Operation(tags = { "Flows" }, summary = "Get flow dependencies")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public FlowTopologyGraph getFlowDependencies(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String id,
@@ -744,6 +764,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/validate/task", consumes = MediaType.APPLICATION_JSON)
     @Operation(tags = { "Flows" }, summary = "Validate task")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public ValidateConstraintViolation validateTask(
         @RequestBody(description = "The task") @Schema(implementation = Object.class) @Body String task) {
         ValidateConstraintViolation.ValidateConstraintViolationBuilder<?, ?> validateConstraintViolationBuilder = ValidateConstraintViolation.builder();
@@ -768,6 +789,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/validate/trigger", consumes = MediaType.APPLICATION_JSON)
     @Operation(tags = { "Flows" }, summary = "Validate trigger")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public ValidateConstraintViolation validateTrigger(
         @RequestBody(description = "The trigger") @Schema(implementation = Object.class) @Body String trigger) {
         ValidateConstraintViolation.ValidateConstraintViolationBuilder<?, ?> validateConstraintViolationBuilder = ValidateConstraintViolation.builder();
@@ -790,6 +812,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/validate/task", consumes = MediaType.APPLICATION_YAML)
     @Operation(tags = { "Flows" }, summary = "Validate a task")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public ValidateConstraintViolation validateTask(
         @RequestBody(description = "A task definition that can be from tasks or triggers") @Schema(implementation = Object.class) @Body String task,
         @Parameter(description = "The flow section the definition belongs to (triggers, or any task-holding section: tasks, errors, finally, afterExecution)") @QueryValue String section) {
@@ -822,6 +845,7 @@ public class FlowController {
         tags = { "Flows" },
         summary = "Export flows as a ZIP archive of yaml sources."
     )
+    @RequirePermission(Permission.FLOWS_VIEW)
     public HttpResponse<byte[]> exportFlowsByQuery(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`", in = ParameterIn.QUERY)
         @QueryFilterFormat(Resource.FLOW) List<QueryFilter> filters) throws IOException {
@@ -840,6 +864,7 @@ public class FlowController {
         tags = { "Flows" },
         summary = "Export flows as a ZIP archive of yaml sources."
     )
+    @RequirePermission(Permission.FLOWS_VIEW)
     public HttpResponse<byte[]> exportFlowsByIds(
         @RequestBody(description = "A list of tuple flow ID and namespace as flow identifiers") @Body List<IdWithNamespace> ids) throws IOException {
         var flows = ids.stream()
@@ -856,6 +881,7 @@ public class FlowController {
         summary = "Delete flows returned by the query parameters."
     )
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = BulkResponse.class)) })
+    @RequirePermission(Permission.FLOWS_DELETE)
     public HttpResponse<BulkResponse> deleteFlowsByQuery(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`", in = ParameterIn.QUERY)
         @QueryFilterFormat(Resource.FLOW) List<QueryFilter> filters) throws QueueException {
@@ -875,6 +901,7 @@ public class FlowController {
         summary = "Delete flows by their IDs."
     )
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = BulkResponse.class)) })
+    @RequirePermission(Permission.FLOWS_DELETE)
     public HttpResponse<BulkResponse> deleteFlowsByIds(
         @RequestBody(description = "A list of tuple flow ID and namespace as flow identifiers") @Body List<IdWithNamespace> ids) throws QueueException {
         List<Flow> list = ids
@@ -893,6 +920,7 @@ public class FlowController {
         summary = "Disable flows returned by the query parameters."
     )
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = BulkResponse.class)) })
+    @RequirePermission(Permission.FLOWS_EDIT)
     public HttpResponse<BulkResponse> disableFlowsByQuery(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`", in = ParameterIn.QUERY)
         @QueryFilterFormat(Resource.FLOW) List<QueryFilter> filters) throws Exception {
@@ -906,6 +934,7 @@ public class FlowController {
         summary = "Disable flows by their IDs."
     )
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = BulkResponse.class)) })
+    @RequirePermission(Permission.FLOWS_EDIT)
     public HttpResponse<BulkResponse> disableFlowsByIds(
         @RequestBody(description = "A list of tuple flow ID and namespace as flow identifiers") @Body List<IdWithNamespace> ids) throws Exception {
 
@@ -919,6 +948,7 @@ public class FlowController {
         summary = "Enable flows returned by the query parameters."
     )
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = BulkResponse.class)) })
+    @RequirePermission(Permission.FLOWS_EDIT)
     public HttpResponse<BulkResponse> enableFlowsByQuery(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`", in = ParameterIn.QUERY)
         @QueryFilterFormat(Resource.FLOW) List<QueryFilter> filters) throws Exception {
@@ -932,6 +962,7 @@ public class FlowController {
         summary = "Enable flows by their IDs."
     )
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = BulkResponse.class)) })
+    @RequirePermission(Permission.FLOWS_EDIT)
     public HttpResponse<BulkResponse> enableFlowsByIds(
         @RequestBody(description = "A list of tuple flow ID and namespace as flow identifiers") @Body List<IdWithNamespace> ids) throws Exception {
 
@@ -949,6 +980,7 @@ public class FlowController {
             """
     )
     @ApiResponse(responseCode = "200", description = "On success")
+    @RequirePermission(Permission.FLOWS_CREATE)
     public HttpResponse<List<String>> importFlows(
         @Parameter(description = "The file to import, can be a ZIP archive or a multi-objects YAML file")
         @Part CompletedFileUpload fileUpload,
@@ -979,6 +1011,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Flows" }, summary = "Export all flows as a streamed CSV file")
     @SuppressWarnings("unchecked")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public MutableHttpResponse<Flux<String>> exportFlows(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[labels][NOT_EQUALS][foo]=bar`, `filters[namespace][CONTAINS]=test`", in = ParameterIn.QUERY)
         @QueryFilterFormat(Resource.FLOW) List<QueryFilter> filters) {
@@ -1067,6 +1100,7 @@ public class FlowController {
     @ExecuteOn(TaskExecutors.IO)
     @Get("/deprecated")
     @Operation(tags = { "Flows" }, summary = "List flows containing deprecated tasks")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public List<FlowWithDeprecatedTasks> listDeprecated(
         @Parameter(description = "A namespace filter prefix") @Nullable @QueryValue String namespace) {
         List<Flow> flows = namespace != null

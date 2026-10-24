@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
@@ -314,6 +317,7 @@ public class PluginController {
     @Get
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Plugins" }, summary = "Get list of plugins")
+    @RequirePermission(Permission.SETTINGS_VIEW)
     public PagedResults<Plugin> listPlugins(
         @Parameter(description = "The current page") @QueryValue(value = "page", defaultValue = "1") int page,
         @Parameter(description = "The current page size") @QueryValue(value = "size", defaultValue = "1000") @Max(PageableUtils.MAX_PAGE_SIZE) int size,
@@ -412,6 +416,7 @@ public class PluginController {
             "`hash` is non-null exactly when the class has an icon, so callers can still tell which classes to " +
             "render an icon for."
     )
+    @RequirePermission(Permission.SETTINGS_VIEW)
     public MutableHttpResponse<Map<String, PluginIcon>> getPluginIcons() {
         return HttpResponse.ok(pluginIconsMetadataIndex()).header(HttpHeaders.CACHE_CONTROL, CACHE_DIRECTIVE);
     }
@@ -560,6 +565,7 @@ public class PluginController {
         description = "Answers the icon metadata of every plugin group and subgroup. As on `GET /plugins/icons` the " +
             "`icon` field is always null; the bytes come from `GET /plugins/icons/{cls}/icon.svg`."
     )
+    @RequirePermission(Permission.SETTINGS_VIEW)
     public MutableHttpResponse<Map<String, PluginIcon>> getPluginGroupIcons() {
         return HttpResponse.ok(pluginGroupIconsMetadataIndex()).header(HttpHeaders.CACHE_CONTROL, CACHE_DIRECTIVE);
     }
@@ -589,6 +595,7 @@ public class PluginController {
     @Get(uri = "{cls}")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Plugins" }, summary = "Get plugin documentation")
+    @RequirePermission(Permission.SETTINGS_VIEW)
     public HttpResponse<DocumentationWithSchema> getPluginDocumentation(
         @Parameter(description = "The plugin full class name") @PathVariable String cls,
         @Parameter(description = "Include all the properties") @QueryValue(value = "all", defaultValue = "false") Boolean allProperties) throws IOException {
@@ -598,6 +605,7 @@ public class PluginController {
     @Get(uri = "{cls}/versions/{version}")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Plugins" }, summary = "Get plugin documentation")
+    @RequirePermission(Permission.SETTINGS_VIEW)
     public HttpResponse<DocumentationWithSchema> getPluginDocumentationFromVersion(
         @Parameter(description = "The plugin type") @PathVariable String cls,
         @Parameter(description = "The plugin version") @PathVariable String version,
@@ -635,6 +643,7 @@ public class PluginController {
     @Get("/groups/subgroups")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Plugins" }, summary = "Get plugins group by subgroups")
+    @RequirePermission(Permission.SETTINGS_VIEW)
     public List<Plugin> getPluginBySubgroups() {
         return Stream.concat(
             pluginRegistry.plugins()

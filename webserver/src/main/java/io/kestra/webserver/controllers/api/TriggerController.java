@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -93,6 +96,7 @@ public class TriggerController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/search")
     @Operation(tags = { "Triggers" }, summary = "Search for triggers")
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public PagedResults<ApiTriggerAndState> searchTriggers(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
         @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) @Max(PageableUtils.MAX_PAGE_SIZE) int size,
@@ -132,6 +136,7 @@ public class TriggerController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{namespace}/{flowId}")
     @Operation(tags = { "Triggers" }, summary = "Get all triggers for a flow")
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public PagedResults<ApiTriggerState> searchTriggersForFlow(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
         @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) @Max(PageableUtils.MAX_PAGE_SIZE) int size,
@@ -163,6 +168,7 @@ public class TriggerController {
     @Operation(tags = { "Triggers" }, summary = "Unlock a trigger")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = ApiTriggerState.class)) })
     @ApiResponse(responseCode = "409", description = "If the trigger is already unlocked or is a realtime trigger")
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public HttpResponse<ApiTriggerState> unlockTrigger(
         @Parameter(description = "The namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String flowId,
@@ -177,6 +183,7 @@ public class TriggerController {
     @Post(uri = "/unlock/by-triggers")
     @Operation(tags = { "Triggers" }, summary = "Unlock given triggers asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> unlockTriggersByIds(
         @Parameter(description = "The triggers to unlock") @Body List<ApiTriggerId> triggers) {
         final String tenantId = tenantService.resolveTenant();
@@ -189,6 +196,7 @@ public class TriggerController {
     @Post(uri = "/unlock/by-query")
     @Operation(tags = { "Triggers" }, summary = "Unlock triggers by query parameters asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> unlockTriggersByQuery(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[flowId][EQUALS]=hello-world`, `filters[namespace][CONTAINS]=test`", in = ParameterIn.QUERY)
         @QueryFilterFormat(Resource.TRIGGER) List<QueryFilter> filters) {
@@ -205,6 +213,7 @@ public class TriggerController {
     @Operation(tags = { "Triggers" }, summary = "Restart a trigger")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = ApiTriggerState.class)) })
     @ApiResponse(responseCode = "409", description = "If the trigger cannot be restarted")
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public HttpResponse<ApiTriggerState> restartTrigger(
         @Parameter(description = "The namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String flowId,
@@ -238,6 +247,7 @@ public class TriggerController {
     @Operation(tags = { "Triggers" }, summary = "Pause a backfill")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = ApiTriggerState.class)) })
     @ApiResponse(responseCode = "409", description = "If the backfill cannot be paused")
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public HttpResponse<ApiTriggerState> pauseBackfill(
         @Parameter(description = "The trigger that need the backfill to be paused") @Body ApiTriggerId trigger) {
         TriggerState state = triggerStateService.setBackfillPaused(trigger.toTriggerId(tenantService.resolveTenant()), true);
@@ -248,6 +258,7 @@ public class TriggerController {
     @Post(uri = "/backfill/pause/by-triggers")
     @Operation(tags = { "Triggers" }, summary = "Pause backfill for given triggers asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> pauseBackfillByIds(
         @Parameter(description = "The triggers that need the backfill to be paused") @Body List<ApiTriggerId> triggers) {
         return HttpResponse.accepted().body(
@@ -259,6 +270,7 @@ public class TriggerController {
     @Post(uri = "/backfill/pause/by-query")
     @Operation(tags = { "Triggers" }, summary = "Pause backfill for triggers matching query asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> pauseBackfillByQuery(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[flowId][EQUALS]=hello-world`, `filters[namespace][CONTAINS]=test`", in = ParameterIn.QUERY)
         @QueryFilterFormat(Resource.TRIGGER) List<QueryFilter> filters) {
@@ -272,6 +284,7 @@ public class TriggerController {
     @Operation(tags = { "Triggers" }, summary = "Unpause a backfill")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = ApiTriggerState.class)) })
     @ApiResponse(responseCode = "409", description = "If the backfill cannot be resumed")
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public HttpResponse<ApiTriggerState> unpauseBackfill(
         @Parameter(description = "The trigger that need the backfill to be resume") @Body ApiTriggerId trigger) {
         TriggerState state = triggerStateService.setBackfillPaused(trigger.toTriggerId(tenantService.resolveTenant()), false);
@@ -282,6 +295,7 @@ public class TriggerController {
     @Post(uri = "/backfill/unpause/by-triggers")
     @Operation(tags = { "Triggers" }, summary = "Unpause backfill for given triggers asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> unpauseBackfillByIds(
         @Parameter(description = "The triggers that need the backfill to be resume") @Body List<ApiTriggerId> triggers) {
         return HttpResponse.accepted().body(
@@ -293,6 +307,7 @@ public class TriggerController {
     @Post(uri = "/backfill/unpause/by-query")
     @Operation(tags = { "Triggers" }, summary = "Unpause backfill for triggers matching query asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> unpauseBackfillByQuery(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[flowId][EQUALS]=hello-world`, `filters[namespace][CONTAINS]=test`", in = ParameterIn.QUERY)
         @QueryFilterFormat(Resource.TRIGGER) List<QueryFilter> filters) {
@@ -306,6 +321,7 @@ public class TriggerController {
     @Operation(tags = { "Triggers" }, summary = "Delete a backfill")
     @ApiResponse(responseCode = "200", description = "On success", content = { @Content(schema = @Schema(implementation = ApiTriggerState.class)) })
     @ApiResponse(responseCode = "409", description = "If the backfill cannot be deleted")
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public HttpResponse<ApiTriggerState> deleteBackfill(
         @Parameter(description = "The trigger that need to have its backfill to be deleted") @Body ApiTriggerId trigger) {
         TriggerState state = triggerStateService.deleteBackfill(trigger.toTriggerId(tenantService.resolveTenant()));
@@ -316,6 +332,7 @@ public class TriggerController {
     @Post(uri = "/backfill/delete/by-triggers")
     @Operation(tags = { "Triggers" }, summary = "Delete backfill for given triggers asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> deleteBackfillByIds(
         @Parameter(description = "The triggers that need the backfill to be deleted") @Body List<ApiTriggerId> triggers) {
         return HttpResponse.accepted().body(
@@ -327,6 +344,7 @@ public class TriggerController {
     @Post(uri = "/backfill/delete/by-query")
     @Operation(tags = { "Triggers" }, summary = "Delete backfill for triggers matching query asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> deleteBackfillByQuery(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[flowId][EQUALS]=hello-world`, `filters[namespace][CONTAINS]=test`", in = ParameterIn.QUERY)
         @QueryFilterFormat(Resource.TRIGGER) List<QueryFilter> filters) {
@@ -341,6 +359,7 @@ public class TriggerController {
     @Operation(tags = { "Triggers" }, summary = "Delete a trigger")
     @ApiResponse(responseCode = "204", description = "On success")
     @ApiResponse(responseCode = "409", description = "If the trigger cannot be deleted")
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public HttpResponse<Void> deleteTrigger(
         @Parameter(description = "The namespace") @PathVariable String namespace,
         @Parameter(description = "The flow id") @PathVariable String flowId,
@@ -353,6 +372,7 @@ public class TriggerController {
     @Delete(uri = "/delete/by-triggers")
     @Operation(tags = { "Triggers" }, summary = "Delete given triggers asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> deleteTriggersByIds(
         @Parameter(description = "The triggers to delete") @Body List<ApiTriggerId> triggers) {
         return HttpResponse.accepted().body(
@@ -364,6 +384,7 @@ public class TriggerController {
     @Delete(uri = "/delete/by-query")
     @Operation(tags = { "Triggers" }, summary = "Delete triggers by query parameters asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> deleteTriggersByQuery(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[flowId][EQUALS]=hello-world`, `filters[namespace][CONTAINS]=test`")
         @QueryFilterFormat(Resource.TRIGGER) List<QueryFilter> filters) {
@@ -390,6 +411,7 @@ public class TriggerController {
     @Post(uri = "/set-disabled/by-triggers")
     @Operation(tags = { "Triggers" }, summary = "Disable/enable given triggers asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> disabledTriggersByIds(
         @Parameter(description = "The triggers you want to set the disabled state") @Body @Valid SetDisabledRequest request) {
         return HttpResponse.accepted().body(
@@ -401,6 +423,7 @@ public class TriggerController {
     @Post(uri = "/set-disabled/by-query")
     @Operation(tags = { "Triggers" }, summary = "Disable/enable triggers by query parameters asynchronously")
     @ApiResponse(responseCode = "202", description = "Accepted", content = { @Content(schema = @Schema(implementation = ApiAsyncOperationResponse.class)) })
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<ApiAsyncOperationResponse> disabledTriggersByQuery(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[flowId][EQUALS]=hello-world`, `filters[namespace][CONTAINS]=test`", in = ParameterIn.QUERY)
         @QueryFilterFormat(Resource.TRIGGER) List<QueryFilter> filters,
@@ -419,6 +442,7 @@ public class TriggerController {
     @Operation(tags = { "Triggers" }, summary = "Export all triggers as a streamed CSV file")
     @ApiResponse(responseCode = "200", content = { @Content(mediaType = MediaType.TEXT_CSV, schema = @Schema(type = "string")) })
     @SuppressWarnings("unchecked")
+    @RequirePermission(Permission.ADMIN_TRIGGERS)
     public MutableHttpResponse<Flux<String>> exportTriggers(
         @Parameter(description = "Filters. PHP-style nested query is used - examples: `filters[flowId][EQUALS]=hello-world`, `filters[namespace][CONTAINS]=test`", in = ParameterIn.QUERY)
         @QueryFilterFormat(Resource.TRIGGER) List<QueryFilter> filters) {

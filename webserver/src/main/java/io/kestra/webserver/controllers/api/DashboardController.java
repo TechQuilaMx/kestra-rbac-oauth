@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -112,6 +115,7 @@ public class DashboardController {
     @ExecuteOn(TaskExecutors.IO)
     @Get
     @Operation(tags = { "Dashboards" }, summary = "Search for dashboards")
+    @RequirePermission(Permission.DASHBOARDS_VIEW)
     public PagedResults<DashboardResponse> searchDashboards(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
         @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) @Max(PageableUtils.MAX_PAGE_SIZE) int size,
@@ -123,6 +127,7 @@ public class DashboardController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{id}")
     @Operation(tags = { "Dashboards" }, summary = "Get a dashboard")
+    @RequirePermission(Permission.DASHBOARDS_VIEW)
     public DashboardResponse getDashboard(
         @Parameter(description = "The dashboard id") @PathVariable String id) throws ConstraintViolationException {
         return findDashboard(tenantService.resolveTenant(), id)
@@ -198,6 +203,7 @@ public class DashboardController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "charts/preview")
     @Operation(tags = { "Dashboards" }, summary = "Preview a chart data")
+    @RequirePermission(Permission.DASHBOARDS_VIEW)
     public PagedResults<Map<String, Object>> previewChart(
         @Parameter(description = "The chart") @Body @Valid PreviewRequest previewRequest) throws IOException {
         var fetchChartDataQuery = buildChartPreviewDataQuery(previewRequest);

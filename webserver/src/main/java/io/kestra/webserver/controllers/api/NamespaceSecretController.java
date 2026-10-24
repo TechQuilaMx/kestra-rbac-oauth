@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
@@ -29,6 +32,7 @@ public class NamespaceSecretController<META extends ApiSecretMeta> {
     @Get(uri = "{namespace}/inherited-secrets")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Namespaces" }, summary = "List inherited secrets")
+    @RequirePermission(Permission.SECRETS_VIEW)
     public HttpResponse<Map<String, Set<String>>> getInheritedSecrets(
         @Parameter(description = "The namespace id") @PathVariable String namespace) throws IllegalArgumentException, IOException {
         return HttpResponse.ok(secretService.inheritedSecrets(tenantService.resolveTenant(), namespace));

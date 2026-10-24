@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +49,7 @@ public class AiController {
     @ExecuteOn(TaskExecutors.IO)
     @Post(uri = "/generate/flow", produces = "application/yaml")
     @Operation(tags = { "AI" }, summary = "Generate or regenerate a flow based on a prompt")
+    @RequirePermission(Permission.FLOWS_CREATE)
     public HttpResponse<String> generateFlow(
         @RequestBody(description = "Prompt and context required for flow generation") @Body FlowGenerationPrompt flowGenerationPrompt,
         HttpRequest<?> httpRequest) {
@@ -68,6 +72,7 @@ public class AiController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "providers")
     @Operation(tags = { "AI" }, summary = "List available AI providers")
+    @RequirePermission(Permission.FLOWS_VIEW)
     public List<AiProviderResponse> getProviders() {
         List<AiProviderResponse> response = new ArrayList<>();
         for (Map.Entry<String, AiServiceInterface> entry : aiServiceManager.getAllAiServices().entrySet()) {

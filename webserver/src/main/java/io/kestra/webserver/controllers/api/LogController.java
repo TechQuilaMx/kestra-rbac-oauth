@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.io.InputStream;
 import java.time.Duration;
 import java.util.List;
@@ -67,6 +70,7 @@ public class LogController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/search")
     @Operation(tags = { "Logs" }, summary = "Search for logs")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public CursorOrOffsetPagedResults<LogEntry> searchLogs(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
         @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) @Max(PageableUtils.MAX_PAGE_SIZE) int size,
@@ -101,6 +105,7 @@ public class LogController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{executionId}")
     @Operation(tags = { "Logs" }, summary = "Get logs for a specific execution, taskrun or task")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public List<LogEntry> listLogsFromExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "Filters") @Nullable @QueryFilterFormat(Resource.LOG) List<QueryFilter> filters) {
@@ -113,6 +118,7 @@ public class LogController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{executionId}/download", produces = MediaType.TEXT_PLAIN)
     @Operation(tags = { "Logs" }, summary = "Download logs for a specific execution, taskrun or task")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public HttpResponse<StreamedFile> downloadLogsFromExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "Filters") @Nullable @QueryFilterFormat(Resource.LOG) List<QueryFilter> filters) {
@@ -138,6 +144,7 @@ public class LogController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "/{executionId}/follow", produces = MediaType.TEXT_EVENT_STREAM)
     @Operation(tags = { "Logs" }, summary = "Follow logs for a specific execution")
+    @RequirePermission(Permission.EXECUTIONS_VIEW)
     public Flux<Event<FollowLogEvent>> followLogsFromExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "Filters") @Nullable @QueryFilterFormat(Resource.LOG) List<QueryFilter> filters) {
@@ -191,6 +198,7 @@ public class LogController {
     @ExecuteOn(TaskExecutors.IO)
     @Delete(uri = "/{executionId}")
     @Operation(tags = { "Logs" }, summary = "Delete logs for a specific execution, taskrun or task")
+    @RequirePermission(Permission.EXECUTIONS_KILL)
     public void deleteLogsFromExecution(
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "The min log level filter") @Nullable @QueryValue Level minLevel,
@@ -203,6 +211,7 @@ public class LogController {
     @ExecuteOn(TaskExecutors.IO)
     @Delete(uri = "/{namespace}/{flowId}")
     @Operation(tags = { "Logs" }, summary = "Delete logs for a specific execution, taskrun or task")
+    @RequirePermission(Permission.FLOWS_EDIT)
     public void deleteLogsFromFlow(
         @Parameter(description = "The namespace") @PathVariable String namespace,
         @Parameter(description = "The flow identifier") @PathVariable String flowId,

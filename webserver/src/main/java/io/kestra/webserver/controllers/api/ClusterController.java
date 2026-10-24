@@ -1,5 +1,8 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -30,6 +33,7 @@ public class ClusterController {
     @ExecuteOn(TaskExecutors.IO)
     @Get("services/{id}")
     @Operation(tags = { "Services" }, summary = "Get details about a service")
+    @RequirePermission(Permission.ADMIN_STATS)
     public HttpResponse<ServiceInstance> getService(@PathVariable("id") String id) throws HttpStatusException {
         return repository.findById(id)
             .map(HttpResponse::ok)
