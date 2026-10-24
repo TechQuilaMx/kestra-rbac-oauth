@@ -7,6 +7,7 @@ import org.reactivestreams.Publisher;
 
 import io.kestra.webserver.annotation.AnonymousAccess;
 import io.kestra.webserver.services.BasicAuthService;
+import io.kestra.webserver.services.OAuth2Service;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
@@ -28,6 +29,7 @@ import reactor.core.scheduler.Schedulers;
 @Requires(property = "kestra.server-type", pattern = "(WEBSERVER|STANDALONE)")
 @Requires(property = "micronaut.security.enabled", notEquals = "true")
 public class AuthenticationFilter implements HttpServerFilter {
+    private static final String PREFIX_BEARER = "Bearer";
     private static final Integer ORDER = ServerFilterPhase.SECURITY.order();
     /** @deprecated Use {@link BasicAuthService#BASIC_AUTH_COOKIE_NAME} */
     public static final String BASIC_AUTH_COOKIE_NAME = BasicAuthService.BASIC_AUTH_COOKIE_NAME;
@@ -35,6 +37,9 @@ public class AuthenticationFilter implements HttpServerFilter {
 
     @Inject
     private BasicAuthService basicAuthService;
+
+    @Inject
+    private Optional<OAuth2Service> oauth2Service = Optional.empty();
 
     @Override
     public int getOrder() {
@@ -75,20 +80,54 @@ public class AuthenticationFilter implements HttpServerFilter {
                         .map(stream -> stream.anyMatch(normalizedPath::startsWith))
                         .orElse(false);
 
+                // Check OAuth2 openUrls as well
+                boolean isOAuth2OpenUrl = oauth2Service
+                    .filter(OAuth2Service::isEnabled)
+                    .map(service -> service.getConfiguration().getOpenUrls())
+                    .map(Collection::stream)
+                    .map(stream -> stream.anyMatch(normalizedPath::startsWith))
+                    .orElse(false);
+
                 boolean mcpAuthHandled = request.getAttribute(McpServerAuthenticationFilter.MCP_AUTH_HANDLED, Boolean.class)
                     .orElse(false);
 
-                if (isConfigEndpoint || isOpenUrl || isManagementEndpoint(request) || mcpAuthHandled) {
+                if (isConfigEndpoint || isOpenUrl || isOAuth2OpenUrl || isManagementEndpoint(request) || mcpAuthHandled) {
                     return chain.proceed(request);
                 }
 
+                boolean oauth2Enabled = oauth2Service.isPresent() && oauth2Service.get().isEnabled();
+
+                // Try OAuth2 Bearer token authentication first
+                if (oauth2Enabled) {
+                    var bearerToken = fromBearerToken(request);
+                    if (bearerToken.isPresent()) {
+                        // Validate OAuth2 token
+                        var userInfo = oauth2Service.get().validateToken(bearerToken.get());
+                        if (userInfo.isPresent()) {
+                            // Token is valid, store user info in request for authorization
+                            request.setAttribute("userInfo", userInfo.get());
+                            return chain.proceed(request);
+                        } else {
+                            // Invalid OAuth2 token
+                            return Mono.just(HttpResponse.unauthorized());
+                        }
+                    }
+                }
+
+                // Fall back to Basic Auth
                 if (!basicAuthService.isAuthenticated(request)) {
                     Boolean isFromLoginPage = Optional.ofNullable(request.getHeaders().get("Referer"))
                         .map(referer -> referer.split("\\?")[0].endsWith("/login"))
                         .orElse(false);
 
+                    boolean acceptsHtml = Optional.ofNullable(request.getHeaders().get("Accept"))
+                        .map(a -> a.contains("text/html"))
+                        .orElse(false);
+
+                    boolean shouldChallengeWithBasic = !oauth2Enabled && !isFromLoginPage && acceptsHtml;
+
                     return Mono.just(HttpResponse.unauthorized())
-                        .map(response -> isFromLoginPage ? response : response.header("WWW-Authenticate", "Basic"));
+                        .map(response -> shouldChallengeWithBasic ? response.header("WWW-Authenticate", "Basic") : response);
                 }
 
                 return chain.proceed(request);
@@ -97,6 +136,20 @@ public class AuthenticationFilter implements HttpServerFilter {
 
     private static String normalizePath(String path) {
         return path.replaceAll("/+", "/");
+    }
+
+    private Optional<String> fromBearerToken(HttpRequest<?> request) {
+        Optional<String> fromHeader = request.getHeaders()
+            .getAuthorization()
+            .filter(auth -> auth.toLowerCase().startsWith(PREFIX_BEARER.toLowerCase()))
+            .map(token -> token.substring(PREFIX_BEARER.length() + 1).trim());
+        if (fromHeader.isPresent()) {
+            return fromHeader;
+        }
+
+        // EventSource/worker requests cannot always set Authorization headers.
+        return Optional.ofNullable(request.getParameters().get("token"))
+            .filter(token -> !token.isBlank());
     }
 
     @SuppressWarnings("rawtypes")
