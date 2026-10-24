@@ -22,8 +22,12 @@ import io.kestra.core.runners.pebble.PebbleFunction;
 import io.kestra.core.services.InstanceService;
 import io.kestra.core.utils.EditionProvider;
 import io.kestra.core.utils.VersionProvider;
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.configurations.OAuth2Configuration;
+import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.services.BasicAuthCredentials;
 import io.kestra.webserver.services.BasicAuthService;
+import io.kestra.webserver.services.OAuth2Service;
 import io.kestra.webserver.services.ai.AiServiceManager;
 
 import io.micronaut.context.ApplicationContext;
@@ -67,6 +71,9 @@ public class MiscController {
 
     @Inject
     Optional<BasicAuthService> basicAuthService = Optional.empty();
+
+    @Inject
+    Optional<OAuth2Service> oauth2Service = Optional.empty();
 
     @Inject
     Optional<AiServiceManager> aiServiceManager = Optional.empty();
@@ -166,6 +173,23 @@ public class MiscController {
             );
         }
 
+        // Add OAuth2 configuration if enabled
+        if (oauth2Service.isPresent() && oauth2Service.get().isEnabled()) {
+            OAuth2Configuration oauth2Config = oauth2Service.get().getConfiguration();
+            log.info("OAuth2 Configuration: authEndpoint={}, tokenEndpoint={}, userInfoEndpoint={}",
+                oauth2Config.getAuthorizationEndpoint(),
+                oauth2Config.getTokenEndpoint(),
+                oauth2Config.getUserInfoEndpoint()
+            );
+            builder
+                .oauth2ClientId(oauth2Config.getClientId())
+                .oauth2AuthEndpoint(oauth2Config.getAuthorizationEndpoint())
+                .oauth2TokenEndpoint(oauth2Config.getTokenEndpoint())
+                .oauth2UserInfoEndpoint(oauth2Config.getUserInfoEndpoint())
+                .oauth2LogoutEndpoint(oauth2Config.getLogoutEndpoint())
+                .oauth2Scope(oauth2Config.getScope());
+        }
+
         return builder.build();
     }
 
@@ -176,7 +200,21 @@ public class MiscController {
         description = "Public endpoint available to unauthenticated users; exposes only what the login/setup UI needs."
     )
     public LoginConfiguration getLoginConfiguration() {
-        return new LoginConfiguration(isBasicAuthInitialized());
+        LoginConfiguration.LoginConfigurationBuilder loginBuilder = LoginConfiguration.builder()
+            .isBasicAuthInitialized(isBasicAuthInitialized());
+
+        if (oauth2Service.isPresent() && oauth2Service.get().isEnabled()) {
+            OAuth2Configuration oauth2Config = oauth2Service.get().getConfiguration();
+            loginBuilder
+                .oauth2ClientId(oauth2Config.getClientId())
+                .oauth2AuthEndpoint(oauth2Config.getAuthorizationEndpoint())
+                .oauth2TokenEndpoint(oauth2Config.getTokenEndpoint())
+                .oauth2UserInfoEndpoint(oauth2Config.getUserInfoEndpoint())
+                .oauth2LogoutEndpoint(oauth2Config.getLogoutEndpoint())
+                .oauth2Scope(oauth2Config.getScope());
+        }
+
+        return loginBuilder.build();
     }
 
     private boolean isBasicAuthInitialized() {
@@ -193,6 +231,7 @@ public class MiscController {
 
     @Get("/{tenant}/usages/all")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Misc" }, summary = "Retrieve instance usage information")
     public ApiUsage getUsages() {
         ZonedDateTime now = ZonedDateTime.now();
@@ -205,6 +244,7 @@ public class MiscController {
 
     @Post(uri = "/{tenant}/basicAuth")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_EDIT)
     @Operation(
         tags = { "Misc" }, summary = "Configure basic authentication for the instance.",
         description = "Sets up basic authentication credentials. Once credentials already exist, the request must also carry the current password."
@@ -236,6 +276,7 @@ public class MiscController {
     @Get("/basicAuthValidationErrors")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Misc" }, summary = "Retrieve the instance configuration.", description = "Global endpoint available to all users.")
+    @RequirePermission(Permission.SETTINGS_VIEW)
     public List<String> getBasicAuthConfigErrors() {
         return basicAuthService
             .orElseThrow(() -> new IllegalStateException("basicAuthService bean is required in OSS"))
@@ -302,6 +343,7 @@ public class MiscController {
 
     @Get("/pebble/filters")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Misc" }, summary = "Retrieve the list of available Pebble expression filters.")
     public List<String> getExpressionFilters() {
         return pebbleExpressionService.filters();
@@ -309,6 +351,7 @@ public class MiscController {
 
     @Get("/pebble/functions")
     @ExecuteOn(TaskExecutors.IO)
+    @RequirePermission(Permission.SETTINGS_VIEW)
     @Operation(tags = { "Misc" }, summary = "Retrieve the available Pebble expression functions with their arguments and defaults.")
     public List<PebbleFunction> getExpressionFunctions() {
         return pebbleExpressionService.functions();
@@ -360,6 +403,23 @@ public class MiscController {
         Long pluginsHash;
 
         Boolean isPluginAutoInstallEnabled;
+
+        String oauth2ClientId;
+
+        @JsonInclude
+        String oauth2AuthEndpoint;
+
+        @JsonInclude
+        String oauth2TokenEndpoint;
+
+        @JsonInclude
+        String oauth2UserInfoEndpoint;
+
+        @JsonInclude
+        String oauth2LogoutEndpoint;
+
+        @JsonInclude
+        String oauth2Scope;
     }
 
     @Value
@@ -386,6 +446,27 @@ public class MiscController {
     /**
      * Minimal configuration exposed to unauthenticated callers for the login/setup UI.
      */
-    public record LoginConfiguration(@JsonInclude Boolean isBasicAuthInitialized) {
+    @Getter
+    @Builder(toBuilder = true)
+    public static class LoginConfiguration {
+        @JsonInclude
+        Boolean isBasicAuthInitialized;
+
+        String oauth2ClientId;
+
+        @JsonInclude
+        String oauth2AuthEndpoint;
+
+        @JsonInclude
+        String oauth2TokenEndpoint;
+
+        @JsonInclude
+        String oauth2UserInfoEndpoint;
+
+        @JsonInclude
+        String oauth2LogoutEndpoint;
+
+        @JsonInclude
+        String oauth2Scope;
     }
 }
