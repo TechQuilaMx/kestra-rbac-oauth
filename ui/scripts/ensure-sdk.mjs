@@ -16,7 +16,8 @@ const heyApiPluginDir = path.join(ownUiRoot, "packages/hey-api-plugin")
 
 /** @param {string} cmd @param {string} uiRoot */
 export function run(cmd, uiRoot) {
-    execSync(cmd, {stdio: "inherit", cwd: uiRoot})
+    const fullCmd = cmd === "npm install" ? "npm install --engine-strict=false" : cmd
+    execSync(fullCmd, {stdio: "inherit", cwd: uiRoot})
 }
 
 

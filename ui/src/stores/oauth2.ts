@@ -1,6 +1,6 @@
 import {defineStore} from "pinia";
 import OAuth2Manager, {type OAuth2Config} from "../utils/oauth2";
-import {useAxios} from "../utils/axios";
+import {useClient} from "@kestra-io/kestra-sdk";
 
 interface UserInfo {
     authenticated: boolean;
@@ -162,7 +162,7 @@ export const useOAuth2Store = defineStore("oauth2", {
                 if (!this.isAuthenticated || !this.accessToken) {
                     return;
                 }
-                const axios = useAxios();
+                const axios = useClient();
                 const response = await axios.get("/api/v1/user/me");
                 this.userInfo = response.data;
                 console.log("User info loaded:", this.userInfo);
