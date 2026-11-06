@@ -14,7 +14,7 @@ import lombok.ToString;
 
 @ToString
 @Getter
-@Introspected
+@Introspected // without it, there is a deserialization issue with GraphTask
 public abstract class AbstractGraphTask extends AbstractGraph {
     @Setter
     private TaskInterface task;

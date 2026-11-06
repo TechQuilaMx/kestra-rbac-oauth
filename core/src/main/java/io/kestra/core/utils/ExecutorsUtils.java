@@ -4,6 +4,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.*;
 
+import io.kestra.core.contexts.configuration.KestraConfiguration;
+
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
 import jakarta.inject.Inject;
@@ -18,15 +20,31 @@ import lombok.extern.slf4j.Slf4j;
 @Singleton
 @Slf4j
 public class ExecutorsUtils {
-
     @Inject
     private MeterRegistry meterRegistry;
+
+    @Inject
+    private KestraConfiguration kestraConfiguration;
+
+    public int getAllocatedCpuCores() {
+        int allocatedCpuCores = kestraConfiguration.allocatedCpuCores() != null ? kestraConfiguration.allocatedCpuCores() : 0;
+        return allocatedCpuCores == 0 ? Runtime.getRuntime().availableProcessors() : allocatedCpuCores;
+    }
 
     public ExecutorService cachedThreadPool(String name) {
         return this.wrap(
             name,
             Executors.newCachedThreadPool(
                 ThreadMainFactoryBuilder.build(name + "_%d")
+            )
+        );
+    }
+
+    public ExecutorService cachedVirtualThreadPool(String name) {
+        return this.wrap(
+            name,
+            Executors.newCachedThreadPool(
+                Thread.ofVirtual().name(name + "_%d").uncaughtExceptionHandler(new ThreadUncaughtExceptionHandler()).factory()
             )
         );
     }
@@ -39,6 +57,24 @@ public class ExecutorsUtils {
             TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(),
             ThreadMainFactoryBuilder.build(name + "_%d")
+        );
+
+        threadPoolExecutor.allowCoreThreadTimeOut(true);
+
+        return this.wrap(
+            name,
+            threadPoolExecutor
+        );
+    }
+
+    public ExecutorService maxCachedVirtualThreadPool(int maxThread, String name) {
+        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(
+            maxThread,
+            maxThread,
+            60L,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(),
+            Thread.ofVirtual().name(name + "_%d").uncaughtExceptionHandler(new ThreadUncaughtExceptionHandler()).factory()
         );
 
         threadPoolExecutor.allowCoreThreadTimeOut(true);
@@ -98,4 +134,27 @@ public class ExecutorsUtils {
         );
     }
 
+    /**
+     * Gracefully shutdown the given {@link ExecutorService} and wait for its termination within the specified timeout.
+     *
+     * @param name the name of the executor service, used for logging purposes.
+     * @param executorService the executor service to shutdown.
+     * @param awaitTermination the duration to wait for the executor service to terminate before forcing shutdown.
+     */
+    public static void closeExecutorService(String name, ExecutorService executorService, Duration awaitTermination) {
+        executorService.shutdown();
+        if (executorService.isTerminated()) {
+            return;
+        }
+        try {
+            if (!executorService.awaitTermination(awaitTermination.toMillis(), TimeUnit.MILLISECONDS)) {
+                log.warn("Executor service [{}] did not terminate within timeout, forcing shutdown", name);
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            log.debug("Interrupted while shutting down executor service [{}]", name, e);
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
 }

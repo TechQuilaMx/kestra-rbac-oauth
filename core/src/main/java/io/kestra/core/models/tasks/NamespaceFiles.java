@@ -4,7 +4,6 @@ import java.util.List;
 
 import io.kestra.core.models.property.Property;
 
-import io.micronaut.core.annotation.Introspected;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -17,7 +16,6 @@ import lombok.extern.jackson.Jacksonized;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-@Introspected
 @Jacksonized
 public class NamespaceFiles {
     @Schema(

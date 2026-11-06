@@ -27,7 +27,6 @@ class ExitTest {
         assertThat(execution.getTaskRunList()).hasSize(2);
         assertThat(execution.getTaskRunList().getFirst().getState().getCurrent()).isEqualTo(State.Type.KILLED);
         assertThat(execution.getTaskRunList().get(1).getState().getCurrent()).isEqualTo(State.Type.KILLED);
-
     }
 
     @Test
@@ -40,15 +39,6 @@ class ExitTest {
         assertThat(execution.findTaskRunsByTaskId("nested_bool_check").getFirst().getState().getCurrent()).isEqualTo(State.Type.FAILED);
         assertThat(execution.findTaskRunsByTaskId("nested_bool_check").getFirst().getAttempts().getFirst().getState().getCurrent()).isEqualTo(State.Type.FAILED);
         assertThat(execution.findTaskRunsByTaskId("nested_was_false").getFirst().getState().getCurrent()).isEqualTo(State.Type.FAILED);
-    }
-
-    @Test
-    @ExecuteFlow("flows/valids/exit-canceled.yaml")
-    void shouldExitWithCanceled(Execution execution) {
-        assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.CANCELLED);
-        assertThat(execution.getTaskRunList()).hasSize(2);
-        assertThat(execution.getTaskRunList().getFirst().getState().getCurrent()).isEqualTo(State.Type.CANCELLED);
-        assertThat(execution.getTaskRunList().get(1).getState().getCurrent()).isEqualTo(State.Type.CANCELLED);
     }
 
     @Test

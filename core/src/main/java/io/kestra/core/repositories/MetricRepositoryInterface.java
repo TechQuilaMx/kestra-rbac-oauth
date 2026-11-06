@@ -7,13 +7,14 @@ import java.util.function.Function;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.executions.MetricEntry;
 import io.kestra.core.models.executions.metrics.MetricAggregations;
+import io.kestra.core.runners.IndexingRepository;
 import io.kestra.plugin.core.dashboard.data.Metrics;
 
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.Pageable;
 import reactor.core.publisher.Flux;
 
-public interface MetricRepositoryInterface extends SaveRepositoryInterface<MetricEntry>, QueryBuilderInterface<Metrics.Fields> {
+public interface MetricRepositoryInterface extends IndexingRepository<MetricEntry>, QueryBuilderInterface<Metrics.Fields> {
     ArrayListTotal<MetricEntry> findByExecutionId(String tenantId, String id, Pageable pageable);
 
     ArrayListTotal<MetricEntry> findByExecutionIdAndTaskId(String tenantId, String executionId, String taskId, Pageable pageable);

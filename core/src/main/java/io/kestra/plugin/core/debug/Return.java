@@ -46,23 +46,43 @@ import lombok.experimental.SuperBuilder;
                 """
         ),
         @Example(
+            full = true,
             code = """
-                id: compute_header
-                type: io.kestra.plugin.core.debug.Return
-                format: >-
-                  {%- if inputs.token is not empty -%}
-                  Bearer {{ inputs.token }}
-                  {%- elseif inputs.username is not empty and inputs.password is not empty -%}
-                  Basic {{ (inputs.username + ':' + inputs.password) | base64encode }}
-                  {%- endif -%}
+                id: return
+                namespace: company.team
+
+                inputs:
+                  - id: token
+                    type: STRING
+                    required: false
+                    displayName: "API Token"
+
+                  - id: username
+                    type: STRING
+                    displayName: "Username"
+                    required: false
+
+                  - id: password
+                    type: STRING
+                    displayName: "Password"
+                    required: false
+
+                tasks:
+                  - id: compute_header
+                    type: io.kestra.plugin.core.debug.Return
+                    format: >-
+                      {%- if inputs.token is not empty -%}
+                      Bearer {{ inputs.token }}
+                      {%- elseif inputs.username is not empty and inputs.password is not empty -%}
+                      Basic {{ (inputs.username + ':' + inputs.password) | base64encode }}
+                      {%- endif -%}
                 """
         )
     },
     metrics = {
         @Metric(name = "length", type = Counter.TYPE),
         @Metric(name = "duration", type = Timer.TYPE)
-    },
-    aliases = "io.kestra.core.tasks.debugs.Return"
+    }
 )
 public class Return extends Task implements RunnableTask<Return.Output> {
     @Schema(

@@ -9,14 +9,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import io.kestra.core.queues.QueueFactoryInterface;
-import io.kestra.core.queues.QueueInterface;
-import jakarta.inject.Inject;
-import jakarta.inject.Named;
 import org.assertj.core.api.Assertions;
 import org.hamcrest.MatcherAssert;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -27,13 +23,14 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.runners.AbstractTaskRunnerTest;
 import io.kestra.core.models.tasks.runners.ScriptService;
 import io.kestra.core.models.tasks.runners.TaskRunner;
+import io.kestra.core.queues.DispatchQueueInterface;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.utils.Await;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 
-import reactor.core.publisher.Flux;
+import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwRunnable;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -42,8 +39,7 @@ import static org.hamcrest.Matchers.is;
 
 class DockerTest extends AbstractTaskRunnerTest {
     @Inject
-    @Named(QueueFactoryInterface.WORKERTASKLOG_NAMED)
-    QueueInterface<LogEntry> workerTaskLogQueue;
+    DispatchQueueInterface<LogEntry> workerTaskLogQueue;
 
     @BeforeEach
     void assumeDockerAvailable() {
@@ -135,12 +131,7 @@ class DockerTest extends AbstractTaskRunnerTest {
 
         // Setup log queue consumer
         List<LogEntry> logs = new CopyOnWriteArrayList<>();
-        Flux<LogEntry> receive = TestsUtils.receive(workerTaskLogQueue, (logEntry) ->
-        {
-            if (logEntry.isLeft()) {
-                logs.add(logEntry.getLeft());
-            }
-        });
+        workerTaskLogQueue.addListener(logs::add);
 
         var commandsList = ScriptService.scriptCommands(
             List.of("/bin/sh", "-c"), Collections.emptyList(),
@@ -201,7 +192,6 @@ class DockerTest extends AbstractTaskRunnerTest {
             LogEntry createContainerLog = TestsUtils
                 .awaitLog(logs, logEntry -> logEntry.getMessage().contains("Container created:"));
 
-            receive.blockLast(timeout);
             // Assert that the log messages are present
             assertThat(createContainerLog).withFailMessage("create container log should not be null").isNotNull();
             assertThat(createContainerLog.getMessage()).contains("Container created:");
@@ -249,12 +239,7 @@ class DockerTest extends AbstractTaskRunnerTest {
 
         // Setup log queue consumer
         List<LogEntry> logs = new CopyOnWriteArrayList<>();
-        Flux<LogEntry> receive = TestsUtils.receive(workerTaskLogQueue, (logEntry) ->
-        {
-            if (logEntry.isLeft()) {
-                logs.add(logEntry.getLeft());
-            }
-        });
+        workerTaskLogQueue.addListener(logEntry -> logs.add(logEntry));
 
         var commandsList = ScriptService.scriptCommands(
             List.of("/bin/sh", "-c"), Collections.emptyList(),
@@ -320,7 +305,6 @@ class DockerTest extends AbstractTaskRunnerTest {
             LogEntry awaitLog = TestsUtils
                 .awaitLog(logs, logEntry -> logEntry.getMessage().contains("Resuming existing container:"));
 
-            receive.blockLast(timeout);
             // Assert that the log messages are present
             assertThat(createContainerLog).withFailMessage("create container log should not be null").isNotNull();
             assertThat(createContainerLog.getMessage()).contains("Container created:");

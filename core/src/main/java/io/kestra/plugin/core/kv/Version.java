@@ -1,7 +1,6 @@
 package io.kestra.plugin.core.kv;
 
 import java.io.IOException;
-import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -10,8 +9,9 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.kestra.core.models.FetchVersion;
 import io.kestra.core.models.QueryFilter;
+import io.kestra.core.services.KVStoreService;
 import io.kestra.core.storages.kv.KVEntry;
-import io.kestra.core.storages.kv.KVStore;
+import io.kestra.core.utils.TypeConverter;
 import io.kestra.core.validations.KvVersionBehaviorValidation;
 
 import io.micronaut.data.model.Pageable;
@@ -46,12 +46,14 @@ public class Version extends KvPurgeBehavior {
     private Integer keepAmount;
 
     @Override
-    protected List<KVEntry> entriesToPurge(KVStore kvStore) throws IOException {
-        List<KVEntry> entries = kvStore.list(
+    protected List<KVEntry> entriesToPurge(String tenant, String namespace, KVStoreService service) throws IOException {
+        List<KVEntry> entries = service.list(
             Pageable.UNPAGED.withSort(Sort.of(Sort.Order.desc("version"))),
+            tenant,
+            namespace,
             before == null
                 ? Collections.emptyList()
-                : List.of(QueryFilter.builder().field(QueryFilter.Field.UPDATED).operation(QueryFilter.Op.LESS_THAN_OR_EQUAL_TO).value(ZonedDateTime.parse(before)).build()),
+                : List.of(QueryFilter.builder().field(QueryFilter.Field.UPDATED).operation(QueryFilter.Op.LESS_THAN_OR_EQUAL_TO).value(TypeConverter.toZonedDateTime(before)).build()),
             true,
             true,
             before == null ? FetchVersion.ALL : FetchVersion.OLD

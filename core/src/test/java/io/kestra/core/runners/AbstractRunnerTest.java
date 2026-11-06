@@ -1,13 +1,19 @@
 package io.kestra.core.runners;
 
-import java.util.Map;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junitpioneer.jupiter.RetryingTest;
+import org.slf4j.event.Level;
 
+import io.kestra.core.exceptions.InternalException;
+import io.kestra.core.executor.command.Create;
+import io.kestra.core.executor.command.ExecutionCommand;
 import io.kestra.core.junit.annotations.ExecuteFlow;
-import io.kestra.core.junit.annotations.FlakyTest;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.junit.annotations.LoadFlows;
 import io.kestra.core.models.executions.Execution;
@@ -15,31 +21,31 @@ import io.kestra.core.models.executions.LogEntry;
 import io.kestra.core.models.executions.TaskRun;
 import io.kestra.core.models.executions.TaskRunAttempt;
 import io.kestra.core.models.flows.State;
+import io.kestra.core.queues.DispatchQueueInterface;
 import io.kestra.core.queues.QueueException;
-import io.kestra.core.queues.QueueFactoryInterface;
-import io.kestra.core.queues.QueueInterface;
+import io.kestra.core.services.TaskOutputService;
+import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.core.flow.*;
 
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 @KestraTest(startRunner = true)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 //@org.junit.jupiter.api.parallel.Execution(org.junit.jupiter.api.parallel.ExecutionMode.CONCURRENT)
 // must be per-class to allow calling once init() which took a lot of time
 public abstract class AbstractRunnerTest {
-
+    public static final String NAMESPACE = "io.kestra.tests";
     public static final String TENANT_1 = "tenant1";
     public static final String TENANT_2 = "tenant2";
     @Inject
     protected TestRunnerUtils runnerUtils;
 
     @Inject
-    @Named(QueueFactoryInterface.WORKERTASKLOG_NAMED)
-    protected QueueInterface<LogEntry> logsQueue;
+    protected DispatchQueueInterface<LogEntry> logsQueue;
 
     @Inject
     protected RestartCaseTest restartCaseTest;
@@ -49,9 +55,6 @@ public abstract class AbstractRunnerTest {
 
     @Inject
     protected MultipleConditionTriggerCaseTest multipleConditionTriggerCaseTest;
-
-    @Inject
-    private PluginDefaultsCaseTest pluginDefaultsCaseTest;
 
     @Inject
     protected FlowCaseTest flowCaseTest;
@@ -66,10 +69,10 @@ public abstract class AbstractRunnerTest {
     private IgnoreExecutionCaseTest ignoreExecutionCaseTest;
 
     @Inject
-    protected ForEachItemCaseTest forEachItemCaseTest;
+    protected LoopUntilCaseTest loopUntilTestCaseTest;
 
     @Inject
-    protected LoopUntilCaseTest loopUntilTestCaseTest;
+    protected LoopCaseTest loopCaseTest;
 
     @Inject
     protected ScheduleDateCaseTest scheduleDateCaseTest;
@@ -86,12 +89,21 @@ public abstract class AbstractRunnerTest {
     @Inject
     private AfterExecutionTestCase afterExecutionTestCase;
 
+    @Inject
+    private TaskOutputService taskOutputService;
+
+    @Inject
+    protected DispatchQueueInterface<ExecutionCommand> executionCommandQueue;
+
+    @Inject
+    protected DispatchQueueInterface<ExecutionEvent> executionEventQueue;
+
     @Test
     @ExecuteFlow("flows/valids/full.yaml")
-    void full(Execution execution) {
+    void full(Execution execution) throws Exception {
         assertThat(execution.getTaskRunList()).hasSize(13);
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.SUCCESS);
-        assertThat((String) execution.findTaskRunsByTaskId("t2").getFirst().getOutputs().get("value")).contains("value1");
+        assertThat((String) taskOutputService.getOutputs(execution.findTaskRunsByTaskId("t2").getFirst()).get("value")).contains("value1");
     }
 
     @Test
@@ -119,35 +131,19 @@ public abstract class AbstractRunnerTest {
     }
 
     @Test
-    @ExecuteFlow("flows/valids/each-parallel-subflow-notfound.yml")
-    void eachParallelWithSubflowMissing(Execution execution) {
-        assertThat(execution).isNotNull();
+    @LoadFlows({ "flows/valids/parallel-fail-fast-cancelled.yaml" })
+    void parallelFailFastCancelled() throws QueueException, TimeoutException {
+        Execution execution = runnerUtils.runOneUntil(
+            MAIN_TENANT,
+            NAMESPACE, "parallel-fail-fast-cancelled", null, null, Duration.ofSeconds(20),
+            execution1 -> execution1.getState().isTerminated()
+                && execution1.getTaskRunList() != null
+                && execution1.getTaskRunList().stream().allMatch(taskRun -> taskRun.getState().isTerminated())
+        );
+
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.FAILED);
-        // on JDBC, when using an each parallel, the flow is failed even if not all subtasks of the each parallel are ended as soon as
-        // there is one failed task FIXME https://github.com/kestra-io/kestra/issues/2179
-        // so instead of asserting that all tasks FAILED we assert that at least two failed (the each parallel and one of its subtasks)
-        assertThat(
-            execution.getTaskRunList().stream().filter(taskRun -> taskRun.getState().isFailed())
-                .count()
-        ).isGreaterThanOrEqualTo(2L); // Should be 3
-    }
-
-    @Test
-    @ExecuteFlow("flows/valids/each-sequential-nested.yaml")
-    void eachSequentialNested(Execution execution) {
-        assertThat(execution.getTaskRunList()).hasSize(23);
-    }
-
-    @Test
-    @ExecuteFlow("flows/valids/each-parallel.yaml")
-    void eachParallel(Execution execution) {
-        assertThat(execution.getTaskRunList()).hasSize(8);
-    }
-
-    @Test
-    @ExecuteFlow("flows/valids/each-parallel-nested.yaml")
-    void eachParallelNested(Execution execution) {
-        assertThat(execution.getTaskRunList()).hasSize(11);
+        // the sibling must be cancelled quickly instead of running its full PT10S duration
+        assertThat(execution.findTaskRunsByTaskId("sleep").getFirst().getState().getCurrent()).isEqualTo(State.Type.CANCELLED);
     }
 
     @Test
@@ -157,9 +153,27 @@ public abstract class AbstractRunnerTest {
     }
 
     @Test
-    @LoadFlows({ "flows/valids/restart-each.yaml" })
+    @LoadFlows({ "flows/valids/replay.yaml" })
     void replay() throws Exception {
         restartCaseTest.replay();
+    }
+
+    @Test
+    @LoadFlows({ "flows/valids/replay.yaml" })
+    void replayFromTaskId() throws Exception {
+        restartCaseTest.replayFromTaskId();
+    }
+
+    @Test
+    @LoadFlows({ "flows/valids/replay-loop.yaml" })
+    void replayLoop() throws Exception {
+        restartCaseTest.replayLoop();
+    }
+
+    @Test
+    @LoadFlows({ "flows/valids/restart-loop.yaml" })
+    void restartLoop() throws Exception {
+        restartCaseTest.restartLoop();
     }
 
     @Test
@@ -178,6 +192,12 @@ public abstract class AbstractRunnerTest {
     @LoadFlows({ "flows/valids/restart_local_errors.yaml" })
     protected void restartFailedThenFailureWithLocalErrors() throws Exception {
         restartCaseTest.restartFailedThenFailureWithLocalErrors();
+    }
+
+    @Test
+    @LoadFlows({ "flows/valids/restart-parent-loop.yaml", "flows/valids/restart-child.yaml" })
+    protected void restartSubflowWithLoop() throws Exception {
+        restartCaseTest.restartSubflowWithLoop();
     }
 
     @Test
@@ -216,13 +236,14 @@ public abstract class AbstractRunnerTest {
         flowTriggerCaseTest.trigger("listener-tenant");
     }
 
-    @Test // flaky on CI but never fail locally
+    @Test
     @LoadFlows(
-        { "flows/valids/trigger-flow-listener-with-pause.yaml",
-            "flows/valids/trigger-flow-with-pause.yaml" }
+        value = { "flows/valids/trigger-flow-listener-with-pause.yaml",
+            "flows/valids/trigger-flow-with-pause.yaml" },
+        tenantId = "pause-tenant"
     )
     void flowTriggerWithPause() throws Exception {
-        flowTriggerCaseTest.triggerWithPause();
+        flowTriggerCaseTest.triggerWithPause("pause-tenant");
     }
 
     @Test
@@ -237,44 +258,12 @@ public abstract class AbstractRunnerTest {
 
     @Test
     @LoadFlows(
-        { "flows/valids/trigger-multiplecondition-listener.yaml",
-            "flows/valids/trigger-multiplecondition-flow-a.yaml",
-            "flows/valids/trigger-multiplecondition-flow-b.yaml" }
+        { "flows/valids/flow-trigger-stable-condition-id-flow-listen.yaml",
+            "flows/valids/flow-trigger-stable-condition-id-flow-a.yaml",
+            "flows/valids/flow-trigger-stable-condition-id-flow-b.yaml" }
     )
-    void multipleConditionTrigger() throws Exception {
-        multipleConditionTriggerCaseTest.trigger();
-    }
-
-    @Test // Flaky on CI but never locally even with 100 repetitions
-    @LoadFlows(
-        value = { "flows/valids/trigger-flow-listener-namespace-condition.yaml",
-            "flows/valids/trigger-multiplecondition-flow-c.yaml",
-            "flows/valids/trigger-multiplecondition-flow-d.yaml" },
-        tenantId = "condition-tenant"
-    )
-    void multipleConditionTriggerFailed() throws Exception {
-        multipleConditionTriggerCaseTest.failed("condition-tenant");
-    }
-
-    @Test
-    @LoadFlows(
-        { "flows/valids/flow-trigger-preconditions-flow-listen.yaml",
-            "flows/valids/flow-trigger-preconditions-flow-a.yaml",
-            "flows/valids/flow-trigger-preconditions-flow-b.yaml" }
-    )
-    void flowTriggerPreconditions() throws Exception {
-        multipleConditionTriggerCaseTest.flowTriggerPreconditions();
-    }
-
-    @Test
-    @LoadFlows(
-        value = { "flows/valids/flow-trigger-preconditions-flow-listen.yaml",
-            "flows/valids/flow-trigger-preconditions-flow-a.yaml",
-            "flows/valids/flow-trigger-preconditions-flow-b.yaml" },
-        tenantId = TENANT_1
-    )
-    void flowTriggerPreconditionsMergeOutputs() throws Exception {
-        multipleConditionTriggerCaseTest.flowTriggerPreconditionsMergeOutputs(TENANT_1);
+    void flowTriggerDependsOnWithStableConditionId() throws Exception {
+        flowTriggerCaseTest.triggerDependsOnWithStableConditionId();
     }
 
     @Test
@@ -284,15 +273,28 @@ public abstract class AbstractRunnerTest {
     }
 
     @Test
-    @LoadFlows({ "flows/valids/flow-trigger-for-each-item-parent.yaml", "flows/valids/flow-trigger-for-each-item-child.yaml", "flows/valids/flow-trigger-for-each-item-grandchild.yaml" })
-    void forEachItemWithFlowTrigger() throws Exception {
-        multipleConditionTriggerCaseTest.forEachItemWithFlowTrigger();
+    @LoadFlows(
+        { "flows/valids/flow-trigger-depends-on-flow-listen.yaml",
+            "flows/valids/flow-trigger-depends-on-flow-a.yaml",
+            "flows/valids/flow-trigger-depends-on-flow-b.yaml" }
+    )
+    void flowTriggerDependsOn() throws Exception {
+        multipleConditionTriggerCaseTest.flowTriggerDependsOn();
     }
 
     @Test
-    @LoadFlows({ "flows/valids/flow-trigger-multiple-preconditions-flow-a.yaml", "flows/valids/flow-trigger-multiple-preconditions-flow-listen.yaml" })
-    void flowTriggerMultiplePreconditions() throws Exception {
-        multipleConditionTriggerCaseTest.flowTriggerMultiplePreconditions();
+    @LoadFlows(
+        { "flows/valids/flow-trigger-multiple-depends-on-flow-a.yaml", "flows/valids/flow-trigger-reset-after-fire-flow-b.yaml",
+            "flows/valids/flow-trigger-multiple-depends-on-flow-listen.yaml" }
+    )
+    void flowTriggerMultipleDependsOn() throws Exception {
+        multipleConditionTriggerCaseTest.flowTriggerMultipleDependsOn();
+    }
+
+    @Test
+    @LoadFlows({ "flows/valids/flow-trigger-reset-after-fire-flow-a.yaml", "flows/valids/flow-trigger-reset-after-fire-flow-b.yaml", "flows/valids/flow-trigger-reset-after-fire-flow-unrelated.yaml", "flows/valids/flow-trigger-reset-after-fire-flow-listen.yaml" })
+    void flowTriggerDependsOnResetsAfterFiring() throws Exception {
+        multipleConditionTriggerCaseTest.flowTriggerDependsOnResetsAfterFiring();
     }
 
     @Test
@@ -302,21 +304,51 @@ public abstract class AbstractRunnerTest {
     }
 
     @Test
+    @LoadFlows({ "flows/valids/flow-trigger-when-condition-flow-a.yaml", "flows/valids/flow-trigger-when-condition-flow-listen.yaml" })
+    void flowTriggerWhenCondition() throws Exception {
+        multipleConditionTriggerCaseTest.flowTriggerWhenCondition();
+    }
+
+    @Test
     @LoadFlows({ "flows/valids/flow-trigger-mixed-conditions-flow-a.yaml", "flows/valids/flow-trigger-mixed-conditions-flow-listen.yaml" })
     void flowTriggerMixedConditions() throws Exception {
         multipleConditionTriggerCaseTest.flowTriggerMixedConditions();
     }
 
     @Test
-    @LoadFlows(value = { "flows/valids/each-null.yaml" }, tenantId = "eachwithnull")
-    void eachWithNull() throws Exception {
-        EachSequentialTest.eachNullTest("eachwithnull", runnerUtils, logsQueue);
+    @LoadFlows(
+        {
+            "flows/valids/flow-trigger-any-mode-flow-a.yaml",
+            "flows/valids/flow-trigger-any-mode-flow-b.yaml",
+            "flows/valids/flow-trigger-any-mode-flow-listen.yaml"
+        }
+    )
+    void flowTriggerAnyMode() throws Exception {
+        multipleConditionTriggerCaseTest.flowTriggerAnyMode();
     }
 
     @Test
-    @LoadFlows({ "flows/tests/plugin-defaults.yaml" })
-    void taskDefaults() throws Exception {
-        pluginDefaultsCaseTest.taskDefaults();
+    @LoadFlows(
+        {
+            "flows/valids/flow-trigger-at-least-mode-flow-a.yaml",
+            "flows/valids/flow-trigger-at-least-mode-flow-b.yaml",
+            "flows/valids/flow-trigger-at-least-mode-flow-c.yaml",
+            "flows/valids/flow-trigger-at-least-mode-flow-listen.yaml"
+        }
+    )
+    void flowTriggerAtLeastMode() throws Exception {
+        multipleConditionTriggerCaseTest.flowTriggerAtLeastMode();
+    }
+
+    @Test
+    @LoadFlows(
+        {
+            "flows/valids/flow-trigger-invalid-inputs-flow-a.yaml",
+            "flows/valids/flow-trigger-invalid-inputs-flow-listen.yaml"
+        }
+    )
+    void flowTriggerWithInvalidInputs() throws Exception {
+        multipleConditionTriggerCaseTest.flowTriggerWithInvalidInputs();
     }
 
     @Test
@@ -342,32 +374,21 @@ public abstract class AbstractRunnerTest {
     }
 
     @Test
-    @LoadFlows(
-        value = { "flows/valids/switch.yaml",
-            "flows/valids/task-flow.yaml",
-            "flows/valids/task-flow-inherited-labels.yaml" },
-        tenantId = TENANT_2
-    )
-    public void invalidOutputs() throws Exception {
-        flowCaseTest.invalidOutputs(TENANT_2);
-    }
-
-    @Test
     @LoadFlows({ "flows/valids/working-directory.yaml" })
-    public void workerSuccess() throws Exception {
+    public void workingDirectorySuccess() throws Exception {
         workingDirectoryTest.success(runnerUtils);
     }
 
     @Test
     @LoadFlows(value = { "flows/valids/working-directory.yaml" }, tenantId = TENANT_1)
-    public void workerFailed() throws Exception {
+    public void workingDirectoryFailed() throws Exception {
         workingDirectoryTest.failed(TENANT_1, runnerUtils);
     }
 
     @Test
-    @LoadFlows({ "flows/valids/working-directory-each.yaml" })
-    public void workerEach() throws Exception {
-        workingDirectoryTest.each(runnerUtils);
+    @LoadFlows({ "flows/valids/working-directory-loop.yaml" })
+    public void workingDirectoryLoop() throws Exception {
+        workingDirectoryTest.loop(runnerUtils);
     }
 
     @Test
@@ -383,21 +404,15 @@ public abstract class AbstractRunnerTest {
     }
 
     @Test
-    @LoadFlows({ "flows/valids/pause-delay.yaml" })
+    @LoadFlows(value = { "flows/valids/pause-delay.yaml" }, tenantId = "pause-run-delay")
     public void pauseRunDelay() throws Exception {
-        pauseTest.runDelay(runnerUtils);
+        pauseTest.runDelay("pause-run-delay", runnerUtils);
     }
 
     @Test
-    @LoadFlows({ "flows/valids/pause-duration-from-input.yaml" })
+    @LoadFlows(value = { "flows/valids/pause-duration-from-input.yaml" }, tenantId = "pause-run-duration")
     public void pauseRunDurationFromInput() throws Exception {
-        pauseTest.runDurationFromInput(runnerUtils);
-    }
-
-    @Test
-    @LoadFlows({ "flows/valids/each-parallel-pause.yml" })
-    public void pauseRunParallelDelay() throws Exception {
-        pauseTest.runParallelDelay(runnerUtils);
+        pauseTest.runDurationFromInput("pause-run-duration", runnerUtils);
     }
 
     @Test
@@ -422,68 +437,6 @@ public abstract class AbstractRunnerTest {
     @LoadFlows({ "flows/valids/minimal.yaml", "flows/valids/minimal2.yaml" })
     void shouldIgnoreExecutionByNamespace() throws Exception {
         ignoreExecutionCaseTest.shouldIgnoreExecutionByNamespace();
-    }
-
-    @Test
-    @LoadFlows(
-        value = { "flows/valids/for-each-item-subflow.yaml",
-            "flows/valids/for-each-item.yaml" },
-        tenantId = "foreachitem"
-    )
-    protected void forEachItem() throws Exception {
-        forEachItemCaseTest.forEachItem("foreachitem");
-    }
-
-    @Test
-    @LoadFlows(value = { "flows/valids/for-each-item.yaml" }, tenantId = TENANT_1)
-    protected void forEachItemEmptyItems() throws Exception {
-        forEachItemCaseTest.forEachItemEmptyItems(TENANT_1);
-    }
-
-    @Test
-    @LoadFlows(
-        value = { "flows/valids/for-each-item-subflow-failed.yaml",
-            "flows/valids/for-each-item-failed.yaml" },
-        tenantId = "foreachitemfailed"
-    )
-    protected void forEachItemFailed() throws Exception {
-        forEachItemCaseTest.forEachItemFailed("foreachitemfailed");
-    }
-
-    @Test
-    @LoadFlows(
-        value = { "flows/valids/for-each-item-outputs-subflow.yaml",
-            "flows/valids/for-each-item-outputs.yaml" },
-        tenantId = "foreachitemsubflowoutputs"
-    )
-    protected void forEachItemSubflowOutputs() throws Exception {
-        forEachItemCaseTest.forEachItemWithSubflowOutputs("foreachitemsubflowoutputs");
-    }
-
-    @Test // flaky on CI but always pass locally even with 100 iterations
-    @LoadFlows(value = { "flows/valids/restart-for-each-item.yaml", "flows/valids/restart-child.yaml" }, tenantId = TENANT_1)
-    void restartForEachItem() throws Exception {
-        forEachItemCaseTest.restartForEachItem(TENANT_1);
-    }
-
-    @Test
-    @LoadFlows(
-        value = { "flows/valids/for-each-item-subflow.yaml",
-            "flows/valids/for-each-item-in-if.yaml" },
-        tenantId = TENANT_1
-    )
-    protected void forEachItemInIf() throws Exception {
-        forEachItemCaseTest.forEachItemInIf(TENANT_1);
-    }
-
-    @Test
-    @LoadFlows(
-        value = { "flows/valids/for-each-item-subflow-after-execution.yaml",
-            "flows/valids/for-each-item-after-execution.yaml" },
-        tenantId = "foreachitemwithafterexecution"
-    )
-    protected void forEachItemWithAfterExecution() throws Exception {
-        forEachItemCaseTest.forEachItemWithAfterExecution("foreachitemwithafterexecution");
     }
 
     @Test
@@ -536,6 +489,151 @@ public abstract class AbstractRunnerTest {
     @LoadFlows(value = { "flows/valids/waitfor-multiple-tasks-failed.yaml" }, tenantId = "waitformultipletasksfailed")
     void waitforMultipleTasksFailed() throws Exception {
         loopUntilTestCaseTest.waitforMultipleTasksFailed("waitformultipletasksfailed");
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-serial.yaml")
+    protected void loopSerial(Execution execution) throws Exception {
+        loopCaseTest.loopSerial(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-serial-multiple-tasks.yaml")
+    protected void loopSerialMultipleTasks(Execution execution) throws Exception {
+        loopCaseTest.loopSerialMultipleTasks(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-failed.yaml")
+    protected void loopFailed(Execution execution) throws Exception {
+        loopCaseTest.loopFailed(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-failed-no-transmit.yaml")
+    protected void loopTransmitFailedFalse(Execution execution) throws Exception {
+        loopCaseTest.loopTransmitFailedFalse(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-parallel-unlimited.yaml")
+    protected void loopParallelUnlimited(Execution execution) throws Exception {
+        loopCaseTest.loopParallelUnlimited(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-parallel-equal.yaml")
+    protected void loopParallelEqual(Execution execution) throws Exception {
+        loopCaseTest.loopParallelEqual(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-parallel-more.yaml")
+    protected void loopParallelMore(Execution execution) throws Exception {
+        loopCaseTest.loopParallelMore(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-parallel-less.yaml")
+    protected void loopParallelLess(Execution execution) throws Exception {
+        loopCaseTest.loopParallelLess(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-flowable.yaml")
+    protected void loopFlowable(Execution execution) throws Exception {
+        loopCaseTest.loopFlowable(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-multiple.yaml")
+    protected void loopMultiple(Execution execution) throws Exception {
+        loopCaseTest.loopMultiple(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-nested.yaml")
+    protected void loopNested(Execution execution) throws Exception {
+        loopCaseTest.loopNested(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-map.yaml")
+    protected void loopMap(Execution execution) throws Exception {
+        loopCaseTest.loopMap(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-values-from-uri.yaml")
+    protected void loopValuesFromUri(Execution execution) throws Exception {
+        loopCaseTest.loopValuesFromUri(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-expression-context.yaml")
+    protected void loopExecutionContext(Execution execution) throws Exception {
+        loopCaseTest.loopExpressionContext(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-outputs.yaml")
+    protected void loopOutputs(Execution execution) throws Exception {
+        loopCaseTest.loopOutputs(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-outputs-store.yaml")
+    protected void loopOutputsStore(Execution execution) throws Exception {
+        loopCaseTest.loopOutputsStore(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-outputs-auto.yaml")
+    protected void loopOutputsAuto(Execution execution) throws Exception {
+        loopCaseTest.loopOutputsAuto(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-outputs-failed-render.yaml")
+    protected void loopOutputsFailedRender(Execution execution) {
+        loopCaseTest.loopOutputsFailedRender(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-empty.yaml")
+    protected void loopEmpty(Execution execution) {
+        loopCaseTest.loopEmpty(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-null.yaml")
+    protected void loopWithNull(Execution execution) {
+        loopCaseTest.loopWithNull(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-object.yaml")
+    public void loopObject(Execution execution) throws InternalException {
+        loopCaseTest.loopObject(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-object-in-list.yaml")
+    public void loopObjectInList(Execution execution) throws InternalException {
+        loopCaseTest.loopObjectInList(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-switch.yaml")
+    public void loopSwitch(Execution execution) throws InternalException {
+        loopCaseTest.loopSwitch(execution);
+    }
+
+    @Test
+    @ExecuteFlow("flows/valids/loop-with-subflow.yaml")
+    @LoadFlows("flows/valids/minimal.yaml")
+    public void loopWithSubflow(Execution execution) {
+        loopCaseTest.loopWithSubflow(execution);
     }
 
     @Test
@@ -606,26 +704,74 @@ public abstract class AbstractRunnerTest {
 
     @Test
     @ExecuteFlow("flows/valids/after-execution.yaml")
-    public void shouldCallTasksAfterExecution(Execution execution) {
+    public void shouldCallTasksAfterExecution(Execution execution) throws InternalException {
         afterExecutionTestCase.shouldCallTasksAfterExecution(execution);
     }
 
     @Test
     @ExecuteFlow("flows/valids/after-execution-finally.yaml")
-    public void shouldCallTasksAfterFinally(Execution execution) {
+    public void shouldCallTasksAfterFinally(Execution execution) throws InternalException {
         afterExecutionTestCase.shouldCallTasksAfterFinally(execution);
     }
 
     @Test
     @ExecuteFlow("flows/valids/after-execution-error.yaml")
-    public void shouldCallTasksAfterError(Execution execution) {
+    public void shouldCallTasksAfterError(Execution execution) throws InternalException {
         afterExecutionTestCase.shouldCallTasksAfterError(execution);
     }
 
     @Test
-    @ExecuteFlow("flows/valids/after-execution-listener.yaml")
-    public void shouldCallTasksAfterListener(Execution execution) {
-        afterExecutionTestCase.shouldCallTasksAfterListener(execution);
+    @ExecuteFlow("flows/valids/after-execution-flowable.yaml")
+    public void shouldCallFlowableTasksAfterExecution(Execution execution) {
+        afterExecutionTestCase.shouldCallFlowableTasksAfterExecution(execution);
+    }
+
+    @Test
+    @LoadFlows({ "flows/valids/workertask-result-too-large.yaml" })
+    protected void workerTaskResultTooLarge() throws Exception {
+        List<LogEntry> logs = new CopyOnWriteArrayList<>();
+        logsQueue.addListener(l -> logs.add(l));
+
+        Execution execution = runnerUtils.runOne(
+            MAIN_TENANT,
+            "io.kestra.tests",
+            "workertask-result-too-large"
+        );
+
+        LogEntry matchingLog = TestsUtils.awaitLog(
+            logs, log -> log.getMessage()
+                .startsWith("Unable to emit the worker task result to the queue")
+        );
+
+        assertThat(matchingLog).isNotNull();
+        assertThat(matchingLog.getLevel()).isEqualTo(Level.ERROR);
+        // the size is different on all runs, so we cannot assert on the exact message size
+        assertThat(matchingLog.getMessage()).contains("message of size");
+        assertThat(matchingLog.getMessage()).contains("has exceeded the configured limit of 1048576");
+
+        assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.FAILED);
+        assertThat(execution.getTaskRunList().size()).isEqualTo(1);
+    }
+
+    @Test
+    void avoidInfiniteExecutionLoop() throws QueueException {
+        CopyOnWriteArrayList<ExecutionEvent> executions = new CopyOnWriteArrayList<>();
+        executionEventQueue.addListener(e -> executions.add(e));
+
+        executionCommandQueue.emit(Create.of(TestsUtils.mockFlow().toFlowId()));
+
+        // The flow does not exist in the repository: handleCreate logs an error and returns empty.
+        // We expect zero execution events — and certainly no infinite loop.
+        await()
+            .during(Duration.ofMillis(500)) // Wait to ensure no event is ever emitted
+            .atMost(Duration.ofSeconds(1))
+            .until(executions::isEmpty);
+    }
+
+    @Test
+    @LoadFlows(value = { "flows/valids/waitfor-child-task-warning.yaml" }, tenantId = "waitforchildtaskwarning")
+    void waitForChildTaskWarning() throws Exception {
+        loopUntilTestCaseTest.waitForChildTaskWarning("waitforchildtaskwarning");
     }
 
     @Test
@@ -633,4 +779,87 @@ public abstract class AbstractRunnerTest {
     void waitforNestedThreeLevels() throws Exception {
         loopUntilTestCaseTest.waitforNestedThreeLevels("waitfornested");
     }
+
+    @Test
+    @LoadFlows(value = { "flows/valids/loopuntil-failed-flowable.yaml" }, tenantId = "loopuntilfailedflowable")
+    void loopUntilFailedFlowable() throws Exception {
+        loopUntilTestCaseTest.loopUntilFailedFlowable("loopuntilfailedflowable");
+    }
+
+    @Test
+    @LoadFlows("flows/valids/errors.yaml")
+    void errors() throws Exception {
+        List<LogEntry> logs = new CopyOnWriteArrayList<>();
+        logsQueue.addListener(l -> logs.add(l));
+
+        Execution execution = runnerUtils.runOne(
+            MAIN_TENANT, NAMESPACE, "errors", null, null,
+            Duration.ofSeconds(60)
+        );
+
+        assertThat(execution.getTaskRunList()).hasSize(7);
+
+        LogEntry logEntry = TestsUtils.awaitLog(
+            logs,
+            log -> log.getMessage().contains("- task: failed, message: Task failure")
+        );
+        assertThat(logEntry).isNotNull();
+        assertThat(logEntry.getMessage()).isEqualTo("- task: failed, message: Task failure");
+    }
+
+    @RetryingTest(5)
+    @LoadFlows({ "flows/valids/execution.yaml" })
+    void executionDate() throws Exception {
+        Execution execution = runnerUtils.runOne(
+            MAIN_TENANT, NAMESPACE,
+            "execution-start-date", null, null, Duration.ofSeconds(60)
+        );
+
+        Map<String, Object> outputs = taskOutputService.getOutputs(execution.getTaskRunList().getFirst());
+        assertThat((String) outputs.get("value")).matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6,9}Z");
+    }
+
+    @Test
+    @LoadFlows(value = { "flows/valids/sequential-sleep.yaml" }, tenantId = "killed-flowable")
+    void killedFlowableTaskRunShouldHaveTerminalAttempt() throws QueueException {
+        // Given — wait until the leaf sleep task is actually running so the Sequential flowable
+        // parent has a live attempt; killing too early could bypass the attempt-update path entirely.
+        Execution running = runnerUtils.runOneUntil(
+            "killed-flowable", NAMESPACE, "sequential-sleep", null, null, Duration.ofSeconds(30),
+            e -> e.getState().isRunning()
+                && e.getTaskRunList() != null
+                && e.getTaskRunList().stream().anyMatch(t -> "sleep".equals(t.getTaskId()) && t.getState().isRunning())
+        );
+
+        // When
+        Execution killed = runnerUtils.killExecution(running);
+
+        // Then — every task run (including the Sequential flowable parent) must be in a terminal
+        // state with its last attempt also terminal, so the UI doesn't show a stuck duration counter.
+        assertThat(killed.getState().getCurrent()).isEqualTo(State.Type.KILLED);
+        for (TaskRun taskRun : killed.getTaskRunList()) {
+            assertThat(taskRun.getState().isTerminated())
+                .as("taskRun '%s' must be terminal after kill", taskRun.getTaskId())
+                .isTrue();
+            List<TaskRunAttempt> attempts = taskRun.getAttempts();
+            if (attempts != null && !attempts.isEmpty()) {
+                assertThat(attempts.getLast().getState().isTerminated())
+                    .as("last attempt of taskRun '%s' must be terminal after kill", taskRun.getTaskId())
+                    .isTrue();
+            }
+        }
+        // Specifically verify the Sequential flowable parent (seq) has a non-empty attempt list
+        // and that its last attempt is terminal — this is the path fixed by the bug.
+        TaskRun seqTaskRun = killed.getTaskRunList().stream()
+            .filter(t -> "seq".equals(t.getTaskId()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Expected 'seq' task run not found"));
+        assertThat(seqTaskRun.getAttempts())
+            .as("Sequential flowable parent 'seq' must have at least one attempt after kill")
+            .isNotEmpty();
+        assertThat(seqTaskRun.getAttempts().getLast().getState().isTerminated())
+            .as("last attempt of 'seq' must be terminal after kill")
+            .isTrue();
+    }
+
 }

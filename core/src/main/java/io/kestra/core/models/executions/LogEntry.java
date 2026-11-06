@@ -11,22 +11,26 @@ import org.slf4j.event.Level;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.kestra.core.models.TenantInterface;
-import io.kestra.core.models.flows.FlowInterface;
+import io.kestra.core.models.flows.FlowId;
 import io.kestra.core.models.triggers.AbstractTrigger;
-import io.kestra.core.models.triggers.TriggerContext;
+import io.kestra.core.models.triggers.TriggerId;
+import io.kestra.core.queues.event.DispatchEvent;
+import io.kestra.core.utils.IdUtils;
+import io.kestra.core.validations.TenantId;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import lombok.Builder;
 import lombok.Value;
 
 @Value
 @Builder(toBuilder = true)
-public class LogEntry implements TenantInterface {
+public class LogEntry implements TenantInterface, DispatchEvent {
     @Hidden
-    @Pattern(regexp = "^[a-z0-9][a-z0-9_-]*")
+    @TenantId
     String tenantId;
 
     @NotNull
@@ -62,6 +66,10 @@ public class LogEntry implements TenantInterface {
     @Nullable
     ExecutionKind executionKind;
 
+    // Opaque plugin-defined step token; wrap in a record if percent/total is ever needed
+    @Nullable
+    String progress;
+
     public static List<Level> findLevelsByMin(Level minLevel) {
         if (minLevel == null) {
             return Arrays.asList(Level.values());
@@ -72,6 +80,16 @@ public class LogEntry implements TenantInterface {
             .toList();
     }
 
+    public static List<Level> findLevelsByMax(Level maxLevel) {
+        if (maxLevel == null) {
+            return Arrays.asList(Level.values());
+        }
+
+        return Arrays.stream(Level.values())
+            .filter(level -> level.toInt() <= maxLevel.toInt())
+            .toList();
+    }
+
     public static LogEntry of(Execution execution) {
         return LogEntry.builder()
             .tenantId(execution.getTenantId())
@@ -79,6 +97,16 @@ public class LogEntry implements TenantInterface {
             .flowId(execution.getFlowId())
             .executionId(execution.getId())
             .executionKind(execution.getKind())
+            .build();
+    }
+
+    public static LogEntry of(ExecutionId executionId, ExecutionKind executionKind) {
+        return LogEntry.builder()
+            .tenantId(executionId.tenantId())
+            .namespace(executionId.namespace())
+            .flowId(executionId.flowId())
+            .executionId(executionId.executionId())
+            .executionKind(executionKind)
             .build();
     }
 
@@ -95,7 +123,7 @@ public class LogEntry implements TenantInterface {
             .build();
     }
 
-    public static LogEntry of(FlowInterface flow, AbstractTrigger abstractTrigger) {
+    public static LogEntry of(FlowId flow, AbstractTrigger abstractTrigger) {
         return LogEntry.builder()
             .tenantId(flow.getTenantId())
             .namespace(flow.getNamespace())
@@ -105,11 +133,11 @@ public class LogEntry implements TenantInterface {
             .build();
     }
 
-    public static LogEntry of(TriggerContext triggerContext, AbstractTrigger abstractTrigger) {
+    public static LogEntry of(TriggerId trigger, AbstractTrigger abstractTrigger) {
         return LogEntry.builder()
-            .tenantId(triggerContext.getTenantId())
-            .namespace(triggerContext.getNamespace())
-            .flowId(triggerContext.getFlowId())
+            .tenantId(trigger.getTenantId())
+            .namespace(trigger.getNamespace())
+            .flowId(trigger.getFlowId())
             .triggerId(abstractTrigger.getId())
             .executionId(abstractTrigger.getId())
             .build();
@@ -130,7 +158,7 @@ public class LogEntry implements TenantInterface {
     }
 
     public Map<String, String> toMap() {
-        return Stream
+        Map<String, String> map = Stream
             .of(
                 new AbstractMap.SimpleEntry<>("tenantId", this.tenantId),
                 new AbstractMap.SimpleEntry<>("namespace", this.namespace),
@@ -143,6 +171,15 @@ public class LogEntry implements TenantInterface {
             )
             .filter(e -> e.getValue() != null)
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        // enrich with the active OpenTelemetry trace context, a no-op when tracing is disabled
+        SpanContext spanContext = Span.current().getSpanContext();
+        if (spanContext.isValid()) {
+            map.put("trace_id", spanContext.getTraceId());
+            map.put("span_id", spanContext.getSpanId());
+        }
+
+        return map;
     }
 
     public Map<String, Object> toLogMap() {
@@ -153,4 +190,9 @@ public class LogEntry implements TenantInterface {
         return map;
     }
 
+    @Override
+    public String key() {
+        // FIXME should we return null instead?
+        return IdUtils.create();
+    }
 }

@@ -3,13 +3,11 @@ package io.kestra.webserver.models.events;
 import java.time.Instant;
 import java.util.Optional;
 
-import io.micronaut.core.annotation.Introspected;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.Getter;
 
 @Getter
-@Introspected
 public class OssAuthEvent extends Event {
     private final OssAuth ossAuth;
 

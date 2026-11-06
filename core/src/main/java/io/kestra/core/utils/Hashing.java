@@ -4,6 +4,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.google.common.hash.HashCode;
 
 /**
@@ -20,6 +22,18 @@ public final class Hashing {
      */
     public static String hashToString(final String value) {
         return getHashString(value).toString();
+    }
+
+    /**
+     * Returns a consistent hash value for the given input strings, using
+     * a non-cryptographic hash function.
+     * Each string will be concatenated before hashing.
+     *
+     * @param values the values to be hashed.
+     * @return the string hash value.
+     */
+    public static String hashToString(final String... values) {
+        return getHashString(StringUtils.join(values)).toString();
     }
 
     /**

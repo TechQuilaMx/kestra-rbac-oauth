@@ -3,7 +3,7 @@ package io.kestra.core.models.flows;
 import java.util.Optional;
 
 import io.kestra.core.models.executions.Execution;
-import io.kestra.core.models.triggers.Trigger;
+import io.kestra.core.models.triggers.TriggerId;
 import io.kestra.core.utils.IdUtils;
 
 import lombok.AllArgsConstructor;
@@ -23,6 +23,10 @@ public interface FlowId {
 
     String getTenantId();
 
+    default FlowId toFlowId() {
+        return new Default(this.getTenantId(), this.getNamespace(), this.getId(), this.getRevision());
+    }
+
     static String uid(FlowId flow) {
         return uid(flow.getTenantId(), flow.getNamespace(), flow.getId(), Optional.ofNullable(flow.getRevision()));
     }
@@ -39,7 +43,7 @@ public interface FlowId {
         return of(tenantId, namespace, id, null).toString();
     }
 
-    static String uid(Trigger trigger) {
+    static String uid(TriggerId trigger) {
         return of(trigger.getTenantId(), trigger.getNamespace(), trigger.getFlowId(), null).toString();
     }
 
@@ -54,6 +58,15 @@ public interface FlowId {
      */
     static FlowId of(String tenantId, String namespace, String id, Integer revision) {
         return new Default(tenantId, namespace, id, revision);
+    }
+
+    /**
+     * Static helper method for constructing a new {@link TriggerId}.
+     *
+     * @return a new {@link FlowId}.
+     */
+    static FlowId of(TriggerId triggerId) {
+        return new Default(triggerId.getTenantId(), triggerId.getNamespace(), triggerId.getFlowId(), null);
     }
 
     @Getter

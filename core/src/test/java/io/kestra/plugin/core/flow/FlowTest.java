@@ -39,30 +39,9 @@ class FlowTest {
         value = { "flows/valids/task-flow.yaml",
             "flows/valids/task-flow-inherited-labels.yaml",
             "flows/valids/switch.yaml" },
-        tenantId = "invalidoutputs"
-    )
-    void invalidOutputs() throws Exception {
-        flowCaseTest.invalidOutputs("invalidoutputs");
-    }
-
-    @Test
-    @LoadFlows(
-        value = { "flows/valids/task-flow.yaml",
-            "flows/valids/task-flow-inherited-labels.yaml",
-            "flows/valids/switch.yaml" },
         tenantId = "nolabels"
     )
     void noLabels() throws Exception {
         flowCaseTest.noLabels("nolabels");
-    }
-
-    @Test
-    @LoadFlows(
-        value = { "flows/valids/subflow-old-task-name.yaml",
-            "flows/valids/minimal.yaml" },
-        tenantId = "oldtaskname"
-    )
-    void oldTaskName() throws Exception {
-        flowCaseTest.oldTaskName("oldtaskname");
     }
 }

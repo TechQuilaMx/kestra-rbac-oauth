@@ -1,15 +1,23 @@
-import {ElNotification, ElMessageBox, ElTable, ElTableColumn} from "element-plus"
+import {KsMarkdown, KsMessageBox, KsNotification, KsTable, KsTableColumn} from "@kestra-io/design-system"
 import {App, h} from "vue"
 import {useI18n} from "vue-i18n"
 
-import Markdown from "../components/layout/Markdown.vue"
+// Module-scoped so repeated Ctrl+S collapses earlier "saved" toasts without dismissing
+// unrelated notifications (e.g. the plugin auto-install progress toast).
+let savedNotificationHandles: {close: () => void}[] = []
 
 
-export const makeToast = (t: (t:string, options?: Record<string, string>) => string) => ({
-    _wrap: function(message:string) {
-        if(Array.isArray(message) && message.length > 0){
+/**
+ * What a toast body may be: markdown text, or one entry per item for a bulk operation that partly failed.
+ */
+export type ToastMessageBody = string | {message: string}[]
+
+export const makeToast = (t: (t:string, options?: Record<string, string>) => string) => {
+    /** A list of items renders as a table; a plain string renders as markdown. */
+    function wrapMessage(message: ToastMessageBody) {
+        if (Array.isArray(message) && message.length > 0) {
             return h(
-                ElTable,
+                KsTable,
                 {
                     stripe: true,
                     tableLayout: "auto",
@@ -19,91 +27,90 @@ export const makeToast = (t: (t:string, options?: Record<string, string>) => str
                     size: "small",
                 },
                 [
-                    h(ElTableColumn, {label: "Message", formatter: (row) => { return h("span",{innerHTML:row.message})}})
-                ]
+                    h(KsTableColumn, {label: "Message", formatter: (row: any) => { return h("span",{innerHTML:row.message})}}),
+                ],
             )
         } else {
-            return h(Markdown, {source: message});
+            return h(KsMarkdown, {content: message as string})
         }
-    },
-    _MarkdownWrap: function(message:string) {
-        return h(Markdown, {source: message})
-    },
-    confirm: function(message:string, callback: () => Promise<any>, type = "warning" as const, showCancelButton = true) {
-        return ElMessageBox
-            .confirm(typeof message === "string" ? this._MarkdownWrap(message || t("toast confirm")) : h(message), t("confirmation"), {type, showCancelButton})
-            .then(() => callback())
-            .catch(() => {
-                // User cancelled
-            });
-    },
-    saved: function(name:string, title?:string, options?: Record<string, any>) {
-        ElNotification.closeAll();
-        const message = options?.multiple
-            ? t("multiple saved done", {name})
-            : t("saved done", {name: name});
-        ElNotification({
-
-                title: title || t("saved"),
-                message: this._wrap(message),
-                position: "bottom-right",
-                type: "success",
-            ...options
-        });
-    },
-    deleted: function(name:string, title?:string, options?: Record<string, any>) {
-        ElNotification({
-
-                title: title || t("deleted"),
-                message: this._wrap(t("deleted confirm", {name: name})),
-                position: "bottom-right",
-                type: "success",
-            ...options
-        })
-    },
-    success: function(message:string, title?:string, options?: Record<string, any>) {
-        ElNotification({
-
-                title: title || t("success"),
-                message: this._wrap(message),
-                position: "bottom-right",
-                type: "success",
-            ...options
-        })
-    },
-    warning: function(message:string, title?:string, options?: Record<string, any>) {
-        ElNotification({
-
-                title: title || t("warning"),
-                message: this._wrap(message),
-                position: "bottom-right",
-                type: "warning",
-            ...options
-        })
-    },
-    error: function(message:string, title?:string, options?: Record<string, any>) {
-        ElNotification({
-
-                title: title ?? t("error"),
-                message: this._wrap(message),
-                position: "bottom-right",
-                type: "error",
-                duration: 0,
-                customClass: "large",
-            ...options
-        })
     }
-})
+
+    function MarkdownWrap(message:string) {
+        return h(KsMarkdown, {content: message})
+    }
+    
+    return {
+        confirm: function(message:string, callback: () => Promise<any>, type = "warning" as const, showCancelButton = true) {
+            return KsMessageBox
+                .confirm(typeof message === "string" ? MarkdownWrap(message || t("toast confirm")) : h(message), t("confirmation"), {type, showCancelButton})
+                .then(() => callback())
+                .catch(() => {
+                    // User cancelled
+                })
+        },
+        saved: function(name:string, title?:string, options?: Record<string, any>) {
+            savedNotificationHandles.forEach((handle) => handle.close())
+            const message = options?.multiple
+                ? t("multiple saved done", {name})
+                : t("saved done", {name: name})
+            savedNotificationHandles = [KsNotification({
+                    title: title || t("saved"),
+                    message: wrapMessage(message),
+                    position: "bottom-right",
+                    type: "success",
+                ...options,
+            })]
+        },
+        deleted: function(name:string, title?:string, options?: Record<string, any>) {
+            KsNotification({
+                    title: title || t("deleted"),
+                    message: wrapMessage(t("deleted confirm", {name: name})),
+                    position: "bottom-right",
+                    type: "success",
+                ...options,
+            })
+        },
+        success: function(message:string, title?:string, options?: Record<string, any>) {
+            KsNotification({
+                    title: title || t("success"),
+                    message: wrapMessage(message),
+                    position: "bottom-right",
+                    type: "success",
+                ...options,
+            })
+        },
+        warning: function(message:string, title?:string, options?: Record<string, any>) {
+            KsNotification({
+                    title: title || t("warning"),
+                    message: wrapMessage(message),
+                    position: "bottom-right",
+                    type: "warning",
+                ...options,
+            })
+        },
+        error: function(message: ToastMessageBody, title?:string, options?: Record<string, any>) {
+            KsNotification({
+                    title: title ?? t("error"),
+                    message: wrapMessage(message),
+                    position: "bottom-right",
+                    type: "error",
+                    duration: 0,
+                    customClass: "kel-notification__large",
+                ...options,
+            })
+        },
+    }
+}
 
 export default {
     install(app: App) {
         app.config.globalProperties.$toast = () => {
-            return makeToast(app.config.globalProperties.$t);
+            return makeToast(app.config.globalProperties.$t)
         }
-    }
+    },
 }
 
 export function useToast(){
-    const {t} = useI18n({useScope: "global"});
+    const {t} = useI18n({useScope: "global"})
     return makeToast(t)
 }

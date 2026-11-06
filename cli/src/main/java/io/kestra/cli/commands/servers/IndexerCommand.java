@@ -11,7 +11,6 @@ import io.kestra.core.runners.Indexer;
 import io.kestra.core.services.IgnoreExecutionService;
 import io.kestra.core.utils.Await;
 
-import io.micronaut.context.ApplicationContext;
 import jakarta.inject.Inject;
 import picocli.CommandLine;
 
@@ -21,16 +20,15 @@ import picocli.CommandLine;
 )
 public class IndexerCommand extends AbstractServerCommand {
     @Inject
-    private ApplicationContext applicationContext;
+    private Indexer indexer;
     @Inject
     private IgnoreExecutionService ignoreExecutionService;
 
-    @CommandLine.Option(names = { "--skip-indexer-records" }, split = ",", description = "deprecated - use '--ignore-indexer-record' instead")
-    @Deprecated
-    private List<String> skipIndexerRecords;
-
     @CommandLine.Option(names = { "--ignore-indexer-records" }, split = ",", description = "a list of indexer record keys to ignore, separated by a coma; for troubleshooting only")
     private List<String> ignoreIndexerRecords = Collections.emptyList();
+
+    @CommandLine.Option(names = { "--ignore-queue-records" }, split = ",", description = "a list of queue record keys to ignore, separated by a coma; for troubleshooting only")
+    private List<String> ignoreQueueRecords = Collections.emptyList();
 
     @SuppressWarnings("unused")
     public static Map<String, Object> propertiesOverrides() {
@@ -41,14 +39,14 @@ public class IndexerCommand extends AbstractServerCommand {
 
     @Override
     public Integer call() throws Exception {
-        this.ignoreExecutionService.setIgnoredIndexerRecords(skipIndexerRecords != null ? skipIndexerRecords : ignoreIndexerRecords);
+        this.ignoreExecutionService.setIgnoredIndexerRecords(ignoreIndexerRecords);
+        this.ignoreExecutionService.setIgnoredQueueRecords(ignoreQueueRecords);
 
         super.call();
 
-        Indexer indexer = applicationContext.getBean(Indexer.class);
         indexer.run();
 
-        Await.until(() -> !this.applicationContext.isRunning());
+        Await.await().forever().until(() -> !this.applicationContext.isRunning());
 
         return 0;
     }

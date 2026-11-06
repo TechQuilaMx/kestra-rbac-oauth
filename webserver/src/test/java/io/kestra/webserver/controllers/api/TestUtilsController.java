@@ -5,11 +5,9 @@ import io.micronaut.http.annotation.*;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
-import io.micronaut.validation.Validated;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-@Validated
 @Controller("/test-utils")
 public class TestUtilsController {
 

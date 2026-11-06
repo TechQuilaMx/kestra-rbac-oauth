@@ -1,7 +1,6 @@
 package io.kestra.cli.commands.flows;
 
 import io.kestra.cli.AbstractApiCommand;
-import io.kestra.cli.AbstractValidateCommand;
 import io.kestra.cli.services.TenantIdSelectorService;
 
 import io.micronaut.http.HttpRequest;
@@ -29,7 +28,6 @@ public class FlowDeleteCommand extends AbstractApiCommand {
     @Inject
     private TenantIdSelectorService tenantService;
 
-    @SuppressWarnings("deprecation")
     @Override
     public Integer call() throws Exception {
         super.call();
@@ -44,7 +42,11 @@ public class FlowDeleteCommand extends AbstractApiCommand {
 
             stdOut("Flow successfully deleted !");
         } catch (HttpClientResponseException e) {
-            AbstractValidateCommand.handleHttpException(e, "flow");
+            stdErr("\t@|fg(red) Unable to parse flows due to the following error:|@");
+            stdErr(
+                "\t- @|bold,yellow {0}|@",
+                e.getMessage()
+            );
             return 1;
         }
 

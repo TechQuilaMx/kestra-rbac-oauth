@@ -13,7 +13,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.google.common.collect.ImmutableMap;
 
 import io.kestra.core.debug.Breakpoint;
 import io.kestra.core.exceptions.InternalException;
@@ -25,7 +24,7 @@ import io.kestra.core.models.flows.Flow;
 import io.kestra.core.models.flows.FlowInterface;
 import io.kestra.core.models.flows.State;
 import io.kestra.core.models.tasks.ResolvedTask;
-import io.kestra.core.runners.FlowableUtils;
+import io.kestra.core.queues.event.DispatchEvent;
 import io.kestra.core.runners.RunContextLogger;
 import io.kestra.core.serializers.ListOrMapOfLabelDeserializer;
 import io.kestra.core.serializers.ListOrMapOfLabelSerializer;
@@ -33,7 +32,7 @@ import io.kestra.core.services.LabelService;
 import io.kestra.core.test.flow.TaskFixture;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.ListUtils;
-import io.kestra.core.utils.MapUtils;
+import io.kestra.core.validations.TenantId;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.LoggingEvent;
@@ -42,7 +41,6 @@ import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -55,7 +53,10 @@ import lombok.extern.slf4j.Slf4j;
 @AllArgsConstructor
 @ToString
 @EqualsAndHashCode
-public class Execution implements SoftDeletable<Execution>, TenantInterface, HasUID {
+public class Execution implements SoftDeletable<Execution>, TenantInterface, HasUID, DispatchEvent {
+    // !!! WARNING !!!
+    // When you add anything in this class, make sure to also update ApiExecution and ApiLightExecution in the webserver module
+    // !!!!!!!!!!!!!!!
 
     public static final String STATE_START_DATE_FIELD = "state.startDate";
     public static final String STATE_END_DATE_FIELD = "state.endDate";
@@ -63,7 +64,7 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
     @NotNull
     @With
     @Hidden
-    @Pattern(regexp = "^[a-z0-9][a-z0-9_-]*")
+    @TenantId
     String tenantId;
 
     @NotNull
@@ -87,9 +88,14 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
     @Schema(implementation = Object.class)
     Map<String, Object> inputs;
 
+    /**
+     * @deprecated should only be used inside the pre-2.0 compatibility layer.
+     */
     @With
+    @Hidden
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     @Schema(implementation = Object.class)
+    @Deprecated(forRemoval = true, since = "2.0.0")
     Map<String, Object> outputs;
 
     @JsonSerialize(using = ListOrMapOfLabelSerializer.class)
@@ -105,6 +111,7 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
 
     String parentId;
 
+    @NotNull
     String originalId;
 
     @With
@@ -114,6 +121,7 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
     @Builder.Default
     boolean deleted = false;
 
+    @NotNull
     @With
     ExecutionMetadata metadata;
 
@@ -134,6 +142,9 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
 
     @Nullable
     List<Breakpoint> breakpoints;
+
+    @Nullable
+    LoopRun loopRun;
 
     @Override
     @JsonIgnore
@@ -200,21 +211,18 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
             .kind(kind)
             .build();
 
-        List<Label> executionLabels = new ArrayList<>(LabelService.labelsExcludingSystem(flow.getLabels()));
-        if (labels != null) {
-            executionLabels.addAll(labels);
-        }
-        if (executionLabels.stream().noneMatch(label -> Label.CORRELATION_ID.equals(label.key()))) {
-            // add a correlation ID if none exist
-            executionLabels.add(new Label(Label.CORRELATION_ID, execution.getId()));
-        }
-        execution = execution.withLabels(executionLabels);
+        execution = execution.withLabels(LabelService.forExecution(flow, labels, execution.getId()));
 
         if (inputs != null) {
             execution = execution.withInputs(inputs.apply(flow, execution));
         }
 
         return execution;
+    }
+
+    @Override
+    public String key() {
+        return id;
     }
 
     /**
@@ -276,7 +284,8 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
             this.traceParent,
             this.fixtures,
             this.kind,
-            this.breakpoints
+            this.breakpoints,
+            this.loopRun
         );
     }
 
@@ -302,7 +311,8 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
             this.traceParent,
             this.fixtures,
             this.kind,
-            this.breakpoints
+            this.breakpoints,
+            this.loopRun
         );
     }
 
@@ -343,7 +353,8 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
             this.traceParent,
             this.fixtures,
             this.kind,
-            this.breakpoints
+            this.breakpoints,
+            this.loopRun
         );
     }
 
@@ -369,7 +380,8 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
             this.traceParent,
             this.fixtures,
             this.kind,
-            newBreakpoints
+            newBreakpoints,
+            this.loopRun
         );
     };
 
@@ -382,6 +394,11 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
         return withLabels(existingLabel);
     }
 
+    /**
+     * Creates a child execution with the given parameters.
+     * Child executions derived from the original execution, to restart or replay it.
+     * When restarting, set the <code>childExecutionId</code> to the original execution ID, when replaying, set it to null.
+     */
     public Execution childExecution(String childExecutionId, List<TaskRun> taskRunList,
         State state) {
         return new Execution(
@@ -392,11 +409,13 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
             this.flowRevision,
             taskRunList,
             this.inputs,
-            this.outputs,
+            // outputs are not copied: they are recomputed when the child execution ends.
+            null,
             this.labels,
             this.variables,
             state,
-            childExecutionId != null ? this.getId() : null,
+            // preserve the parentId when restarting, this is needed for loop sub-executions
+            childExecutionId != null ? this.getId() : this.parentId,
             this.originalId,
             this.trigger,
             this.deleted,
@@ -405,8 +424,57 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
             this.traceParent,
             this.fixtures,
             this.kind,
-            this.breakpoints
+            this.breakpoints,
+            this.loopRun
         );
+    }
+
+    /**
+     * Creates a derived loop execution from the current execution and the loop task run
+     * with the given iteration information (index, key and value).
+     */
+    public Execution loopExecution(TaskRun taskRun, int index, @Nullable String key, String value) {
+        return new Execution(
+            this.tenantId,
+            IdUtils.create(),
+            this.namespace,
+            this.flowId,
+            this.flowRevision,
+            null,
+            null, // we don't copy inputs to reduce the size, the RunVariables must get them from the parent execution
+            null, // same for the outputs, the RunVariables get them from the parent execution
+            this.labels,
+            this.variables,
+            this.state,
+            this.id,
+            null,
+            null, // we don't copy triggers to reduce the size, the RunVariables must get them from the parent execution
+            this.deleted,
+            this.metadata,
+            null,
+            this.traceParent,
+            this.fixtures,
+            ExecutionKind.LOOP,
+            this.breakpoints,
+            new LoopRun(this, taskRun.getTaskId(), taskRun.getId(), index, key, value, computeParents())
+        );
+    }
+
+    /**
+     * Computes loop parents from the current execution's loop run for inclusion in a new loop execution.
+     */
+    private List<LoopRun.Parent> computeParents() {
+        if (this.loopRun == null) {
+            return null;
+        }
+
+        List<LoopRun.Parent> parents = new ArrayList<>();
+        if (this.loopRun.parents() != null) {
+            parents.addAll(this.loopRun.parents());
+        }
+
+        parents.add(new LoopRun.Parent(this.loopRun.index(), this.loopRun.key(), this.loopRun.value()));
+        return parents;
     }
 
     public List<TaskRun> findTaskRunsByTaskId(String id) {
@@ -420,21 +488,30 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
             .toList();
     }
 
+    /**
+     * Find a task run by its task run id.
+     *
+     * @see #findTaskRunByTaskRunIdIfPresent(String) for a safe alternative
+     * @throws InternalException if the task run doesn't exist
+     */
     public TaskRun findTaskRunByTaskRunId(String id) throws InternalException {
-        Optional<TaskRun> find = (this.taskRunList == null ? Collections.<TaskRun> emptyList()
-            : this.taskRunList)
+        return findTaskRunByTaskRunIdIfPresent(id)
+            .orElseThrow(() -> new InternalException(
+                "Can't find taskrun with taskrunId '" + id + "' on execution '" + this.id + "' "
+                    + this.toStringState()
+            ));
+    }
+
+    /**
+     * Find a task run by its task run id if present, else return an empty optional.
+     *
+     * @see #findTaskRunByTaskRunId(String) for a fail-fast alternative
+     */
+    public Optional<TaskRun> findTaskRunByTaskRunIdIfPresent(String id) {
+        return ListUtils.emptyOnNull(this.taskRunList)
             .stream()
             .filter(taskRun -> taskRun.getId().equals(id))
             .findFirst();
-
-        if (find.isEmpty()) {
-            throw new InternalException(
-                "Can't find taskrun with taskrunId '" + id + "' on execution '" + this.id + "' "
-                    + this.toStringState()
-            );
-        }
-
-        return find.get();
     }
 
     public TaskRun findTaskRunByTaskIdAndValue(String id, List<String> values)
@@ -516,15 +593,14 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
         resolvedErrors = removeDisabled(resolvedErrors);
         resolvedFinally = removeDisabled(resolvedFinally);
 
-        List<TaskRun> errorsFlow = this.findTaskRunByTasks(resolvedErrors, parentTaskRun);
         List<TaskRun> finallyFlow = this.findTaskRunByTasks(resolvedFinally, parentTaskRun);
-
-        // finally is already started, just continue these finally
+        // finally is already started, just continue it
         if (!finallyFlow.isEmpty()) {
             return resolvedFinally == null ? Collections.emptyList() : resolvedFinally;
         }
 
-        // check if the parent task should fail, and there is error tasks so we start them
+        List<TaskRun> errorsFlow = this.findTaskRunByTasks(resolvedErrors, parentTaskRun);
+        // check if the parent task should fail, and there are error tasks so we start them
         if (errorsFlow.isEmpty() && terminalState == State.Type.FAILED) {
             return resolvedErrors == null ? resolvedFinally == null ? Collections.emptyList() : resolvedFinally : resolvedErrors;
         }
@@ -573,15 +649,15 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
             return Collections.emptyList();
         }
 
+        // to avoid nested loops, we pre-compute a per-uid resolved task map for fast retrieval
+        Map<String, ResolvedTask> resolvedTaskMap = HashMap.newHashMap(resolvedTasks.size());
+        resolvedTasks.forEach(resolvedTask -> resolvedTaskMap.put(resolvedTask.uid(), resolvedTask));
         return this
             .getTaskRunList()
             .stream()
             .filter(
-                t -> resolvedTasks
-                    .stream()
-                    .anyMatch(
-                        resolvedTask -> FlowableUtils.isTaskRunFor(resolvedTask, t, parentTaskRun)
-                    )
+                t -> resolvedTaskMap.containsKey(IdUtils.fromParts(t.getTaskId(), t.getValue()))
+                    && (parentTaskRun == null || parentTaskRun.getId().equals(t.getParentTaskRunId()))
             )
             .toList();
     }
@@ -594,17 +670,6 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
         return this.taskRunList
             .stream()
             .filter(t -> t.getState().getCurrent() == state)
-            .findFirst();
-    }
-
-    public Optional<TaskRun> findFirstRunning() {
-        if (this.taskRunList == null) {
-            return Optional.empty();
-        }
-
-        return this.taskRunList
-            .stream()
-            .filter(t -> t.getState().isRunning())
             .findFirst();
     }
 
@@ -624,7 +689,7 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
         return this.taskRunList
             .reversed()
             .stream()
-            .filter(t -> !t.getState().isTerminated() || !t.getState().isPaused())
+            .filter(t -> !t.getState().isTerminated() && !t.getState().isPaused())
             .findFirst();
     }
 
@@ -641,22 +706,6 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
             .reversed()
             .stream()
             .filter(t -> t.getState().isCreated())
-            .findFirst();
-    }
-
-    public Optional<TaskRun> findLastSubmitted(List<TaskRun> taskRuns) {
-        return taskRuns
-            .reversed()
-            .stream()
-            .filter(t -> t.getState().getCurrent() == State.Type.SUBMITTED)
-            .findFirst();
-    }
-
-    public Optional<TaskRun> findLastRunning(List<TaskRun> taskRuns) {
-        return taskRuns
-            .reversed()
-            .stream()
-            .filter(t -> t.getState().isRunning())
             .findFirst();
     }
 
@@ -682,30 +731,10 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
         return terminatedCount == resolvedTasks.size();
     }
 
-    public boolean hasWarning() {
-        return this.taskRunList != null && this.taskRunList
-            .stream()
-            .anyMatch(taskRun -> taskRun.getState().getCurrent() == State.Type.WARNING);
-    }
-
-    public boolean hasWarning(List<ResolvedTask> resolvedTasks) {
-        return this.hasWarning(resolvedTasks, null);
-    }
-
-    public boolean hasWarning(List<ResolvedTask> resolvedTasks, TaskRun parentTaskRun) {
-        return this.findTaskRunByTasks(resolvedTasks, parentTaskRun)
-            .stream()
-            .anyMatch(taskRun -> taskRun.getState().getCurrent() == State.Type.WARNING);
-    }
-
     public boolean hasFailed() {
         return this.taskRunList != null && this.taskRunList
             .stream()
             .anyMatch(taskRun -> taskRun.getState().isFailed());
-    }
-
-    public boolean hasFailed(List<ResolvedTask> resolvedTasks) {
-        return this.hasFailed(resolvedTasks, null);
     }
 
     public boolean hasFailed(List<ResolvedTask> resolvedTasks, TaskRun parentTaskRun) {
@@ -735,32 +764,6 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
         return !taskRun.shouldBeRetried(resolvedTask.getTask().getRetry());
     }
 
-    public boolean hasCreated() {
-        return this.taskRunList != null && this.taskRunList
-            .stream()
-            .anyMatch(taskRun -> taskRun.getState().isCreated());
-    }
-
-    public boolean hasCreated(List<ResolvedTask> resolvedTasks) {
-        return this.hasCreated(resolvedTasks, null);
-    }
-
-    public boolean hasCreated(List<ResolvedTask> resolvedTasks, TaskRun parentTaskRun) {
-        return this.findTaskRunByTasks(resolvedTasks, parentTaskRun)
-            .stream()
-            .anyMatch(taskRun -> taskRun.getState().isCreated());
-    }
-
-    public boolean hasRunning(List<ResolvedTask> resolvedTasks) {
-        return this.hasRunning(resolvedTasks, null);
-    }
-
-    public boolean hasRunning(List<ResolvedTask> resolvedTasks, TaskRun parentTaskRun) {
-        return this.findTaskRunByTasks(resolvedTasks, parentTaskRun)
-            .stream()
-            .anyMatch(taskRun -> taskRun.getState().isRunning());
-    }
-
     public State.Type guessFinalState(Flow flow) {
         return this.guessFinalState(ResolvedTask.of(flow.getTasks()), null, false, false);
     }
@@ -773,25 +776,25 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
     public State.Type guessFinalState(List<ResolvedTask> currentTasks, TaskRun parentTaskRun,
         boolean allowFailure, boolean allowWarning, State.Type terminalState) {
         List<TaskRun> taskRuns = this.findTaskRunByTasks(currentTasks, parentTaskRun);
-        var state = this
-            .findLastByState(taskRuns, State.Type.KILLED)
-            .map(taskRun -> taskRun.getState().getCurrent())
-            .or(
-                () -> this
-                    .findLastByState(taskRuns, State.Type.FAILED)
-                    .map(taskRun -> taskRun.getState().getCurrent())
-            )
-            .or(
-                () -> this
-                    .findLastByState(taskRuns, State.Type.WARNING)
-                    .map(taskRun -> taskRun.getState().getCurrent())
-            )
-            .or(
-                () -> this
-                    .findLastByState(taskRuns, State.Type.PAUSED)
-                    .map(taskRun -> taskRun.getState().getCurrent())
-            )
-            .orElse(terminalState);
+
+        // Single pass over taskRuns, tracking the highest-priority terminal state found.
+        // Priority order: KILLED > FAILED > CANCELLED > WARNING > PAUSED
+        State.Type state = terminalState;
+        for (TaskRun taskRun : taskRuns) {
+            State.Type current = taskRun.getState().getCurrent();
+            if (current == State.Type.KILLED) {
+                state = State.Type.KILLED;
+                break; // highest priority, no need to continue
+            } else if (current == State.Type.FAILED && state != State.Type.KILLED) {
+                state = State.Type.FAILED;
+            } else if (current == State.Type.CANCELLED && state != State.Type.KILLED && state != State.Type.FAILED) {
+                state = State.Type.CANCELLED;
+            } else if (current == State.Type.WARNING && state != State.Type.KILLED && state != State.Type.FAILED && state != State.Type.CANCELLED) {
+                state = State.Type.WARNING;
+            } else if (current == State.Type.PAUSED && state == terminalState) {
+                state = State.Type.PAUSED;
+            }
+        }
 
         if (state == State.Type.FAILED && allowFailure) {
             if (allowWarning) {
@@ -991,108 +994,6 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
         return loggingEvent;
     }
 
-    public Map<String, Object> outputs() {
-        if (this.taskRunList == null) {
-            return ImmutableMap.of();
-        }
-
-        // we pre-compute the map of taskrun by id to avoid traversing the list of all taskrun for each taskrun
-        Map<String, TaskRun> byIds = this.taskRunList.stream().collect(
-            Collectors.toMap(
-                taskRun -> taskRun.getId(),
-                taskRun -> taskRun
-            )
-        );
-
-        Map<String, Object> result = new HashMap<>();
-        this.taskRunList.stream()
-            .filter(taskRun -> taskRun.getOutputs() != null)
-            .collect(Collectors.groupingBy(taskRun -> taskRun.getTaskId()))
-            .forEach((taskId, taskRuns) ->
-            {
-                Map<String, Object> taskOutputs = new HashMap<>();
-                for (TaskRun current : taskRuns) {
-                    if (!MapUtils.isEmpty(current.getOutputs())) {
-                        if (current.getIteration() != null) {
-                            Map<String, Object> merged = MapUtils.merge(taskOutputs, outputs(current, byIds));
-                            // If one of two of the map is null in the merge() method, we just return the other
-                            // And if the not null map is a Variables (= read only), we cast it back to a simple
-                            // hashmap to avoid taskOutputs becoming read-only
-                            // i.e this happen in nested loopUntil tasks
-                            if (merged instanceof Variables) {
-                                merged = new HashMap<>(merged);
-                            }
-                            taskOutputs = merged;
-                        } else {
-                            taskOutputs.putAll(outputs(current, byIds));
-                        }
-                    }
-                }
-                result.put(taskId, taskOutputs);
-            });
-
-        return result;
-    }
-
-    private Map<String, Object> outputs(TaskRun taskRun, Map<String, TaskRun> byIds) {
-        List<TaskRun> parents = findParents(taskRun, byIds)
-            .stream()
-            .filter(r -> r.getValue() != null)
-            .toList();
-
-        if (parents.isEmpty()) {
-            if (taskRun.getValue() == null) {
-                return taskRun.getOutputs();
-            } else {
-                return Map.of(taskRun.getValue(), taskRun.getOutputs());
-            }
-        }
-
-        Map<String, Object> result = HashMap.newHashMap(1);
-        Map<String, Object> current = result;
-
-        for (TaskRun t : parents) {
-            HashMap<String, Object> item = HashMap.newHashMap(1);
-            current.put(t.getValue(), item);
-            current = item;
-        }
-
-        if (taskRun.getOutputs() != null) {
-            if (taskRun.getValue() != null) {
-                current.put(taskRun.getValue(), taskRun.getOutputs());
-            } else {
-                current.putAll(taskRun.getOutputs());
-            }
-        }
-
-        return result;
-    }
-
-    public List<Map<String, Object>> parents(TaskRun taskRun) {
-        List<Map<String, Object>> result = new ArrayList<>();
-
-        List<TaskRun> parents = findParents(taskRun);
-        Collections.reverse(parents);
-
-        for (TaskRun childTaskRun : parents) {
-            Map<String, Object> current = HashMap.newHashMap(2);
-
-            if (childTaskRun.getValue() != null) {
-                current.put("taskrun", Map.of("value", childTaskRun.getValue()));
-            }
-
-            if (childTaskRun.getOutputs() != null && !childTaskRun.getOutputs().isEmpty()) {
-                current.put("outputs", childTaskRun.getOutputs());
-            }
-
-            if (!current.isEmpty()) {
-                result.add(current);
-            }
-        }
-
-        return result;
-    }
-
     /**
      * Find all parents from this {@link TaskRun}. The list is starting from deeper parent and end
      * on the closest parent, so the first element is the task that starts first. This method
@@ -1129,41 +1030,37 @@ public class Execution implements SoftDeletable<Execution>, TenantInterface, Has
     }
 
     /**
-     * Find all parents from this {@link TaskRun}. This method does the same as #findParents(TaskRun
-     * taskRun) but for performance reason, as it's called a lot, we pre-compute the map of taskrun
-     * by ID and use it here.
-     */
-    private List<TaskRun> findParents(TaskRun taskRun, Map<String, TaskRun> taskRunById) {
-        if (taskRun.getParentTaskRunId() == null || taskRunById.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<TaskRun> result = new ArrayList<>();
-        boolean ended = false;
-        while (!ended) {
-            final TaskRun finalTaskRun = taskRun;
-            TaskRun find = taskRunById.get(finalTaskRun.getParentTaskRunId());
-
-            if (find != null) {
-                result.add(find);
-                taskRun = find;
-            } else {
-                ended = true;
-            }
-        }
-
-        Collections.reverse(result);
-
-        return result;
-    }
-
-    /**
      * Find all children of this {@link TaskRun}.
      */
     public List<TaskRun> findChildren(TaskRun parentTaskRun) {
         return taskRunList.stream()
             .filter(taskRun -> parentTaskRun.getId().equals(taskRun.getParentTaskRunId()))
             .toList();
+    }
+
+    /**
+     * Find every descendant of this {@link TaskRun}, at any depth, in breadth-first order.
+     * Unlike {@link #findChildren(TaskRun)}, which returns only direct children, this walks the
+     * {@code parentTaskRunId} chain recursively.
+     */
+    public List<TaskRun> findAllChildren(TaskRun parentTaskRun) {
+        if (this.taskRunList == null) {
+            return Collections.emptyList();
+        }
+
+        Map<String, List<TaskRun>> childrenByParentId = this.taskRunList.stream()
+            .filter(taskRun -> taskRun.getParentTaskRunId() != null)
+            .collect(Collectors.groupingBy(TaskRun::getParentTaskRunId));
+
+        List<TaskRun> result = new ArrayList<>();
+        Deque<TaskRun> toVisit = new ArrayDeque<>(childrenByParentId.getOrDefault(parentTaskRun.getId(), Collections.emptyList()));
+        while (!toVisit.isEmpty()) {
+            TaskRun current = toVisit.poll();
+            result.add(current);
+            toVisit.addAll(childrenByParentId.getOrDefault(current.getId(), Collections.emptyList()));
+        }
+
+        return result;
     }
 
     public List<String> findParentsValues(TaskRun taskRun, boolean withCurrent) {

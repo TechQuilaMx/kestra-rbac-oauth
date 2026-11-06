@@ -2,14 +2,10 @@ package io.kestra.plugin.core.flow;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.executions.NextTaskRun;
 import io.kestra.core.models.executions.TaskRun;
@@ -17,18 +13,15 @@ import io.kestra.core.models.flows.State;
 import io.kestra.core.models.hierarchies.GraphCluster;
 import io.kestra.core.models.hierarchies.RelationType;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.FlowableTask;
 import io.kestra.core.models.tasks.ResolvedTask;
-import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.VoidOutput;
 import io.kestra.core.runners.FlowableUtils;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.utils.GraphUtils;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -107,36 +100,50 @@ import lombok.experimental.SuperBuilder;
                             type: io.kestra.plugin.core.debug.Return
                             format: "{{ task.id }}"
                 """
+        ),
+        @Example(
+            full = true,
+            title = """
+                Stop the other branches as soon as one task fails
+                """,
+            code = """
+                id: parallel_fail_fast
+                namespace: company.team
+
+                tasks:
+                  - id: parallel
+                    type: io.kestra.plugin.core.flow.Parallel
+                    onChildFailure: CANCELLED
+                    tasks:
+                      - id: fails_fast
+                        type: io.kestra.plugin.core.execution.Fail
+
+                      - id: long_running
+                        type: io.kestra.plugin.core.flow.Sleep
+                        duration: PT1M
+                """
         )
-    },
-    aliases = "io.kestra.core.tasks.flows.Parallel"
+    }
 )
-public class Parallel extends Task implements FlowableTask<VoidOutput> {
+public class Parallel extends AbstractBranch<VoidOutput> implements OnChildFailureInterface {
     @NotNull
     @Builder.Default
     @Schema(
         title = "Number of concurrent parallel tasks that can be running at any point in time",
         description = "If the value is `0`, no limit exist and all tasks will start at the same time."
     )
-    private final Property<Integer> concurrent = Property.ofValue(0);
+    private final Property<@PositiveOrZero Integer> concurrent = Property.ofValue(0);
 
-    @Valid
-    @PluginProperty
-    @NotEmpty
     @NotNull
-    private List<@NotNull Task> tasks;
+    @Builder.Default
+    @Schema(
+        title = "What to do with the other still-running tasks when one task fails.",
+        description = """
+            `CONTINUE` (default): other tasks keep running to completion, as today.
 
-    @Valid
-    protected List<Task> errors;
-
-    @Valid
-    @JsonProperty("finally")
-    @Getter(AccessLevel.NONE)
-    protected List<Task> _finally;
-
-    public List<Task> getFinally() {
-        return this._finally;
-    }
+            `CANCELLED` / `FAILED`: as soon as a task fails with no retry left, every other still-running task in this Parallel is interrupted and lands in the given state. The Parallel itself still resolves to `FAILED` and its `errors`/`finally` tasks still run normally."""
+    )
+    private final Property<OnChildFailure> onChildFailure = Property.ofValue(OnChildFailure.FAIL);
 
     @Override
     public GraphCluster tasksTree(Execution execution, TaskRun taskRun, List<String> parentValues) throws IllegalVariableEvaluationException {
@@ -152,24 +159,6 @@ public class Parallel extends Task implements FlowableTask<VoidOutput> {
         );
 
         return subGraph;
-    }
-
-    @Override
-    public List<Task> allChildTasks() {
-        return Stream
-            .concat(
-                this.tasks != null ? this.tasks.stream() : Stream.empty(),
-                Stream.concat(
-                    this.errors != null ? this.errors.stream() : Stream.empty(),
-                    this._finally != null ? this._finally.stream() : Stream.empty()
-                )
-            )
-            .toList();
-    }
-
-    @Override
-    public List<ResolvedTask> childTasks(RunContext runContext, TaskRun parentTaskRun) throws IllegalVariableEvaluationException {
-        return FlowableUtils.resolveTasks(this.tasks, parentTaskRun);
     }
 
     @Override

@@ -18,7 +18,7 @@ public record Metric(
     String description,
     String baseUnit,
     List<Tag> tags,
-    Object value) {
+    Number value) {
 
     /**
      * Static method for constructing a new {@link Metric} from a given {@link Meter}.
@@ -29,7 +29,7 @@ public record Metric(
     public static Metric of(final Meter meter) {
         Objects.requireNonNull(meter, "Cannot create Metric from null");
 
-        final AtomicReference<Object> value = new AtomicReference<>();
+        final AtomicReference<Number> value = new AtomicReference<>();
         meter.use(
             gauge -> value.set(gauge.value()),
             counter -> value.set(counter.count()),
@@ -60,7 +60,7 @@ public record Metric(
         );
     }
 
-    record Tag(String key, String value) {
+    public record Tag(String key, String value) {
 
         public static Tag of(final io.micrometer.core.instrument.Tag tag) {
             return new Tag(tag.getKey(), tag.getValue());

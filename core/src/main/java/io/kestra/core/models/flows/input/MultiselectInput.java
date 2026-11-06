@@ -9,11 +9,11 @@ import io.kestra.core.models.flows.Type;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.validations.ManualConstraintViolation;
 import io.kestra.core.validations.MultiselectInputValidation;
-import io.kestra.core.validations.Regex;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,21 +26,14 @@ import lombok.experimental.SuperBuilder;
 @MultiselectInputValidation
 public class MultiselectInput extends Input<List<String>> implements ItemTypeInterface, RenderableInput {
     @Schema(
-        title = "Deprecated, please use `values` instead."
+        title = "List of values available.",
+        description = "Each item is either a plain string (used as both label and value) or an object `{label, value}` to decouple the displayed label from the workflow value."
     )
-    //    @NotNull
-    @Deprecated
-    List<@Regex String> options;
+
+    List<@Valid ValueOption> values;
 
     @Schema(
-        title = "List of values available."
-    )
-    // FIXME: REMOVE `options` in 0.20 and bring back the NotNull
-    // @NotNull
-    List<@Regex String> values;
-
-    @Schema(
-        title = "Expression to be used for dynamically generating the list of values"
+        title = "Expression to be used for dynamically generating the list of values."
     )
     String expression;
 
@@ -69,7 +62,7 @@ public class MultiselectInput extends Input<List<String>> implements ItemTypeInt
     public Property<List<String>> getDefaults() {
         Property<List<String>> baseDefaults = super.getDefaults();
         if (baseDefaults == null && autoSelectFirst && !Optional.ofNullable(values).map(Collection::isEmpty).orElse(true)) {
-            return Property.ofValue(List.of(values.getFirst()));
+            return Property.ofValue(List.of(values.getFirst().value()));
         }
 
         return baseDefaults;
@@ -79,25 +72,13 @@ public class MultiselectInput extends Input<List<String>> implements ItemTypeInt
     public void validate(List<String> inputs) throws ConstraintViolationException {
         Set<ConstraintViolation<?>> violations = new HashSet<>();
 
-        if (values != null && options != null) {
-            violations.add(
-                ManualConstraintViolation.of(
-                    "you can't define both `values` and `options`",
-                    this,
-                    MultiselectInput.class,
-                    getId(),
-                    ""
-                )
-            );
-        }
-
         if (!this.getAllowCustomValue()) {
+            Set<String> allowedValues = this.values.stream().map(ValueOption::value).collect(java.util.stream.Collectors.toSet());
             for (String input : inputs) {
-                List<@Regex String> finalValues = this.values != null ? this.values : this.options;
-                if (!finalValues.contains(input)) {
+                if (!allowedValues.contains(input)) {
                     violations.add(
                         ManualConstraintViolation.of(
-                            "value `" + input + "` doesn't match the values `" + finalValues + "`",
+                            "value `" + input + "` doesn't match the values `" + this.values.stream().map(ValueOption::value).toList() + "`",
                             this,
                             MultiselectInput.class,
                             getId(),
@@ -134,7 +115,7 @@ public class MultiselectInput extends Input<List<String>> implements ItemTypeInt
         return this;
     }
 
-    private List<String> renderExpressionValues(final Function<String, Object> renderer) {
+    private List<ValueOption> renderExpressionValues(final Function<String, Object> renderer) {
         Object result;
         try {
             result = renderer.apply(expression.trim());
@@ -149,12 +130,11 @@ public class MultiselectInput extends Input<List<String>> implements ItemTypeInt
         }
 
         if (result instanceof List<?> list) {
-            return list.stream().filter(Objects::nonNull).map(Object::toString).toList();
+            return list.stream().filter(Objects::nonNull).map(ValueOption::from).toList();
         }
 
-        String type = Optional.ofNullable(result).map(Object::getClass).map(Class::getSimpleName).orElse("<null>");
         throw ManualConstraintViolation.toConstraintViolationException(
-            "Invalid expression result. Expected a list of strings",
+            "Invalid expression result. Expected a list of values",
             this,
             MultiselectInput.class,
             getId(),

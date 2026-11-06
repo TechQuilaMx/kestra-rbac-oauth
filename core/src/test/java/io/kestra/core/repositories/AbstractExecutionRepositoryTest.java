@@ -13,18 +13,19 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.FieldSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.event.Level;
 
 import com.devskiller.friendly_id.FriendlyId;
 import com.google.common.collect.ImmutableMap;
 
-import io.kestra.core.contexts.KestraConfig;
+import io.kestra.core.contexts.configuration.SystemFlowsConfiguration;
 import io.kestra.core.exceptions.InvalidQueryFiltersException;
-import io.kestra.core.junit.annotations.FlakyTest;
 import io.kestra.core.models.Label;
 import io.kestra.core.models.QueryFilter;
 import io.kestra.core.models.QueryFilter.Field;
+import io.kestra.core.models.QueryFilter.Logical;
 import io.kestra.core.models.QueryFilter.Op;
 import io.kestra.core.models.dashboards.AggregationType;
 import io.kestra.core.models.dashboards.ColumnDescriptor;
@@ -32,14 +33,11 @@ import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.executions.ExecutionKind;
 import io.kestra.core.models.executions.ExecutionTrigger;
 import io.kestra.core.models.executions.TaskRun;
-import io.kestra.core.models.executions.statistics.DailyExecutionStatistics;
-import io.kestra.core.models.executions.statistics.ExecutionCount;
-import io.kestra.core.models.executions.statistics.Flow;
-import io.kestra.core.models.flows.FlowScope;
 import io.kestra.core.models.flows.State;
 import io.kestra.core.models.flows.State.Type;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.ResolvedTask;
+import io.kestra.core.models.triggers.TriggerId;
 import io.kestra.core.repositories.ExecutionRepositoryInterface.ChildFilter;
 import io.kestra.core.repositories.ExecutionRepositoryInterface.DateFilter;
 import io.kestra.core.utils.IdUtils;
@@ -54,11 +52,13 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
+import reactor.core.publisher.Flux;
 
 import static io.kestra.core.models.flows.FlowScope.SYSTEM;
 import static io.kestra.core.models.flows.FlowScope.USER;
 import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doReturn;
@@ -205,7 +205,6 @@ public abstract class AbstractExecutionRepositoryTest {
 
     @ParameterizedTest
     @MethodSource("filterCombinations")
-    @FlakyTest(description = "Filtering tests are sometimes returning 0")
     void should_find_all(QueryFilter filter, int expectedSize) {
         var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
         inject(tenant, "executionTriggerId");
@@ -220,8 +219,14 @@ public abstract class AbstractExecutionRepositoryTest {
             Arguments.of(QueryFilter.builder().field(Field.QUERY).value("unittest").operation(Op.EQUALS).build(), 29),
             Arguments.of(QueryFilter.builder().field(Field.QUERY).value("unused").operation(Op.NOT_EQUALS).build(), 29),
 
-            Arguments.of(QueryFilter.builder().field(Field.SCOPE).value(List.of(USER)).operation(Op.EQUALS).build(), 29),
-            Arguments.of(QueryFilter.builder().field(Field.SCOPE).value(List.of(SYSTEM)).operation(Op.NOT_EQUALS).build(), 29),
+            Arguments.of(QueryFilter.builder().field(Field.SCOPE).value(USER).operation(Op.EQUALS).build(), 29),
+            Arguments.of(QueryFilter.builder().field(Field.SCOPE).value(SYSTEM).operation(Op.NOT_EQUALS).build(), 29),
+            Arguments.of(QueryFilter.builder().field(Field.SCOPE).value(List.of(USER)).operation(Op.IN).build(), 29),
+            Arguments.of(QueryFilter.builder().field(Field.SCOPE).value(List.of(SYSTEM)).operation(Op.IN).build(), 0),
+            Arguments.of(QueryFilter.builder().field(Field.SCOPE).value(List.of(USER, SYSTEM)).operation(Op.IN).build(), 29),
+            Arguments.of(QueryFilter.builder().field(Field.SCOPE).value(List.of(USER)).operation(Op.NOT_IN).build(), 0),
+            Arguments.of(QueryFilter.builder().field(Field.SCOPE).value(List.of(SYSTEM)).operation(Op.NOT_IN).build(), 29),
+            Arguments.of(QueryFilter.builder().field(Field.SCOPE).value(List.of(USER, SYSTEM)).operation(Op.NOT_IN).build(), 0),
 
             Arguments.of(QueryFilter.builder().field(Field.NAMESPACE).value("io.kestra.unittest").operation(Op.EQUALS).build(), 29),
             Arguments.of(QueryFilter.builder().field(Field.NAMESPACE).value("not.this.one").operation(Op.NOT_EQUALS).build(), 29),
@@ -252,7 +257,7 @@ public abstract class AbstractExecutionRepositoryTest {
             Arguments.of(QueryFilter.builder().field(Field.FLOW_ID).value("[ful]{4}").operation(Op.REGEX).build(), 16),
             Arguments.of(QueryFilter.builder().field(Field.FLOW_ID).value(List.of(FLOW, "other")).operation(Op.IN).build(), 16),
             Arguments.of(QueryFilter.builder().field(Field.FLOW_ID).value(List.of(FLOW, "other2")).operation(Op.NOT_IN).build(), 13),
-            Arguments.of(QueryFilter.builder().field(Field.FLOW_ID).value("ful").operation(Op.PREFIX).build(), 16),
+            Arguments.of(QueryFilter.builder().field(Field.FLOW_ID).value(FLOW).operation(Op.PREFIX).build(), 16),
 
             Arguments.of(QueryFilter.builder().field(Field.START_DATE).value(ZonedDateTime.now().minusMinutes(1)).operation(Op.GREATER_THAN).build(), 29),
             Arguments.of(QueryFilter.builder().field(Field.END_DATE).value(ZonedDateTime.now().plusMinutes(1)).operation(Op.LESS_THAN).build(), 29),
@@ -261,6 +266,134 @@ public abstract class AbstractExecutionRepositoryTest {
 
             Arguments.of(QueryFilter.builder().field(Field.CHILD_FILTER).value(ChildFilter.CHILD).operation(Op.EQUALS).build(), 29),
             Arguments.of(QueryFilter.builder().field(Field.CHILD_FILTER).value(ChildFilter.CHILD).operation(Op.NOT_EQUALS).build(), 0)
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("complexFilterCombinations")
+    void should_find_all_with_complex_filters(String description, List<QueryFilter> filters, int expectedSize) {
+        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        inject(tenant);
+
+        ArrayListTotal<Execution> entries = executionRepository.find(Pageable.UNPAGED, tenant, filters);
+
+        assertThat(entries).as(description).hasSize(expectedSize);
+    }
+
+    static Stream<Arguments> complexFilterCombinations() {
+        QueryFilter runningState = QueryFilter.builder().field(Field.STATE).operation(Op.EQUALS).value(Type.RUNNING).build();
+        QueryFilter failedState = QueryFilter.builder().field(Field.STATE).operation(Op.EQUALS).value(Type.FAILED).build();
+        QueryFilter successState = QueryFilter.builder().field(Field.STATE).operation(Op.EQUALS).value(Type.SUCCESS).build();
+        QueryFilter flowFull = QueryFilter.builder().field(Field.FLOW_ID).operation(Op.EQUALS).value(FLOW).build();
+        QueryFilter flowSecond = QueryFilter.builder().field(Field.FLOW_ID).operation(Op.EQUALS).value("second").build();
+        QueryFilter namespaceEq = QueryFilter.builder().field(Field.NAMESPACE).operation(Op.EQUALS).value(NAMESPACE).build();
+
+        return Stream.of(
+            // OR at root: state = RUNNING OR state = FAILED -> 5 + 3 = 8
+            Arguments.of(
+                "RUNNING OR FAILED",
+                List.of(
+                    QueryFilter.builder()
+                        .logical(Logical.OR)
+                        .children(List.of(runningState, failedState))
+                        .build()
+                ),
+                8
+            ),
+
+            // (state=RUNNING AND flow=full) OR (state=SUCCESS AND flow=second) -> 5 + 13 = 18
+            Arguments.of(
+                "(RUNNING AND flow=full) OR (SUCCESS AND flow=second)",
+                List.of(
+                    QueryFilter.builder()
+                        .logical(Logical.OR)
+                        .children(
+                            List.of(
+                                QueryFilter.builder()
+                                    .logical(Logical.AND)
+                                    .children(List.of(runningState, flowFull))
+                                    .build(),
+                                QueryFilter.builder()
+                                    .logical(Logical.AND)
+                                    .children(List.of(successState, flowSecond))
+                                    .build()
+                            )
+                        )
+                        .build()
+                ),
+                18
+            ),
+
+            // Mixed root: namespace=X (global AND) + (RUNNING OR FAILED) -> 8
+            Arguments.of(
+                "namespace AND (RUNNING OR FAILED)",
+                List.of(
+                    namespaceEq,
+                    QueryFilter.builder()
+                        .logical(Logical.OR)
+                        .children(List.of(runningState, failedState))
+                        .build()
+                ),
+                8
+            ),
+
+            // 3-way OR with mixed leaves and AND children:
+            // (RUNNING AND flow=full) OR FAILED OR (SUCCESS AND flow=second) -> 5 + 3 + 13 = 21
+            Arguments.of(
+                "(RUNNING AND flow=full) OR FAILED OR (SUCCESS AND flow=second)",
+                List.of(
+                    QueryFilter.builder()
+                        .logical(Logical.OR)
+                        .children(
+                            List.of(
+                                QueryFilter.builder()
+                                    .logical(Logical.AND)
+                                    .children(List.of(runningState, flowFull))
+                                    .build(),
+                                failedState,
+                                QueryFilter.builder()
+                                    .logical(Logical.AND)
+                                    .children(List.of(successState, flowSecond))
+                                    .build()
+                            )
+                        )
+                        .build()
+                ),
+                21
+            ),
+
+            // Deeply nested OR-in-AND-in-OR: namespace AND ((RUNNING AND flow=full) OR FAILED) -> 5 + 3 = 8
+            Arguments.of(
+                "namespace AND ((RUNNING AND flow=full) OR FAILED)",
+                List.of(
+                    namespaceEq,
+                    QueryFilter.builder()
+                        .logical(Logical.OR)
+                        .children(
+                            List.of(
+                                QueryFilter.builder()
+                                    .logical(Logical.AND)
+                                    .children(List.of(runningState, flowFull))
+                                    .build(),
+                                failedState
+                            )
+                        )
+                        .build()
+                ),
+                8
+            ),
+
+            // Single-child AND wrapper -> behaves identically to the leaf -> 5
+            Arguments.of(
+                "AND wrapper containing only RUNNING",
+                List.of(
+                    QueryFilter.builder()
+                        .logical(Logical.AND)
+                        .children(List.of(runningState))
+                        .build()
+                ),
+                5
+            )
         );
     }
 
@@ -277,9 +410,96 @@ public abstract class AbstractExecutionRepositoryTest {
             QueryFilter.builder().field(Field.TRIGGER_ID).value("test").operation(Op.EQUALS).build(),
             QueryFilter.builder().field(Field.EXECUTION_ID).value("test").operation(Op.EQUALS).build(),
             QueryFilter.builder().field(Field.WORKER_ID).value("test").operation(Op.EQUALS).build(),
-            QueryFilter.builder().field(Field.EXISTING_ONLY).value("test").operation(Op.EQUALS).build(),
-            QueryFilter.builder().field(Field.MIN_LEVEL).value(Level.DEBUG).operation(Op.EQUALS).build()
+            QueryFilter.builder().field(Field.LEVEL).value(Level.DEBUG).operation(Op.GREATER_THAN_OR_EQUAL_TO).build()
         );
+    }
+
+    @Test
+    void givenSeededExecutions_whenFindDistinctFieldValuesWithoutFilters_thenReturnsAllDistinctValues() {
+        // Given
+        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        inject(tenant);
+
+        // When
+        List<String> ids = executionRepository.findDistinctFieldValues(tenant, Field.FLOW_ID, null, Pageable.from(0, 100));
+
+        // Then — inject() seeds executions with two flow ids: FLOW ("full") and "second"
+        assertThat(ids).containsExactlyInAnyOrder(FLOW, "second");
+    }
+
+    @Test
+    void givenSeededExecutions_whenFindDistinctFieldValuesNarrowedBySameFieldContains_thenReturnsMatchingValueOnly() {
+        // Given
+        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        inject(tenant);
+        QueryFilter narrow = QueryFilter.builder()
+            .field(Field.FLOW_ID).operation(Op.CONTAINS).value("cond")
+            .build();
+
+        // When
+        List<String> ids = executionRepository.findDistinctFieldValues(tenant, Field.FLOW_ID, List.of(narrow), Pageable.from(0, 100));
+
+        // Then
+        assertThat(ids).containsExactly("second");
+    }
+
+    @Test
+    void givenSeededExecutions_whenFindDistinctFieldValuesNarrowedByOtherField_thenReturnsValuesMatchingThatField() {
+        // Given — only the running executions all have flowId="full" (first 5 in inject() are RUNNING)
+        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        inject(tenant);
+        QueryFilter narrow = QueryFilter.builder()
+            .field(Field.STATE).operation(Op.IN).value(List.of(State.Type.RUNNING.name()))
+            .build();
+
+        // When
+        List<String> ids = executionRepository.findDistinctFieldValues(tenant, Field.FLOW_ID, List.of(narrow), Pageable.from(0, 100));
+
+        // Then
+        assertThat(ids).containsExactly(FLOW);
+    }
+
+    @Test
+    void givenSeededExecutions_whenFindDistinctFieldValuesWithNonMatchingFilter_thenReturnsEmpty() {
+        // Given
+        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        inject(tenant);
+        QueryFilter narrow = QueryFilter.builder()
+            .field(Field.FLOW_ID).operation(Op.CONTAINS).value("no-such-flow-id")
+            .build();
+
+        // When
+        List<String> ids = executionRepository.findDistinctFieldValues(tenant, Field.FLOW_ID, List.of(narrow), Pageable.from(0, 100));
+
+        // Then
+        assertThat(ids).isEmpty();
+    }
+
+    @Test
+    void givenSeededExecutions_whenFindDistinctFieldValuesWithSizeOne_thenReturnsAtMostOneValue() {
+        // Given
+        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        inject(tenant);
+
+        // When
+        List<String> ids = executionRepository.findDistinctFieldValues(tenant, Field.FLOW_ID, null, Pageable.from(0, 1));
+
+        // Then
+        assertThat(ids).hasSize(1);
+    }
+
+    @Test
+    void givenSeededExecutionsForOneTenant_whenFindDistinctFieldValuesForOtherTenant_thenReturnsEmpty() {
+        // Given
+        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        var otherTenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        inject(tenant);
+
+        // When
+        List<String> ids = executionRepository.findDistinctFieldValues(otherTenant, Field.FLOW_ID, null, Pageable.from(0, 100));
+
+        // Then
+        assertThat(ids).isEmpty();
     }
 
     @Test
@@ -523,175 +743,6 @@ public abstract class AbstractExecutionRepositoryTest {
     }
 
     @Test
-    protected void dailyStatistics() throws InterruptedException {
-        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
-        for (int i = 0; i < 28; i++) {
-            executionRepository.save(
-                builder(
-                    tenant,
-                    i < 5 ? State.Type.RUNNING : (i < 8 ? State.Type.FAILED : State.Type.SUCCESS),
-                    i < 15 ? null : "second"
-                ).build()
-            );
-        }
-
-        executionRepository.save(
-            builder(
-                tenant,
-                State.Type.SUCCESS,
-                "second"
-            ).namespace(KestraConfig.DEFAULT_SYSTEM_FLOWS_NAMESPACE).build()
-        );
-
-        // mysql need some time ...
-        Thread.sleep(500);
-
-        List<DailyExecutionStatistics> result = executionRepository.dailyStatistics(
-            null,
-            tenant,
-            null,
-            null,
-            null,
-            ZonedDateTime.now().minusDays(10),
-            ZonedDateTime.now(),
-            null,
-            null
-        );
-
-        assertThat(result.size()).isEqualTo(11);
-        assertThat(result.get(10).getExecutionCounts().size()).isEqualTo(11);
-        assertThat(result.get(10).getDuration().getAvg().toMillis()).isGreaterThan(0L);
-
-        assertThat(result.get(10).getExecutionCounts().get(State.Type.FAILED)).isEqualTo(3L);
-        assertThat(result.get(10).getExecutionCounts().get(State.Type.RUNNING)).isEqualTo(5L);
-        assertThat(result.get(10).getExecutionCounts().get(State.Type.SUCCESS)).isEqualTo(21L);
-
-        result = executionRepository.dailyStatistics(
-            null,
-            tenant,
-            List.of(FlowScope.USER, FlowScope.SYSTEM),
-            null,
-            null,
-            ZonedDateTime.now().minusDays(10),
-            ZonedDateTime.now(),
-            null,
-            null
-        );
-
-        assertThat(result.size()).isEqualTo(11);
-        assertThat(result.get(10).getExecutionCounts().get(State.Type.SUCCESS)).isEqualTo(21L);
-
-        result = executionRepository.dailyStatistics(
-            null,
-            tenant,
-            List.of(FlowScope.USER),
-            null,
-            null,
-            ZonedDateTime.now().minusDays(10),
-            ZonedDateTime.now(),
-            null,
-            null
-        );
-        assertThat(result.size()).isEqualTo(11);
-        assertThat(result.get(10).getExecutionCounts().get(State.Type.SUCCESS)).isEqualTo(20L);
-
-        result = executionRepository.dailyStatistics(
-            null,
-            tenant,
-            List.of(FlowScope.SYSTEM),
-            null,
-            null,
-            ZonedDateTime.now().minusDays(10),
-            ZonedDateTime.now(),
-            null,
-            null
-        );
-        assertThat(result.size()).isEqualTo(11);
-        assertThat(result.get(10).getExecutionCounts().get(State.Type.SUCCESS)).isEqualTo(1L);
-    }
-
-    @SuppressWarnings("OptionalGetWithoutIsPresent")
-    @Test
-    protected void executionsCount() throws InterruptedException {
-        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
-        for (int i = 0; i < 14; i++) {
-            executionRepository.save(
-                builder(
-                    tenant,
-                    State.Type.SUCCESS,
-                    i < 2 ? "first" : (i < 5 ? "second" : "third")
-                ).build()
-            );
-        }
-
-        // mysql need some time ...
-        Thread.sleep(500);
-
-        List<ExecutionCount> result = executionRepository.executionCounts(
-            tenant,
-            List.of(
-                new Flow(NAMESPACE, "first"),
-                new Flow(NAMESPACE, "second"),
-                new Flow(NAMESPACE, "third"),
-                new Flow(NAMESPACE, "missing")
-            ),
-            null,
-            ZonedDateTime.now().minusDays(10),
-            ZonedDateTime.now(),
-            null
-        );
-        assertThat(result.size()).isEqualTo(4);
-        assertThat(result.stream().filter(executionCount -> executionCount.getFlowId().equals("first")).findFirst().get().getCount()).isEqualTo(2L);
-        assertThat(result.stream().filter(executionCount -> executionCount.getFlowId().equals("second")).findFirst().get().getCount()).isEqualTo(3L);
-        assertThat(result.stream().filter(executionCount -> executionCount.getFlowId().equals("third")).findFirst().get().getCount()).isEqualTo(9L);
-        assertThat(result.stream().filter(executionCount -> executionCount.getFlowId().equals("missing")).findFirst().get().getCount()).isEqualTo(0L);
-
-        result = executionRepository.executionCounts(
-            tenant,
-            List.of(
-                new Flow(NAMESPACE, "first"),
-                new Flow(NAMESPACE, "second"),
-                new Flow(NAMESPACE, "third")
-            ),
-            List.of(State.Type.SUCCESS),
-            null,
-            null,
-            null
-        );
-        assertThat(result.size()).isEqualTo(3);
-        assertThat(result.stream().filter(executionCount -> executionCount.getFlowId().equals("first")).findFirst().get().getCount()).isEqualTo(2L);
-        assertThat(result.stream().filter(executionCount -> executionCount.getFlowId().equals("second")).findFirst().get().getCount()).isEqualTo(3L);
-        assertThat(result.stream().filter(executionCount -> executionCount.getFlowId().equals("third")).findFirst().get().getCount()).isEqualTo(9L);
-
-        result = executionRepository.executionCounts(
-            tenant,
-            null,
-            null,
-            null,
-            null,
-            List.of(NAMESPACE)
-        );
-        assertThat(result.size()).isEqualTo(1);
-        assertThat(result.stream().filter(executionCount -> executionCount.getNamespace().equals(NAMESPACE)).findFirst().get().getCount()).isEqualTo(14L);
-    }
-
-    @Test
-    protected void update() {
-        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
-        Execution execution = ExecutionFixture.EXECUTION_1(tenant);
-        executionRepository.save(execution);
-
-        Label label = new Label("key", "value");
-        Execution updated = execution.toBuilder().labels(List.of(label)).build();
-        executionRepository.update(updated);
-
-        Optional<Execution> validation = executionRepository.findById(tenant, updated.getId());
-        assertThat(validation.isPresent()).isTrue();
-        assertThat(validation.get().getLabels().size()).isEqualTo(1);
-        assertThat(validation.get().getLabels().getFirst()).isEqualTo(label);
-    }
-
-    @Test
     void shouldFindLatestExecutionGivenState() {
         var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
         Execution earliest = buildWithCreatedDate(tenant, Instant.now().minus(Duration.ofMinutes(10)));
@@ -767,6 +818,54 @@ public abstract class AbstractExecutionRepositoryTest {
         assertThat(data).first().hasFieldOrProperty("count");
         assertThat(data).first().extracting("count").hasToString("1");
         assertThat(data).first().hasFieldOrPropertyWithValue("id", execution.getId());
+    }
+
+    @Test
+    protected void dashboard_fetchData_durationAggregationInSeconds() throws IOException {
+        var tenantId = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        var executionCreateDate = Instant.now().minus(Duration.ofMinutes(5));
+
+        // sub-minute durations only: the Postgres state_duration column loses the minutes part of longer durations
+        executionRepository.save(executionWithDuration(tenantId, executionCreateDate, Duration.ofMillis(500)));
+        executionRepository.save(executionWithDuration(tenantId, executionCreateDate, Duration.ofMillis(1500)));
+
+        var now = ZonedDateTime.now();
+        ArrayListTotal<Map<String, Object>> data = executionRepository.fetchData(
+            tenantId, Executions.builder()
+                .type(Executions.class.getName())
+                .columns(
+                    Map.of(
+                        "state", ColumnDescriptor.<Executions.Fields> builder().field(Executions.Fields.STATE).build(),
+                        "total", ColumnDescriptor.<Executions.Fields> builder().field(Executions.Fields.ID).agg(AggregationType.COUNT).build(),
+                        "duration", ColumnDescriptor.<Executions.Fields> builder().field(Executions.Fields.DURATION).agg(AggregationType.SUM).build()
+                    )
+                ).build(),
+            now.minusHours(1),
+            now,
+            null
+        );
+
+        assertThat(data.getTotal()).isEqualTo(1L);
+        assertThat(data).first().extracting("total").hasToString("2");
+        // the DURATION column is exposed in seconds, keeping the sub-second part: 0.5s + 1.5s
+        assertThat(((Number) data.getFirst().get("duration")).doubleValue()).isCloseTo(2.0d, within(0.001d));
+    }
+
+    private Execution executionWithDuration(String tenantId, Instant createDate, Duration duration) {
+        return Execution.builder()
+            .tenantId(tenantId)
+            .id(IdUtils.create())
+            .namespace("io.kestra.unittest")
+            .flowId("some-execution")
+            .flowRevision(1)
+            .state(
+                new State(
+                    Type.SUCCESS,
+                    List.of(new State.History(State.Type.CREATED, createDate), new State.History(Type.SUCCESS, createDate.plus(duration)))
+                )
+            )
+            .taskRunList(List.of())
+            .build();
     }
 
     @Test
@@ -911,6 +1010,84 @@ public abstract class AbstractExecutionRepositoryTest {
 
         List<Execution> executions = executionRepository.findAllAsync(tenant).collectList().block();
         assertThat(executions).hasSize(30); // used by the backup so it contains TEST executions
+    }
+
+    @Test
+    protected void shouldFindByParentId() {
+        // Given
+        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+
+        Execution parent = executionRepository.save(
+            builder(tenant, State.Type.SUCCESS, null).build()
+        );
+
+        for (int i = 0; i < 3; i++) {
+            executionRepository.save(
+                builder(tenant, State.Type.SUCCESS, null)
+                    .parentId(parent.getId())
+                    .build()
+            );
+        }
+
+        // Save an execution with a different parent — must not appear in results
+        Execution otherParent = executionRepository.save(
+            builder(tenant, State.Type.SUCCESS, null).build()
+        );
+        executionRepository.save(
+            builder(tenant, State.Type.SUCCESS, null)
+                .parentId(otherParent.getId())
+                .build()
+        );
+
+        // When
+        ArrayListTotal<Execution> result = executionRepository.find(
+            Pageable.UNPAGED,
+            tenant,
+            List.of(QueryFilter.builder().field(Field.PARENT_ID).operation(Op.EQUALS).value(parent.getId()).build())
+        );
+
+        // Then
+        assertThat(result.getTotal()).isEqualTo(3L);
+        assertThat(result).hasSize(3)
+            .allMatch(e -> parent.getId().equals(e.getParentId()));
+    }
+
+    @Test
+    protected void shouldFindLoopSubExecutionsScopedByTaskId() {
+        // Given a parent execution with iterations from two distinct Loop tasks
+        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        Execution parent = executionRepository.save(builder(tenant, State.Type.SUCCESS, null).build());
+
+        TaskRun loop1TaskRun = TaskRun.of(
+            parent, ResolvedTask.of(
+                Return.builder().id("loop1").type(Return.class.getName()).format(Property.ofValue("test")).build()
+            )
+        );
+        TaskRun loop2TaskRun = TaskRun.of(
+            parent, ResolvedTask.of(
+                Return.builder().id("loop2").type(Return.class.getName()).format(Property.ofValue("test")).build()
+            )
+        );
+
+        for (int i = 0; i < 2; i++) {
+            executionRepository.save(parent.loopExecution(loop1TaskRun, i, null, "value" + i));
+        }
+        for (int i = 0; i < 3; i++) {
+            executionRepository.save(parent.loopExecution(loop2TaskRun, i, null, "value" + i));
+        }
+
+        // When / Then: scoping to a single loop task returns only that task's iterations
+        List<Execution> loop1Subs = executionRepository.findLoopSubExecutions(tenant, parent.getId(), "loop1");
+        assertThat(loop1Subs).hasSize(2)
+            .allMatch(e -> "loop1".equals(e.getLoopRun().taskId()));
+
+        List<Execution> loop2Subs = executionRepository.findLoopSubExecutions(tenant, parent.getId(), "loop2");
+        assertThat(loop2Subs).hasSize(3)
+            .allMatch(e -> "loop2".equals(e.getLoopRun().taskId()));
+
+        // A null taskId returns every loop task's iterations
+        List<Execution> allSubs = executionRepository.findLoopSubExecutions(tenant, parent.getId(), null);
+        assertThat(allSubs).hasSize(5);
     }
 
     @Test
@@ -1067,6 +1244,54 @@ public abstract class AbstractExecutionRepositoryTest {
             .as("find execution CONTAINS LABELS key")
             .usingRecursiveFieldByFieldElementComparatorOnFields("id")
             .containsOnly(exec1);
+
+        assertThat(
+            executionRepository.find(
+                Pageable.from(1, 10), tenant,
+                List.of(
+                    QueryFilter.builder()
+                        .field(QueryFilter.Field.LABELS)
+                        .operation(Op.NOT_CONTAINS)
+                        .value("alue2")
+                        .build()
+                )
+            )
+        )
+            .as("find execution NOT_CONTAINS LABELS")
+            .usingRecursiveFieldByFieldElementComparatorOnFields("id")
+            .containsOnly(exec1);
+
+        assertThat(
+            executionRepository.find(
+                Pageable.from(1, 10), tenant,
+                List.of(
+                    QueryFilter.builder()
+                        .field(QueryFilter.Field.LABELS)
+                        .operation(Op.IS_NOT_NULL)
+                        .value("labelkey2")
+                        .build()
+                )
+            )
+        )
+            .as("find execution IS_NOT_NULL LABELS key")
+            .usingRecursiveFieldByFieldElementComparatorOnFields("id")
+            .containsOnly(exec2, exec3);
+
+        assertThat(
+            executionRepository.find(
+                Pageable.from(1, 10), tenant,
+                List.of(
+                    QueryFilter.builder()
+                        .field(QueryFilter.Field.LABELS)
+                        .operation(Op.IS_NULL)
+                        .value("labelkey2")
+                        .build()
+                )
+            )
+        )
+            .as("find execution IS_NULL LABELS key")
+            .usingRecursiveFieldByFieldElementComparatorOnFields("id")
+            .containsOnly(exec1);
     }
 
     record ExecutionSortTestData(Execution createdExecution, Execution successExecution, Execution runningExecution, Execution failedExecution) {
@@ -1210,6 +1435,60 @@ public abstract class AbstractExecutionRepositoryTest {
     }
 
     @Test
+    protected void findShouldSortByTotalDurationAcrossMinuteBoundary() {
+        // given - two terminated executions whose durations straddle the one-minute boundary.
+        // This guards against backends that only compare the sub-minute part of the duration
+        // (e.g. the former Postgres EXTRACT(MILLISECONDS FROM interval) generated column), which
+        // would sort the multi-minute execution below the sub-minute one.
+        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        final Instant clock = Instant.now();
+
+        var longExecution = Execution.builder()
+            .id("longExecution__" + FriendlyId.createFriendlyId())
+            .namespace(NAMESPACE)
+            .tenantId(tenant)
+            .flowId(FLOW)
+            .flowRevision(1)
+            .state(State.of(
+                State.Type.SUCCESS,
+                List.of(
+                    new State.History(State.Type.CREATED, clock),
+                    new State.History(State.Type.SUCCESS, clock.plus(Duration.ofMinutes(5)))
+                )
+            )).build();
+        executionRepository.save(longExecution);
+
+        var shortExecution = Execution.builder()
+            .id("shortExecution__" + FriendlyId.createFriendlyId())
+            .namespace(NAMESPACE)
+            .tenantId(tenant)
+            .flowId(FLOW)
+            .flowRevision(1)
+            .state(State.of(
+                State.Type.SUCCESS,
+                List.of(
+                    new State.History(State.Type.CREATED, clock),
+                    new State.History(State.Type.SUCCESS, clock.plus(Duration.ofSeconds(20)))
+                )
+            )).build();
+        executionRepository.save(shortExecution);
+
+        // when / then
+        List<QueryFilter> emptyFilters = null;
+        var ascSort = createSortLikeInControllers(List.of("state.duration:asc"), executionRepository.sortMapping());
+        assertThat(executionRepository.find(Pageable.from(ascSort), tenant, emptyFilters).stream())
+            .as("shortest total duration first when sorting ascending")
+            .map(Execution::getId)
+            .containsExactly(shortExecution.getId(), longExecution.getId());
+
+        var descSort = createSortLikeInControllers(List.of("state.duration:desc"), executionRepository.sortMapping());
+        assertThat(executionRepository.find(Pageable.from(descSort), tenant, emptyFilters).stream())
+            .as("longest total duration first when sorting descending")
+            .map(Execution::getId)
+            .containsExactly(longExecution.getId(), shortExecution.getId());
+    }
+
+    @Test
     protected void findShouldOrderByStartDateAsc() {
         // given
         var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
@@ -1270,7 +1549,11 @@ public abstract class AbstractExecutionRepositoryTest {
                         String col = split[0];
 
                         if (sortMapper != null) {
-                            col = sortMapper.apply(col);
+                            String mapped = sortMapper.apply(col);
+                            if (mapped == null) {
+                                throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid sort field: " + col);
+                            }
+                            col = mapped;
                         }
 
                         return split[1].equals("asc") ? Sort.Order.asc(col) : Sort.Order.desc(col);
@@ -1394,6 +1677,189 @@ public abstract class AbstractExecutionRepositoryTest {
         }
     }
 
+    @Test
+    void shouldOnlyFindAsyncNormalKindWhenThereIsNoKindFilter() {
+        // Given
+        var tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        Execution normal = executionRepository.save(builder(tenant, State.Type.SUCCESS, "flowA").build());
+        Execution playground = executionRepository.save(
+            builder(tenant, State.Type.SUCCESS, "flowA").kind(ExecutionKind.PLAYGROUND).build()
+        );
+
+        try {
+            List<QueryFilter> flowFilter = List.of(
+                QueryFilter.builder()
+                    .field(QueryFilter.Field.FLOW_ID)
+                    .operation(QueryFilter.Op.EQUALS)
+                    .value("flowA")
+                    .build()
+            );
+            List<QueryFilter> kindFilter = List.of(
+                QueryFilter.builder()
+                    .field(QueryFilter.Field.KIND)
+                    .operation(QueryFilter.Op.EQUALS)
+                    .value(ExecutionKind.PLAYGROUND)
+                    .build()
+            );
+
+            // When
+            List<Execution> filtered = executionRepository.findAsync(tenant, flowFilter).collectList().block();
+            List<Execution> unfiltered = executionRepository.findAsync(tenant, List.of()).collectList().block();
+            List<Execution> byKind = executionRepository.findAsync(tenant, kindFilter).collectList().block();
+
+            // Then
+            assertThat(filtered).map(Execution::getId).containsExactly(normal.getId());
+            assertThat(unfiltered).map(Execution::getId).containsExactly(normal.getId());
+            assertThat(byKind).map(Execution::getId).containsExactly(playground.getId());
+            assertThat(executionRepository.find(Pageable.UNPAGED, tenant, flowFilter)).hasSameSizeAs(filtered);
+        } finally {
+            executionRepository.delete(normal);
+            executionRepository.delete(playground);
+        }
+    }
+
+    @Test
+    protected void shouldFindExecutionByTrigger() {
+        // GIVEN
+        String tenant = TestsUtils.randomTenant(this.getClass().getSimpleName());
+        Execution execution = ExecutionFixture.EXECUTION_1(tenant);
+
+        TriggerId trigger = TriggerId.of(execution.getTenantId(), execution.getNamespace(), execution.getFlowId(), "trigger");
+
+        execution = execution
+            .toBuilder()
+            .trigger(
+                ExecutionTrigger
+                    .builder()
+                    .id(trigger.uid())
+                    .build()
+            )
+            .build();
+        executionRepository.save(execution);
+
+        // WHEN
+        Flux<Execution> flux = executionRepository.findAllByTrigger(trigger);
+
+        // THEN
+        assertThat(flux.collectList().block()).map(Execution::getId).isEqualTo(List.of(execution.getId()));
+    }
+
+    // ---- SCOPE dashboard filter tests ----
+
+    private static final String SCOPE_USER_EXECUTION_ID = "scope-user-exec";
+    private static final String SCOPE_SYSTEM_EXECUTION_ID = "scope-system-exec";
+
+    private static final Duration SCOPE_TEST_DURATION = Duration.ofSeconds(10);
+    private static final Instant SCOPE_TEST_CREATE_DATE = Instant.now().minus(Duration.ofMinutes(5));
+
+    private final Execution scopeUserExecution = Execution.builder()
+        .id(SCOPE_USER_EXECUTION_ID)
+        .namespace(NAMESPACE)
+        .flowId("scope-test")
+        .flowRevision(1)
+        .state(
+            new State(
+                Type.SUCCESS, List.of(
+                    new State.History(State.Type.CREATED, SCOPE_TEST_CREATE_DATE),
+                    new State.History(Type.SUCCESS, SCOPE_TEST_CREATE_DATE.plus(SCOPE_TEST_DURATION))
+                )
+            )
+        )
+        .taskRunList(List.of())
+        .build();
+
+    private final Execution scopeSystemExecution = Execution.builder()
+        .id(SCOPE_SYSTEM_EXECUTION_ID)
+        .namespace(SystemFlowsConfiguration.DEFAULT_NAMESPACE)
+        .flowId("scope-test")
+        .flowRevision(1)
+        .state(
+            new State(
+                Type.SUCCESS, List.of(
+                    new State.History(State.Type.CREATED, SCOPE_TEST_CREATE_DATE),
+                    new State.History(Type.SUCCESS, SCOPE_TEST_CREATE_DATE.plus(SCOPE_TEST_DURATION))
+                )
+            )
+        )
+        .taskRunList(List.of())
+        .build();
+
+    private record DashboardScopeFilterTestCase(
+        QueryFilter queryFilter,
+        List<String> expectedIds) {
+    }
+
+    private static QueryFilter scopeFilter(QueryFilter.Op op, Object value) {
+        return QueryFilter.builder()
+            .field(QueryFilter.Field.SCOPE)
+            .operation(op)
+            .value(value)
+            .build();
+    }
+
+    static final List<DashboardScopeFilterTestCase> dashboardScopeFilterTestCases = List.of(
+        new DashboardScopeFilterTestCase(scopeFilter(Op.EQUALS, USER), List.of(SCOPE_USER_EXECUTION_ID)),
+        new DashboardScopeFilterTestCase(scopeFilter(Op.EQUALS, SYSTEM), List.of(SCOPE_SYSTEM_EXECUTION_ID)),
+        new DashboardScopeFilterTestCase(scopeFilter(Op.NOT_EQUALS, USER), List.of(SCOPE_SYSTEM_EXECUTION_ID)),
+        new DashboardScopeFilterTestCase(scopeFilter(Op.NOT_EQUALS, SYSTEM), List.of(SCOPE_USER_EXECUTION_ID)),
+        new DashboardScopeFilterTestCase(scopeFilter(Op.IN, List.of(USER)), List.of(SCOPE_USER_EXECUTION_ID)),
+        new DashboardScopeFilterTestCase(scopeFilter(Op.IN, List.of(SYSTEM)), List.of(SCOPE_SYSTEM_EXECUTION_ID)),
+        new DashboardScopeFilterTestCase(scopeFilter(Op.IN, List.of(USER, SYSTEM)), List.of(SCOPE_USER_EXECUTION_ID, SCOPE_SYSTEM_EXECUTION_ID)),
+        new DashboardScopeFilterTestCase(scopeFilter(Op.NOT_IN, List.of(USER)), List.of(SCOPE_SYSTEM_EXECUTION_ID)),
+        new DashboardScopeFilterTestCase(scopeFilter(Op.NOT_IN, List.of(SYSTEM)), List.of(SCOPE_USER_EXECUTION_ID)),
+        new DashboardScopeFilterTestCase(scopeFilter(Op.NOT_IN, List.of(USER, SYSTEM)), List.of())
+    );
+
+    @ParameterizedTest
+    @FieldSource("dashboardScopeFilterTestCases")
+    protected void dashboardFetchDataWithScopeFilter(DashboardScopeFilterTestCase testCase) throws IOException {
+        // Given
+        var tenantId = TestsUtils.randomTenant(this.getClass().getSimpleName());
+
+        executionRepository.save(scopeUserExecution.toBuilder().tenantId(tenantId).build());
+        executionRepository.save(scopeSystemExecution.toBuilder().tenantId(tenantId).build());
+
+        // When
+        var now = ZonedDateTime.now();
+        var dataFilter = Executions.builder()
+            .type(Executions.class.getName())
+            .columns(
+                Map.of(
+                    "id", ColumnDescriptor.<Executions.Fields> builder().field(Executions.Fields.ID).build()
+                )
+            )
+            .build();
+        dataFilter.updateWhereWithGlobalFilters(List.of(testCase.queryFilter()), now.minusHours(1), now);
+
+        ArrayListTotal<Map<String, Object>> data = executionRepository.fetchData(tenantId, dataFilter, now.minusHours(1), now, null);
+
+        // Then
+        List<String> returnedIds = data.stream().map(row -> (String) row.get("id")).toList();
+        assertThat(returnedIds).containsExactlyInAnyOrderElementsOf(testCase.expectedIds());
+    }
+
+    @ParameterizedTest
+    @FieldSource("dashboardScopeFilterTestCases")
+    protected void dashboardFetchValueWithScopeFilter(DashboardScopeFilterTestCase testCase) throws IOException {
+        // Given
+        var tenantId = TestsUtils.randomTenant(this.getClass().getSimpleName());
+
+        executionRepository.save(scopeUserExecution.toBuilder().tenantId(tenantId).build());
+        executionRepository.save(scopeSystemExecution.toBuilder().tenantId(tenantId).build());
+
+        // When
+        var now = ZonedDateTime.now();
+        var dataFilter = ExecutionsKPI.builder()
+            .type(ExecutionsKPI.class.getName())
+            .columns(ColumnDescriptor.<ExecutionsKPI.Fields> builder().field(ExecutionsKPI.Fields.ID).agg(AggregationType.COUNT).build())
+            .build();
+        dataFilter.updateWhereWithGlobalFilters(List.of(testCase.queryFilter()), now.minusHours(1), now);
+
+        Double value = executionRepository.fetchValue(tenantId, dataFilter, now.minusHours(1), now, false);
+
+        // Then
+        assertThat(value).isEqualTo((double) testCase.expectedIds().size());
+    }
 
     @Test
     protected void findWithDateFilter() {
@@ -1405,10 +1871,12 @@ public abstract class AbstractExecutionRepositoryTest {
         ZonedDateTime midWindow = ZonedDateTime.now().minusMinutes(150);
 
         // Execution A: started inside window, ended after window
-        State stateA = State.of(Type.SUCCESS, List.of(
-            new State.History(Type.CREATED, midWindow.toInstant()),
-            new State.History(Type.SUCCESS, Instant.now())
-        ));
+        State stateA = State.of(
+            Type.SUCCESS, List.of(
+                new State.History(Type.CREATED, midWindow.toInstant()),
+                new State.History(Type.SUCCESS, Instant.now())
+            )
+        );
         var execA = Execution.builder()
             .id(FriendlyId.createFriendlyId())
             .namespace(NAMESPACE)
@@ -1421,10 +1889,12 @@ public abstract class AbstractExecutionRepositoryTest {
         executionRepository.save(execA);
 
         // Execution B: started before window, ended inside window
-        State stateB = State.of(Type.SUCCESS, List.of(
-            new State.History(Type.CREATED, ZonedDateTime.now().minusHours(4).toInstant()),
-            new State.History(Type.SUCCESS, midWindow.toInstant())
-        ));
+        State stateB = State.of(
+            Type.SUCCESS, List.of(
+                new State.History(Type.CREATED, ZonedDateTime.now().minusHours(4).toInstant()),
+                new State.History(Type.SUCCESS, midWindow.toInstant())
+            )
+        );
         var execB = Execution.builder()
             .id(FriendlyId.createFriendlyId())
             .namespace(NAMESPACE)
@@ -1457,5 +1927,4 @@ public abstract class AbstractExecutionRepositoryTest {
         assertThat(resultBoth).extracting(Execution::getId)
             .containsExactlyInAnyOrder(execA.getId(), execB.getId());
     }
-
 }

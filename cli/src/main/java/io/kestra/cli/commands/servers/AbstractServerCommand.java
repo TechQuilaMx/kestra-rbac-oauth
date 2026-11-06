@@ -1,5 +1,7 @@
 package io.kestra.cli.commands.servers;
 
+import java.util.Map;
+
 import io.kestra.cli.AbstractCommand;
 import io.kestra.core.contexts.KestraContext;
 
@@ -10,6 +12,11 @@ import picocli.CommandLine;
 public abstract class AbstractServerCommand extends AbstractCommand implements ServerCommandInterface {
     @CommandLine.Option(names = { "--port" }, description = "The port to bind")
     Integer serverPort;
+
+    @SuppressWarnings("unused")
+    public static Map<String, Object> propertiesOverrides() {
+        return Map.of();
+    }
 
     @Override
     public Integer call() throws Exception {
@@ -22,9 +29,5 @@ public abstract class AbstractServerCommand extends AbstractCommand implements S
 
     private long maxMemoryInMB() {
         return Runtime.getRuntime().maxMemory() / 1024 / 1024;
-    }
-
-    protected static int defaultWorkerThread() {
-        return Runtime.getRuntime().availableProcessors() * 8;
     }
 }

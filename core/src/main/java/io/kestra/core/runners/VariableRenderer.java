@@ -6,11 +6,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.runners.configuration.VariableConfiguration;
 import io.kestra.core.runners.pebble.*;
 import io.kestra.core.serializers.JacksonMapper;
 
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Nullable;
 import io.pebbletemplates.pebble.PebbleEngine;
 import io.pebbletemplates.pebble.error.AttributeNotFoundException;
@@ -18,7 +17,6 @@ import io.pebbletemplates.pebble.error.PebbleException;
 import io.pebbletemplates.pebble.template.PebbleTemplate;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import lombok.Getter;
 
 @Singleton
 public class VariableRenderer {
@@ -26,21 +24,21 @@ public class VariableRenderer {
     public static final int MAX_RENDERING_AMOUNT = 100;
     public static final String RENDER_DEPTH_VAR = "__kestra_render_depth";
 
-    private PebbleEngine pebbleEngine;
+    private volatile PebbleEngine pebbleEngine;
     private final VariableConfiguration variableConfiguration;
 
     @Inject
-    public VariableRenderer(ApplicationContext applicationContext, @Nullable VariableConfiguration variableConfiguration) {
-        this(applicationContext.getBean(PebbleEngineFactory.class), variableConfiguration);
-    }
-
     public VariableRenderer(PebbleEngineFactory pebbleEngineFactory, @Nullable VariableConfiguration variableConfiguration) {
-        this.variableConfiguration = variableConfiguration != null ? variableConfiguration : new VariableConfiguration();
         this.pebbleEngine = pebbleEngineFactory.create();
+        this.variableConfiguration = variableConfiguration != null ? variableConfiguration : new VariableConfiguration();
     }
 
     public void setPebbleEngine(final PebbleEngine pebbleEngine) {
         this.pebbleEngine = pebbleEngine;
+    }
+
+    private PebbleEngine pebbleEngine() {
+        return this.pebbleEngine;
     }
 
     public static IllegalVariableEvaluationException properPebbleException(PebbleException initialExtension) {
@@ -103,16 +101,17 @@ public class VariableRenderer {
         }
 
         try {
-            PebbleTemplate compiledTemplate = this.pebbleEngine.getLiteralTemplate((String) result);
+            PebbleTemplate compiledTemplate = this.pebbleEngine().getLiteralTemplate((String) result);
 
             try {
-                OutputWriter writer = stringify ? new JsonWriter() : new TypedObjectWriter();
+                long maxOutputSize = this.variableConfiguration.getMaxOutputSize();
+                OutputWriter writer = stringify ? new JsonWriter(maxOutputSize) : new TypedObjectWriter(maxOutputSize);
                 compiledTemplate.evaluate(writer, variables);
                 result = writer.output();
             } catch (IllegalArgumentException e) {
                 //can happen in case of mixed type in string
                 if (!stringify) {
-                    JsonWriter fallbackWriter = new JsonWriter();
+                    JsonWriter fallbackWriter = new JsonWriter(this.variableConfiguration.getMaxOutputSize());
                     compiledTemplate.evaluate(fallbackWriter, variables);
                     Object rendered = fallbackWriter.output();
 
@@ -126,16 +125,11 @@ public class VariableRenderer {
                 }
             }
 
-        } catch (IOException | PebbleException e) {
-            String alternativeRender = this.alternativeRender(e, (String) inline, variables);
-            if (alternativeRender == null) {
-                if (e instanceof PebbleException pebbleException) {
-                    throw properPebbleException(pebbleException);
-                }
-                throw new IllegalVariableEvaluationException(e);
-            } else {
-                result = alternativeRender;
+        } catch (IOException | RuntimeException e) {
+            if (e instanceof PebbleException pebbleException) {
+                throw properPebbleException(pebbleException);
             }
+            throw new IllegalVariableEvaluationException(e);
         }
 
         if (result instanceof String stringValue && replacers != null) {
@@ -152,18 +146,6 @@ public class VariableRenderer {
         } catch (Exception ignored) {
             return value;
         }
-    }
-
-    /**
-     * This method can be used in fallback for rendering an input string.
-     *
-     * @param e The exception that was throw by the default variable renderer.
-     * @param inline The expression to be rendered.
-     * @param variables The context variables.
-     * @return The rendered string.
-     */
-    protected String alternativeRender(Exception e, String inline, Map<String, Object> variables) throws IllegalVariableEvaluationException {
-        return null;
     }
 
     private static String putBackRawTags(Map<String, String> replacers, String result) {
@@ -285,19 +267,5 @@ public class VariableRenderer {
         }
 
         return result;
-    }
-
-    @Getter
-    @ConfigurationProperties("kestra.variables")
-    public static class VariableConfiguration {
-        public VariableConfiguration() {
-            this.cacheEnabled = true;
-            this.cacheSize = 1000;
-            this.recursiveRendering = false;
-        }
-
-        Boolean cacheEnabled;
-        Integer cacheSize;
-        Boolean recursiveRendering;
     }
 }

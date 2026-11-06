@@ -3,6 +3,7 @@ package io.kestra.repository.mysql;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.jooq.Condition;
@@ -15,7 +16,6 @@ import org.jooq.Select;
 import org.jooq.SelectConditionStep;
 import org.jooq.impl.DSL;
 
-import io.kestra.core.queues.QueueService;
 import io.kestra.core.repositories.ArrayListTotal;
 import io.kestra.jdbc.AbstractJdbcRepository;
 import io.kestra.jdbc.JdbcTableConfig;
@@ -23,19 +23,21 @@ import io.kestra.jdbc.JooqDSLContextWrapper;
 
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.data.model.Pageable;
 import io.micronaut.data.model.Sort;
 import io.micronaut.data.model.Sort.Order;
 import jakarta.inject.Inject;
 
 @SuppressWarnings("this-escape")
-@MysqlRepositoryEnabled
+@Requires(condition = MysqlRepository.MysqlCondition.class)
+@Requires(property = "kestra.server-type", notEquals = "WORKER")
 @EachBean(JdbcTableConfig.class)
 public class MysqlRepository<T> extends AbstractJdbcRepository<T> {
 
     @Inject
     public MysqlRepository(@Parameter JdbcTableConfig jdbcTableConfig,
-        QueueService queueService,
         JooqDSLContextWrapper dslContextWrapper) {
         super(jdbcTableConfig, dslContextWrapper);
         this.table = DSL.table(DSL.quotedName(this.getTable().getName()));
@@ -45,7 +47,7 @@ public class MysqlRepository<T> extends AbstractJdbcRepository<T> {
     @Override
     public Condition fullTextCondition(List<String> fields, String query) {
         if (query == null || query.equals("*")) {
-            return DSL.trueCondition();
+            return DSL.noCondition();
         }
 
         String escaped = escapeForLike(query);
@@ -54,7 +56,9 @@ public class MysqlRepository<T> extends AbstractJdbcRepository<T> {
         Condition likeCondition = DSL.falseCondition();
         for (String fieldName : fields) {
             Field<String> f = DSL.field(fieldName, String.class);
-            likeCondition = likeCondition.or(f.like(pattern, '\\'));
+            // COALESCE ensures NULL fields evaluate to false rather than NULL,
+            // so NOT(...LIKE...) works correctly for nullable columns like execution_id.
+            likeCondition = likeCondition.or(DSL.coalesce(f, DSL.inline("")).like(pattern, '\\'));
         }
 
         String booleanQuery = Arrays.stream(query.split("\\p{IsPunct}|\\s+"))
@@ -100,5 +104,16 @@ public class MysqlRepository<T> extends AbstractJdbcRepository<T> {
             DSL.field("DAYOFWEEK(CONCAT(YEAR({0}), '-01-01')) > 5", Boolean.class, timestampField),
             DSL.field("WEEK({0}, 2)", Integer.class, timestampField)
         ).otherwise(DSL.field("WEEK({0}, 3)", Integer.class, timestampField));
+    }
+
+    // We need to create H2 repositories for the queue as it uses an H2Repository named 'queue',
+    // we may find a way to only create this one at some point as here we create unnecessary beans.
+    static class MysqlCondition implements io.micronaut.context.condition.Condition {
+        @Override
+        public boolean matches(ConditionContext context) {
+            boolean isRepository = ((Optional<String>) context.get("kestra.repository.type", String.class)).map(it -> "mysql".equals(it)).orElse(false);
+            boolean isQueue = ((Optional<String>) context.get("kestra.queue.type", String.class)).map(it -> "mysql".equals(it)).orElse(false);
+            return isRepository || isQueue;
+        }
     }
 }

@@ -1,22 +1,24 @@
 package io.kestra.core.repositories;
 
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import io.kestra.core.models.QueryFilter;
 import io.kestra.core.models.executions.Execution;
-import io.kestra.core.models.executions.statistics.DailyExecutionStatistics;
-import io.kestra.core.models.executions.statistics.ExecutionCount;
-import io.kestra.core.models.executions.statistics.Flow;
+import io.kestra.core.models.executions.ExecutionKind;
 import io.kestra.core.models.flows.FlowScope;
 import io.kestra.core.models.flows.State;
-import io.kestra.core.utils.DateUtils;
+import io.kestra.core.models.triggers.TriggerId;
 import io.kestra.plugin.core.dashboard.data.Executions;
 
 import io.micronaut.data.model.Pageable;
+import io.micronaut.data.model.Sort;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -24,7 +26,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 
-public interface ExecutionRepositoryInterface extends SaveRepositoryInterface<Execution>, QueryBuilderInterface<Executions.Fields> {
+public interface ExecutionRepositoryInterface extends QueryBuilderInterface<Executions.Fields>, DistinctFieldValuesQueryInterface {
     default Optional<Execution> findById(String tenantId, String id) {
         return findById(tenantId, id, false);
     }
@@ -36,13 +38,21 @@ public interface ExecutionRepositoryInterface extends SaveRepositoryInterface<Ex
     ArrayListTotal<Execution> findByFlowId(String tenantId, String namespace, String id, Pageable pageable);
 
     /**
-     * Finds all the executions that was triggered by the given execution id.
+     * Finds all the executions that were triggered by the given execution id.
      *
      * @param tenantId the tenant id.
      * @param triggerExecutionId the id of the execution trigger.
      * @return a {@link Flux} of one or more executions.
      */
     Flux<Execution> findAllByTriggerExecutionId(String tenantId, String triggerExecutionId);
+
+    /**
+     * Finds all the executions that was triggered by the given trigger.
+     *
+     * @param triggerId the trigger id.
+     * @return a {@link Flux} of one or more executions.
+     */
+    Flux<Execution> findAllByTrigger(TriggerId triggerId);
 
     /**
      * Finds the latest execution for the given flow and s.
@@ -78,9 +88,8 @@ public interface ExecutionRepositoryInterface extends SaveRepositoryInterface<Ex
         @Nullable ZonedDateTime endDate,
         @Nullable List<State.Type> state,
         @Nullable Map<String, String> labels,
-        @Nullable String triggerExecutionId,
-        @Nullable ChildFilter childFilter) {
-        return find(query, tenantId, scope, namespace, flowId, startDate, endDate, state, labels, triggerExecutionId, childFilter, false);
+        @Nullable String triggerExecutionId) {
+        return find(query, tenantId, scope, namespace, flowId, startDate, endDate, state, labels, triggerExecutionId, false);
     }
 
     Flux<Execution> find(
@@ -94,37 +103,30 @@ public interface ExecutionRepositoryInterface extends SaveRepositoryInterface<Ex
         @Nullable List<State.Type> state,
         @Nullable Map<String, String> labels,
         @Nullable String triggerExecutionId,
-        @Nullable ChildFilter childFilter,
         boolean allowDeleted);
 
     Flux<Execution> findAllAsync(@Nullable String tenantId);
 
+    /**
+     * Streams the executions matching the filters, applying the same conditions as {@link #find(Pageable, String, List)}
+     * so that both return the same executions: without an explicit KIND filter, only executions of kind
+     * {@link ExecutionKind#NORMAL} are returned.
+     *
+     * @param tenantId the tenant
+     * @param filters the filters to apply
+     * @return the matching executions
+     */
     Flux<Execution> findAsync(String tenantId, List<QueryFilter> filters);
 
+    /**
+     * WARNING: this method is only intended to be used in tests.
+     */
+    @VisibleForTesting
     Execution delete(Execution execution);
 
-    Integer purge(Execution execution);
+    boolean purge(Execution execution);
 
     Integer purge(List<Execution> executions);
-
-    List<DailyExecutionStatistics> dailyStatisticsForAllTenants(
-        @Nullable String query,
-        @Nullable String namespace,
-        @Nullable String flowId,
-        @Nullable ZonedDateTime startDate,
-        @Nullable ZonedDateTime endDate,
-        @Nullable DateUtils.GroupType groupBy);
-
-    List<DailyExecutionStatistics> dailyStatistics(
-        @Nullable String query,
-        @Nullable String tenantId,
-        @Nullable List<FlowScope> scope,
-        @Nullable String namespace,
-        @Nullable String flowId,
-        @Nullable ZonedDateTime startDate,
-        @Nullable ZonedDateTime endDate,
-        @Nullable DateUtils.GroupType groupBy,
-        List<State.Type> state);
 
     @Getter
     @SuperBuilder
@@ -136,17 +138,10 @@ public interface ExecutionRepositoryInterface extends SaveRepositoryInterface<Ex
         private String id;
     }
 
-    List<ExecutionCount> executionCounts(
-        @Nullable String tenantId,
-        @Nullable List<Flow> flows,
-        @Nullable List<State.Type> states,
-        @Nullable ZonedDateTime startDate,
-        @Nullable ZonedDateTime endDate,
-        @Nullable List<String> namespaces);
-
+    /**
+     * WARNING: this method is only intended to be used in tests or inside the BackupService.
+     */
     Execution save(Execution execution);
-
-    Execution update(Execution execution);
 
     default Function<String, String> sortMapping() throws IllegalArgumentException {
         return s -> s;
@@ -167,4 +162,39 @@ public interface ExecutionRepositoryInterface extends SaveRepositoryInterface<Ex
     List<Execution> lastExecutions(
         String tenantId,
         @Nullable List<FlowFilter> flows);
+
+    /**
+     * Returns the loop sub-executions for the given parent execution, sorted by iteration index.
+     *
+     * @param taskId if non-null, scopes the result to the iterations of that single Loop task
+     *        (matched against {@code loopRun.taskId}); if null, returns iterations for
+     *        every Loop task under the parent execution.
+     */
+    default List<Execution> findLoopSubExecutions(String tenantId, String parentExecutionId, @Nullable String taskId) {
+        List<QueryFilter> filters = new ArrayList<>();
+        filters.add(
+            QueryFilter.builder()
+                .field(QueryFilter.Field.PARENT_ID)
+                .operation(QueryFilter.Op.EQUALS)
+                .value(parentExecutionId)
+                .build()
+        );
+        filters.add(
+            QueryFilter.builder()
+                .field(QueryFilter.Field.KIND)
+                .operation(QueryFilter.Op.EQUALS)
+                .value(ExecutionKind.LOOP)
+                .build()
+        );
+        if (taskId != null) {
+            filters.add(
+                QueryFilter.builder()
+                    .field(QueryFilter.Field.TASK_ID)
+                    .operation(QueryFilter.Op.EQUALS)
+                    .value(taskId)
+                    .build()
+            );
+        }
+        return find(Pageable.from(Sort.of(Sort.Order.asc("loopRunIndex"))), tenantId, filters);
+    }
 }

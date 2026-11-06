@@ -1,22 +1,25 @@
 <template>
-    <el-select
+    <KsSelect
         v-model="modelValue"
         :placeholder="$te(`no_code.select.${blockType}`) ? $t(`no_code.select.${blockType}`) : $t('no_code.select.default')"
         filterable
+        :filterMethod="onFilter"
         clearable
+        fitInputWidth
+        :fallbackPlacements="['bottom-start', 'top-start']"
+        @visible-change="onVisibleChange"
     >
-        <el-option
-            v-for="item in taskModels"
+        <KsOption
+            v-for="item in renderedTaskModels"
             :key="item.cls"
             :label="item.cls"
             :value="item.cls"
         >
             <span class="options">
                 <TaskIcon
-                    v-if="hasIcons"
                     :cls="item?.cls"
                     :onlyIcon="true"
-                    :icons="pluginsStore.icons"
+                    :loadIcon="pluginsStore.loadIcon"
                 />
                 <div class="option-content">
                     <div class="cls">{{ item?.cls }}</div>
@@ -25,118 +28,125 @@
                     </div>
                 </div>
             </span>
-        </el-option>
+        </KsOption>
 
         <template #prefix>
             <TaskIcon
-                v-if="modelValue && hasIcons"
+                v-if="modelValue"
                 :cls="modelValue"
                 :onlyIcon="true"
-                :icons="pluginsStore.icons"
+                :loadIcon="pluginsStore.loadIcon"
             />
         </template>
-    </el-select>
+    </KsSelect>
 </template>
 
 <script setup lang="ts">
-    import {computed, inject, onBeforeMount, ref} from "vue";
-    import {TaskIcon} from "@kestra-io/ui-libs";
-    import {removeRefPrefix, usePluginsStore} from "../../stores/plugins";
+    import {computed, inject, onBeforeMount, ref} from "vue"
+    import TaskIcon from "./TaskIcon.vue"
+    import {removeRefPrefix, usePluginsStore} from "../../stores/plugins"
     import {
         FULL_SCHEMA_INJECTION_KEY,
         PARENT_PATH_INJECTION_KEY,
-        SCHEMA_DEFINITIONS_INJECTION_KEY
-    } from "../no-code/injectionKeys";
-    import {getValueAtJsonPath} from "../../utils/utils";
+        SCHEMA_DEFINITIONS_INJECTION_KEY,
+    } from "../no-code/injectionKeys"
+    import {getValueAtJsonPath} from "../../utils/utils"
 
-    const pluginsStore = usePluginsStore();
+    const pluginsStore = usePluginsStore()
 
-    const parentPath = inject(PARENT_PATH_INJECTION_KEY, "");
-    const fullSchema = inject(FULL_SCHEMA_INJECTION_KEY, ref<Record<string, any>>({}));
-    const rootDefinitions = inject(SCHEMA_DEFINITIONS_INJECTION_KEY, ref<Record<string, any>>({}));
+    const parentPath = inject(PARENT_PATH_INJECTION_KEY, "")
+    const fullSchema = inject(FULL_SCHEMA_INJECTION_KEY, ref<Record<string, any>>({}))
+    const rootDefinitions = inject(SCHEMA_DEFINITIONS_INJECTION_KEY, ref<Record<string, any>>({}))
 
-    const blockType = (parentPath.split(".").pop() ?? "").replace(/\[\d+\]$/, "");
-    const isPluginBlock = ["tasks", "triggers", "conditions", "taskRunners"].includes(blockType);
+    const blockType = (parentPath.split(".").pop() ?? "").replace(/\[\d+\]$/, "")
+    const isPluginBlock = ["tasks", "triggers", "conditions", "taskRunners"].includes(blockType)
 
     const fieldDefinition = computed(() => {
         if (props.blockSchemaPath.length === 0) {
-            console.error("Definition key is required for PluginSelect component");
+            console.error("Definition key is required for PluginSelect component")
         }
-        return getValueAtJsonPath(fullSchema.value, props.blockSchemaPath);
+        return getValueAtJsonPath(fullSchema.value, props.blockSchemaPath)
     })
 
     onBeforeMount(() => {
-        if (blockType === "pluginDefaults" || isPluginBlock) {
-            pluginsStore.listWithSubgroup({includeDeprecated: false});
+        if (isPluginBlock) {
+            pluginsStore.listWithSubgroup({includeDeprecated: false})
         }
+        pluginsStore.fetchIcons()
     })
 
     const allRefs = computed(() => fieldDefinition.value?.anyOf?.map((item: any) => {
         if (item.allOf) {
             // if the item is an allOf, we need to find the first item that has a $ref
-            const refItem = item.allOf.find((d: any) => d.$ref);
+            const refItem = item.allOf.find((d: any) => d.$ref)
             if (refItem?.$ref) {
-                return removeRefPrefix(refItem.$ref);
+                return removeRefPrefix(refItem.$ref)
             }
         }
-        return removeRefPrefix(item.$ref);
-    }) || []);
+        return removeRefPrefix(item.$ref)
+    }) || [])
 
     const taskModelsSets = computed(() => {
-        if (blockType === "pluginDefaults" || isPluginBlock) {
-            const models = new Map<string, string>();
-            const pluginKeySection = (["tasks", "conditions", "triggers", "taskRunners"] as const)
-                .filter(s => blockType === "pluginDefaults" || s === blockType);
-
-            for (const plugin of pluginsStore.plugins || []) {
-                for (const curSection of pluginKeySection) {
-                    const entries = plugin[curSection] as {cls: string, title?: string, deprecated?: boolean}[] | undefined;
-                    if (entries) {
-                        for (const {cls, title} of entries.filter(({deprecated}) => !deprecated)) {
-                            if (cls) {
-                                models.set(cls, title ?? cls);
-                            }
-                        }
-                    }
-                }
-            }
-
-            return models;
-        }
-
         return allRefs.value.reduce((acc: Map<string, string>, item: string) => {
             const def = rootDefinitions.value?.[item]
 
             if (!def || def.$deprecated) {
-                return acc;
+                return acc
             }
 
             const consolidatedType = def.allOf
                 ? def.allOf.find((d: any) => d.properties?.type)?.properties.type
-                : def.properties?.type;
+                : def.properties?.type
 
             if (consolidatedType?.const) {
-                acc.set(consolidatedType.const, def.title ?? consolidatedType.const);
+                acc.set(consolidatedType.const, def.title ?? consolidatedType.const)
+            }
+
+            if (consolidatedType?.enum) {
+                const val = consolidatedType.enum[0]
+
+                acc.set(val, def.title ?? val)
             }
             return acc
-        }, new Map<string, string>());
+        }, new Map<string, string>())
     })
 
     const taskModels = computed(() => {
-        return (Array.from(taskModelsSets.value) as [string, string][])
+        const entries = (Array.from(taskModelsSets.value) as [string, string][])
             .map(([cls, title]) => ({cls, title}))
-            .sort((a, b) => a.cls.localeCompare(b.cls));
-    });
 
-    const hasIcons = computed(() => {
-        const models = taskModels.value.map(m => m.cls);
-        return pluginsStore.icons && Object.keys(pluginsStore.icons).filter(plugin => models.includes(plugin)).length > 0;
-    });
+        const unique = Array.from(new Map(entries.map(e => [e.cls, e])).values())
+        return unique.sort((a, b) => a.cls.localeCompare(b.cls))
+    })
+    
+    const query = ref("")
+    const onFilter = (value: string) => {
+        query.value = value ?? ""
+    }
+
+    const filteredTaskModels = computed(() => {
+        const q = query.value.trim().toLowerCase()
+        if (!q) {
+            return taskModels.value
+        }
+        return taskModels.value.filter(({cls}) => cls.toLowerCase().includes(q))
+    })
+
+    const hasOpened = ref(false)
+    const onVisibleChange = (visible: boolean) => {
+        if (visible) hasOpened.value = true
+    }
+
+    const renderedTaskModels = computed(() => {
+        if (hasOpened.value) return filteredTaskModels.value
+        const selected = taskModels.value.find(({cls}) => cls === modelValue.value)
+        return selected ? [selected] : []
+    })
 
     const modelValue = defineModel({
         type: String,
         default: "",
-    });
+    })
 
     const props = defineProps<{
         blockSchemaPath: string,
@@ -144,25 +154,25 @@
 </script>
 
 <style scoped lang="scss">
-    :deep(div.wrapper) {
+    :deep(div.task-icon) {
         display: inline-block;
-        width: 20px;
-        height: 20px;
+        width: var(--ks-font-size-lg);
+        height: var(--ks-font-size-lg);
         margin-right: 1rem;
     }
 
-    :deep(.el-input__prefix-inner) {
-        .wrapper {
+    :deep(.kel-input__prefix-inner) {
+        .task-icon {
             top: 0;
             margin-right: 0;
         }
     }
 
-    :deep(.el-select__suffix) {
+    :deep(.kel-select__suffix) {
         display: flex !important;
     }
 
-    .el-select-dropdown__item {
+    .kel-select-dropdown__item {
         height: fit-content;
         line-height: normal;
         padding: 8px 12px;
@@ -173,7 +183,7 @@
         align-items: center;
         gap: 0.5rem;
 
-        :deep(.wrapper) {
+        :deep(.task-icon) {
             width: 2rem;
             height: 2rem;
         }
@@ -185,16 +195,15 @@
             gap: 0.25rem;
 
             .cls {
-                font-weight: 600;
+                font-weight: var(--ks-font-weight-semibold);
                 line-height: 1.2;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                white-space: normal;
+                overflow-wrap: anywhere;
             }
 
             .title {
-                font-size: 0.75rem;
-                color: var(--ks-content-secondary);
+                font-size: var(--ks-font-size-xs);
+                color: var(--ks-text-secondary);
                 line-height: 1.2;
                 white-space: normal;
             }

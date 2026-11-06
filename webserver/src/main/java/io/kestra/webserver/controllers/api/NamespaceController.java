@@ -6,7 +6,8 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.Strings;
 
-import io.kestra.core.contexts.KestraConfig;
+import io.kestra.core.contexts.configuration.SystemFlowsConfiguration;
+import io.kestra.core.models.QueryFilter;
 import io.kestra.core.models.namespaces.Namespace;
 import io.kestra.core.models.namespaces.NamespaceInterface;
 import io.kestra.core.models.topologies.FlowTopologyGraph;
@@ -14,12 +15,12 @@ import io.kestra.core.repositories.ArrayListTotal;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.topologies.FlowTopologyService;
-import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.converters.QueryFilterFormat;
 import io.kestra.webserver.models.api.ApiAutocomplete;
-import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.AutocompleteUtils;
 import io.kestra.webserver.utils.PageableUtils;
+import io.kestra.webserver.utils.Searchable;
 
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.Pageable;
@@ -28,14 +29,13 @@ import io.micronaut.http.annotation.*;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
-import io.micronaut.validation.Validated;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.inject.Inject;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
-@Validated
 @Controller("/api/v1/{tenant}/namespaces")
 public class NamespaceController<N extends Namespace> {
     protected static final Pageable AUTOCOMPLETE_PAGEABLE = PageableUtils.from(1, 50, null);
@@ -50,7 +50,10 @@ public class NamespaceController<N extends Namespace> {
     private FlowTopologyService flowTopologyService;
 
     @Inject
-    private KestraConfig kestraConfig;
+    private SystemFlowsConfiguration systemFlowsConfiguration;
+
+    @Inject
+    private Searchable<Namespace> namespaceSearchable;
 
     protected Comparator<String> sorter(Pageable pageable) {
         return Optional.of(pageable.getSort().getOrderBy())
@@ -67,8 +70,8 @@ public class NamespaceController<N extends Namespace> {
         List<String> filteredFetchedNamespaces = Optional.ofNullable(fetchedNamespacesByForceInclude.get(false)).orElse(Collections.emptyList()).stream()
             .filter(n -> q == null || Strings.CI.contains(n, q))
             .toList();
-        List<String> systemFlowNamespace = q == null || Strings.CI.contains(kestraConfig.getSystemFlowNamespace(), q)
-            ? List.of(kestraConfig.getSystemFlowNamespace())
+        List<String> systemFlowNamespace = q == null || Strings.CI.contains(systemFlowsConfiguration.namespace(), q)
+            ? List.of(systemFlowsConfiguration.namespace())
             : Collections.emptyList();
 
         List<String> forceIncludeExistingNamespaceIds = Optional.ofNullable(fetchedNamespacesByForceInclude.get(true)).orElse(Collections.emptyList());
@@ -109,7 +112,6 @@ public class NamespaceController<N extends Namespace> {
         tags = { "Namespaces" }, summary = "List namespaces for autocomplete",
         description = "Returns a list of namespaces for use in autocomplete fields, optionally allowing to filter by query and ids. Used especially for binding creation."
     )
-    @RequirePermission(Permission.NAMESPACES_VIEW)
     public List<String> autocompleteNamespaces(@NotNull @Body ApiAutocomplete autocomplete) throws HttpStatusException {
         return this.getNamespaces(
             AUTOCOMPLETE_PAGEABLE,
@@ -124,7 +126,6 @@ public class NamespaceController<N extends Namespace> {
     @Get(uri = "{id}")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Namespaces" }, summary = "Get a namespace")
-    @RequirePermission(Permission.NAMESPACES_VIEW)
     public N getNamespace(
         @Parameter(description = "The namespace id") @PathVariable String id) {
         return (N) Namespace.builder().id(id).build();
@@ -133,27 +134,27 @@ public class NamespaceController<N extends Namespace> {
     @Get(uri = "/search")
     @ExecuteOn(TaskExecutors.IO)
     @Operation(tags = { "Namespaces" }, summary = "Search for namespaces")
-    @RequirePermission(Permission.NAMESPACES_VIEW)
+    @SuppressWarnings("unchecked")
     public PagedResults<N> searchNamespaces(
-        @Parameter(description = "A string filter") @Nullable @QueryValue(value = "q") String query,
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
-        @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) int size,
+        @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) @Max(PageableUtils.MAX_PAGE_SIZE) int size,
         @Parameter(description = "The sort of current page") @Nullable @QueryValue List<String> sort,
-        @Parameter(description = "Return only existing namespace") @Nullable @QueryValue(value = "existing", defaultValue = "false") boolean existingOnly) throws HttpStatusException {
-        return PagedResults.of(
-            getNamespaces(
-                PageableUtils.from(page, size, sort),
-                query,
-                Collections.emptyList(),
-                existingOnly
-            )
-        );
+        @Parameter(description = "Return only existing namespace") @QueryValue(value = "existing", defaultValue = "false") Boolean existingOnly,
+        @Parameter(description = "A list of query filters") @Nullable @QueryFilterFormat(QueryFilter.Resource.NAMESPACE) List<QueryFilter> filters) throws HttpStatusException {
+        List<Namespace> allNamespaces = Stream.concat(
+            flowRepository.findDistinctNamespace(tenantService.resolveTenant()).stream(),
+            Stream.of(systemFlowsConfiguration.namespace())
+        )
+            .flatMap(n -> NamespaceInterface.asTree(n).stream())
+            .distinct()
+            .map(id -> (Namespace) Namespace.builder().id(id).build())
+            .toList();
+        return PagedResults.of((ArrayListTotal<N>) namespaceSearchable.filter(allNamespaces, page, size, sort, filters));
     }
 
     @ExecuteOn(TaskExecutors.IO)
     @Get(uri = "{namespace}/dependencies")
     @Operation(tags = { "Flows" }, summary = "Get flow dependencies")
-    @RequirePermission(Permission.FLOWS_VIEW)
     public FlowTopologyGraph getFlowDependenciesFromNamespace(
         @Parameter(description = "The flow namespace") @PathVariable String namespace,
         @Parameter(description = "if true, list only destination dependencies, otherwise list also source dependencies") @QueryValue(defaultValue = "false") boolean destinationOnly) {

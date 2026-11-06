@@ -3,3 +3,17 @@ kestra:
     type: local
     local:
       base-path: /tmp/unittest
+  repository:
+    type: memory
+  queue:
+    type: memory
+# Disable Micronaut embedded gRPC server and health check
+grpc:
+  server:
+    enabled: false
+    health:
+      enabled: false
+
+logger:
+  levels:
+    "io.kestra.core.migration": WARN

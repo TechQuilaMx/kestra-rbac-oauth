@@ -14,7 +14,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
-import com.google.common.annotations.VisibleForTesting;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.runners.RunContext;
@@ -31,7 +30,7 @@ import lombok.Builder;
 import static io.kestra.core.utils.Rethrow.throwFunction;
 
 /**
- * Define a plugin properties that will be rendered and converted to a target type at use time.
+ * Define a plugin property that will be rendered and converted to a target type at use time.
  *
  * @param <T> the target type of the property
  */
@@ -57,32 +56,13 @@ public class Property<T> {
     private String expression;
     private T value;
 
-    /**
-     * @deprecated use {@link #ofExpression(String)} instead.
-     */
-    @Deprecated
-    // Note: when not used, this constructor would not be deleted but made private so it can only be used by ofExpression(String) and the deserializer
-    public Property(String expression) {
+    private Property(String expression) {
         this(expression, false);
     }
 
     private Property(String expression, boolean skipCache) {
         this.expression = expression;
         this.skipCache = skipCache;
-    }
-
-    /**
-     * @deprecated use {@link #ofValue(Object)} instead.
-     */
-    @VisibleForTesting
-    @Deprecated
-    public Property(Map<?, ?> map) {
-        try {
-            expression = MAPPER.writeValueAsString(map);
-            this.skipCache = false;
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException(e);
-        }
     }
 
     String getExpression() {
@@ -131,14 +111,6 @@ public class Property<T> {
         Property<V> p = new Property<>(expression);
         p.value = value;
         return p;
-    }
-
-    /**
-     * @deprecated use {@link #ofValue(Object)} instead.
-     */
-    @Deprecated
-    public static <V> Property<V> of(V value) {
-        return ofValue(value);
     }
 
     /**
@@ -316,7 +288,7 @@ public class Property<T> {
 
     @Override
     public String toString() {
-        return value != null ? value.toString() : expression;
+        return expression != null ? expression : Objects.toString(value);
     }
 
     @Override

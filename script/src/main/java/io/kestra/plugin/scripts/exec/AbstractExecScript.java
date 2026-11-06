@@ -45,12 +45,16 @@ public abstract class AbstractExecScript extends Task implements NamespaceFilesI
 
     @Schema(
         title = "The task runner to use.",
-        description = "Task runners are provided by plugins, each have their own properties.",
-        defaultValue = "{type: io.kestra.plugin.scripts.runner.docker.Docker, pullPolicy: IF_NOT_PRESENT}"
+        description = "Task runners are provided by plugins, each have their own properties."
     )
     @PluginProperty
+    @Builder.Default
+    @NotNull
     @Valid
-    protected TaskRunner<?> taskRunner;
+    protected TaskRunner<?> taskRunner = Docker.builder()
+        .type(Docker.class.getName())
+        .pullPolicy(Property.ofValue(PullPolicy.IF_NOT_PRESENT))
+        .build();
 
     @Schema(
         title = "A list of commands that will run before the `commands`, allowing to set up the environment e.g. `pip install -r requirements.txt`."
@@ -108,19 +112,21 @@ public abstract class AbstractExecScript extends Task implements NamespaceFilesI
     private Property<Boolean> outputDirectory;
 
     @Schema(
+        title = "Whether to write the execution context to a `.kestra-execution-context.json` file in the working directory.",
+        description = """
+            Gives the script its execution metadata — `inputs`, `outputs`, `labels`, `vars`, `trigger`, `flow`, `execution` — as JSON data instead of Pebble expressions interpolated into its source, which keeps the script valid, lintable code in an IDE and safe for values holding quotes or newlines.
+            The Python client reads it with `from kestra import context`, then `context.outputs.previous_task.uri`.
+            Disabled by default: the file holds the same values the task could already render, secret-typed inputs included, so it is only written when asked for.""",
+        defaultValue = "false"
+    )
+    private Property<Boolean> executionContext;
+
+    @Schema(
         title = "The target operating system where the script will run."
     )
     @Builder.Default
     @NotNull
     protected Property<TargetOS> targetOS = Property.ofValue(TargetOS.AUTO);
-
-    @Schema(
-        title = "Deprecated - use the 'taskRunner' property instead.",
-        description = "Only used if the `taskRunner` property is not set",
-        deprecated = true
-    )
-    @Deprecated
-    protected DockerOptions docker;
 
     @Schema(
         title = "The task runner container image, only used if the task runner is container-based."
@@ -158,32 +164,19 @@ public abstract class AbstractExecScript extends Task implements NamespaceFilesI
     }
 
     protected CommandsWrapper commands(RunContext runContext) throws IllegalVariableEvaluationException {
-        TaskRunner<?> effectiveTaskRunner = this.getTaskRunner();
-        if (effectiveTaskRunner == null && this.getRunner() == null) {
-            // No taskRunner and no legacy runner set: fall back to the historical default Docker runner.
-            effectiveTaskRunner = Docker.builder()
-                .type(Docker.class.getName())
-                .pullPolicy(Property.ofValue(PullPolicy.IF_NOT_PRESENT))
-                .build();
-        }
-        if (effectiveTaskRunner != null && this.getRunner() == null) {
-            runContext.logger().debug("Using task runner '{}'", effectiveTaskRunner.getType());
-        }
-
         Map<String, String> renderedEnv = runContext.render(this.getEnv()).asMap(String.class, String.class);
         return new CommandsWrapper(runContext)
             .withEnv(renderedEnv.isEmpty() ? new HashMap<>() : renderedEnv)
-            .withRunnerType(this.getRunner())
             .withContainerImage(runContext.render(this.getContainerImage()).as(String.class).orElse(null))
-            .withTaskRunner(effectiveTaskRunner)
-            .withDockerOptions(this.getDocker() != null ? this.injectDefaults(runContext, this.getDocker()) : null)
+            .withTaskRunner(this.getTaskRunner())
             .withNamespaceFiles(this.getNamespaceFiles())
             .withInputFiles(this.getInputFiles())
             .withOutputFiles(runContext.render(this.getOutputFiles()).asList(String.class))
             .withEnableOutputDirectory(runContext.render(this.getOutputDirectory()).as(Boolean.class).orElse(null))
             .withTimeout(runContext.render(this.getTimeout()).as(Duration.class).orElse(null))
             .withTargetOS(runContext.render(this.getTargetOS()).as(TargetOS.class).orElseThrow())
-            .withFailFast(runContext.render(this.getFailFast()).as(Boolean.class).orElse(false));
+            .withFailFast(runContext.render(this.getFailFast()).as(Boolean.class).orElse(false))
+            .withExecutionContext(runContext.render(this.getExecutionContext()).as(Boolean.class).orElse(false));
     }
 
     /**

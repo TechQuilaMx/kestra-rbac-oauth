@@ -15,17 +15,14 @@ import io.kestra.core.models.flows.Flow;
 import io.kestra.core.models.flows.GenericFlow;
 import io.kestra.core.models.flows.State;
 import io.kestra.core.models.property.Property;
+import io.kestra.core.queues.DispatchQueueInterface;
 import io.kestra.core.queues.QueueException;
-import io.kestra.core.queues.QueueFactoryInterface;
-import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.runners.TestRunnerUtils;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
-import reactor.core.publisher.Flux;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,8 +32,7 @@ class TimeoutTest {
     FlowRepositoryInterface flowRepository;
 
     @Inject
-    @Named(QueueFactoryInterface.WORKERTASKLOG_NAMED)
-    private QueueInterface<LogEntry> workerTaskLogQueue;
+    private DispatchQueueInterface<LogEntry> workerTaskLogQueue;
 
     @Inject
     private TestRunnerUtils runnerUtils;
@@ -44,7 +40,7 @@ class TimeoutTest {
     @RetryingTest(5) // Flaky on CI but never locally even with 100 repetitions
     void timeout() throws TimeoutException, QueueException {
         List<LogEntry> logs = new CopyOnWriteArrayList<>();
-        Flux<LogEntry> receive = TestsUtils.receive(workerTaskLogQueue, either -> logs.add(either.getLeft()));
+        workerTaskLogQueue.addListener(logs::add);
 
         Flow flow = Flow.builder()
             .id(IdUtils.create())
@@ -56,7 +52,7 @@ class TimeoutTest {
                         .id("test")
                         .type(Sleep.class.getName())
                         .duration(Property.ofValue(Duration.ofSeconds(100)))
-                        .timeout(Property.ofValue(Duration.ofNanos(100000)))
+                        .timeout(Property.ofValue(Duration.ofMillis(1)))
                         .build()
                 )
             )
@@ -68,7 +64,6 @@ class TimeoutTest {
 
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.FAILED);
         List<LogEntry> matchingLogs = TestsUtils.awaitLogs(logs, logEntry -> logEntry.getMessage().contains("Timeout"), 2);
-        receive.blockLast();
         assertThat(matchingLogs.size()).isEqualTo(2);
     }
 }

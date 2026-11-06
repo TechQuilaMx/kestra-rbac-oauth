@@ -18,9 +18,9 @@ import io.kestra.core.models.executions.ExecutionKind;
 import io.kestra.core.models.flows.Flow;
 import io.kestra.core.models.flows.FlowInterface;
 import io.kestra.core.models.flows.State;
+import io.kestra.core.queues.BroadcastQueueInterface;
+import io.kestra.core.queues.DispatchQueueInterface;
 import io.kestra.core.queues.QueueException;
-import io.kestra.core.queues.QueueFactoryInterface;
-import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.ArrayListTotal;
 import io.kestra.core.repositories.ExecutionRepositoryInterface;
 import io.kestra.core.repositories.FlowRepositoryInterface;
@@ -29,7 +29,6 @@ import io.kestra.core.utils.Await;
 
 import io.micronaut.data.model.Pageable;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import static io.kestra.core.utils.TestsUtils.stringify;
@@ -39,12 +38,10 @@ public class TestRunnerUtils {
     public static final Duration DEFAULT_MAX_WAIT_DURATION = Duration.ofSeconds(15);
 
     @Inject
-    @Named(QueueFactoryInterface.EXECUTION_NAMED)
-    protected QueueInterface<Execution> executionQueue;
+    protected DispatchQueueInterface<Execution> executionQueue;
 
     @Inject
-    @Named(QueueFactoryInterface.KILL_NAMED)
-    protected QueueInterface<ExecutionKilled> killQueue;
+    protected BroadcastQueueInterface<ExecutionKilled> killQueue;
 
     @Inject
     private FlowRepositoryInterface flowRepository;
@@ -275,14 +272,12 @@ public class TestRunnerUtils {
         }
     }
 
+    public Execution awaitFlowExecution(String tenantId, String namespace, String flowId, Duration duration) {
+        return awaitFlowExecution((_) -> true, tenantId, namespace, flowId, duration);
+    }
+
     /**
      * This method will return the last created execution
-     * 
-     * @param predicate
-     * @param tenantId
-     * @param namespace
-     * @param flowId
-     * @return
      */
     public Execution awaitFlowExecution(Predicate<Execution> predicate, String tenantId, String namespace, String flowId) {
         return awaitFlowExecution(predicate, tenantId, namespace, flowId, null);
@@ -388,6 +383,40 @@ public class TestRunnerUtils {
                     .orElse(null)
             ), execution
         );
+    }
+
+    public Execution awaitChildExecution(Flow flow, Execution parentExecution, Duration duration) throws QueueException {
+        try {
+
+            if (duration == null) {
+                duration = Duration.ofSeconds(20);
+            }
+            return Await.until(() ->
+            {
+                Optional<Execution> exec = executionRepository.findByFlowId(flow.getTenantId(), flow.getNamespace(), flow.getId(), Pageable.UNPAGED)
+                    .stream()
+                    .filter(e -> parentExecution.getId().equals(e.getParentId()))
+                    .findAny();
+                if (exec.isPresent() && isTerminatedChildExecution(parentExecution, flow).test(exec.get())) {
+                    return exec.get();
+                }
+                return null;
+            }, Duration.ofMillis(10), duration);
+
+        } catch (TimeoutException e) {
+            Optional<Execution> byId = executionRepository.findByFlowId(flow.getTenantId(), flow.getNamespace(), flow.getId(), Pageable.UNPAGED)
+                .stream()
+                .filter(exec -> parentExecution.getId().equals(exec.getParentId()))
+                .findAny();
+            if (byId.isPresent()) {
+                Execution exec = byId.get();
+                throw new RuntimeException(
+                    "Execution %s is currently at the status %s which is not the awaited one, full execution object:\n%s".formatted(exec.getId(), exec.getState().getCurrent(), stringify(exec))
+                );
+            } else {
+                throw new RuntimeException("No child execution for parent execution %s exist in the database".formatted(parentExecution.getId()));
+            }
+        }
     }
 
     public Execution emitAndAwaitChildExecution(Flow flow, Execution parentExecution, Execution execution, Duration duration) throws QueueException {

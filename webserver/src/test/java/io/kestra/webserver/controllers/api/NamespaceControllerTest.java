@@ -20,8 +20,6 @@ import io.kestra.core.models.topologies.FlowTopologyGraph;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.repositories.FlowTopologyRepositoryInterface;
 import io.kestra.plugin.core.log.Log;
-import io.kestra.webserver.models.api.secret.ApiSecretListResponse;
-import io.kestra.webserver.models.api.secret.ApiSecretMeta;
 import io.kestra.webserver.responses.PagedResults;
 
 import io.micronaut.core.type.Argument;
@@ -96,7 +94,7 @@ public class NamespaceControllerTest {
         assertThat(list.getResults().get(1).getId()).isEqualTo("my");
 
         list = client.toBlocking().retrieve(
-            HttpRequest.GET("/api/v1/main/namespaces/search?q=ns"),
+            HttpRequest.GET("/api/v1/main/namespaces/search?filters[q][EQUALS]=ns"),
             Argument.of(PagedResults.class, Namespace.class)
         );
         assertThat(list.getTotal()).isEqualTo(3L);
@@ -106,7 +104,7 @@ public class NamespaceControllerTest {
             HttpRequest.GET("/api/v1/main/namespaces/search?page=4&size=2&sort=id:desc"),
             Argument.of(PagedResults.class, Namespace.class)
         );
-        assertThat(list.getTotal()).isEqualTo(0L);
+        assertThat(list.getTotal()).isEqualTo(6L);
         assertThat(list.getResults()).isEmpty();
     }
 
@@ -122,33 +120,6 @@ public class NamespaceControllerTest {
 
         assertThat(retrieve.getNodes().size()).isEqualTo(3);
         assertThat(retrieve.getEdges().size()).isEqualTo(2);
-    }
-
-    @Test
-    void secrets() {
-        ApiSecretListResponse secrets = client.toBlocking().retrieve(
-            HttpRequest.GET("/api/v1/main/namespaces/any.ns/secrets?page=1&size=2"),
-            ApiSecretListResponse.class
-        );
-        assertThat(secrets.readOnly()).isTrue();
-        assertThat(secrets.total()).isEqualTo(4L);
-        assertThat(secrets.results()).isEqualTo(
-            List.of(
-                new ApiSecretMeta("WEBHOOK_KEY"),
-                new ApiSecretMeta("PASSWORD")
-            )
-        );
-
-        secrets = client.toBlocking().retrieve(
-            HttpRequest.GET("/api/v1/main/namespaces/any.ns/secrets?page=2&size=2"),
-            ApiSecretListResponse.class
-        );
-        assertThat(secrets.results()).isEqualTo(
-            List.of(
-                new ApiSecretMeta("NEW_LINE"),
-                new ApiSecretMeta("MY_SECRET")
-            )
-        );
     }
 
     @Test

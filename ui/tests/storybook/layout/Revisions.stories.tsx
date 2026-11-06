@@ -1,8 +1,8 @@
 import Revisions from "../../../src/components/layout/Revisions.vue";
-import { ComponentPropsAndSlots, StoryObj } from "@storybook/vue3-vite";
-import { expect, fn, waitFor } from "storybook/test";
-import { vueRouter } from "storybook-vue3-router";
-import { nextTick } from "vue";
+import {ComponentPropsAndSlots, StoryObj} from "@storybook/vue3-vite";
+import {expect, fn, waitFor} from "storybook/test";
+import {vueRouter} from "storybook-vue3-router";
+import {nextTick} from "vue";
 
 
 export default {
@@ -10,8 +10,8 @@ export default {
     component: Revisions,
     decorators: [
         vueRouter([
-            { path: "/", name: "home", component: { template: "<div />" } }
-        ], { initialRoute: "/" }),
+            {path: "/", name: "home", component: {template: "<div />"}}
+        ], {initialRoute: "/"}),
     ]
 };
 
@@ -22,9 +22,9 @@ function crudText(revision: number) {
 }
 
 const render: Story["render"] = (args: ComponentPropsAndSlots<typeof Revisions>) => ({
-    components: { Revisions },
+    components: {Revisions},
     setup() {
-        return { args, crudText };
+        return {args, crudText};
     },
     template: `<Revisions v-bind="{...args}">
         <template #crud="{revision}">
@@ -34,7 +34,7 @@ const render: Story["render"] = (args: ComponentPropsAndSlots<typeof Revisions>)
 });
 
 async function selectorOptions(canvasElement: HTMLElement) {
-    const revisionSelectors = [...canvasElement.querySelectorAll(".revision-select .el-select__wrapper")] as HTMLElement[];
+    const revisionSelectors = [...canvasElement.querySelectorAll(".revision-select .kel-select__wrapper")] as HTMLElement[];
     const revisionSelectorsOptions: HTMLElement[][] = [];
     for (const selector of revisionSelectors) {
         selector.click();
@@ -78,11 +78,11 @@ export const Default: Story = {
         revisions,
         revisionSource: revisionSourceMock,
         onRestore: (source: string) => {
-            revisions.push({ revision: revisions[revisions.length - 1].revision + 1, source });
+            revisions.push({revision: revisions[revisions.length - 1].revision + 1, source});
             return Promise.resolve();
         }
     },
-    async play({ args, canvas, canvasElement }) {
+    async play({args, canvas, canvasElement}) {
         await expect(
             ([...canvasElement.querySelectorAll(".editor .monaco-editor")] as HTMLElement[])
                 .every(el => el.getAttribute("aria-uri")?.endsWith(`.${args.lang}`))
@@ -114,7 +114,7 @@ export const Default: Story = {
         const htmlElement = await canvas.findByTestId("restore-right");
         htmlElement.click();
         await waitFor(async () => {
-            const confirmButton = document.querySelector("[role='dialog'][aria-label='Confirmation'] button.el-button--primary") as HTMLElement;
+            const confirmButton = document.querySelector("[role='dialog'][aria-label='Confirmation'] button.kel-button--primary") as HTMLElement;
             await expect(confirmButton).not.toBeNull();
             confirmButton.click();
         });

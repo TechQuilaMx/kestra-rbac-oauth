@@ -9,9 +9,6 @@ micronaut:
       swagger:
         paths: classpath:META-INF/swagger
         mapping: /swagger/**
-      ui:
-        paths: classpath:ui
-        mapping: /ui/**
       static:
         paths: classpath:static
         mapping: /static/**
@@ -53,10 +50,28 @@ micronaut:
           - /metrics/.+
           - /prometheus(\?.*)?
     http-version: HTTP_1_1
+  security:
+    filter:
+      enabled: false
+    csrf:
+      enabled: true
+      signature-key: ${kestra.encryption.secret-key:}
+      cookie-name: csrfToken
+      filter:
+        enabled: false
   caches:
     default:
       maximum-weight: 10485760
-
+    # One cache per icon index: the methods behind them take no argument, so they all resolve to the same cache
+    # key and sharing a cache would make them serve each other's entries. Each therefore holds a single entry.
+    plugin-icons:
+      maximum-size: 1
+    plugin-icons-metadata:
+      maximum-size: 1
+    plugin-group-icons:
+      maximum-size: 1
+    plugin-group-icons-metadata:
+      maximum-size: 1
   http:
     client:
       read-idle-timeout: 60s
@@ -112,55 +127,37 @@ jackson:
   mapper:
     ACCEPT_CASE_INSENSITIVE_ENUMS: true
 
+# Disable Micronaut embedded gRPC server and health check
+grpc:
+  server:
+    enabled: false
+    health:
+      enabled: false
 endpoints:
   all:
     port: 8081
-    enabled: true
-    sensitive: false
   health:
-    details-visible: ANONYMOUS
     disk-space:
       enabled: false
     discovery-client:
       enabled: false
-  loggers:
-    write-sensitive: false
-  env:
-    enabled: true
-
-flyway:
-  datasources:
-    postgres:
-      enabled: true
-      locations:
-        - classpath:migrations/postgres
-      # We must ignore missing migrations as we delete some wrong or not used anymore migrations
-      ignore-migration-patterns: "*:missing,*:future"
-      out-of-order: true
-      properties:
-        flyway:
-          postgresql:
-            transactional:
-              lock: false
-    mysql:
-      enabled: true
-      locations:
-        - classpath:migrations/mysql
-      # We must ignore missing migrations as we delete some wrong or not used anymore migrations
-      ignore-migration-patterns: "*:missing,*:future"
-      out-of-order: true
-    h2:
-      enabled: true
-      locations:
-        - classpath:migrations/h2
-      # We must ignore missing migrations as we delete some wrong or not used anymore migrations
-      ignore-migration-patterns: "*:missing,*:future"
-      out-of-order: true
 
 kestra:
   tutorial-flows:
     # Automatically loads all tutorial flows at startup.
     enabled: true
+
+  webserver:
+    # Browser security response headers, added to every HTTP response (UI and API).
+    # Set a value to "" to disable that single header, or security-headers.enabled to false to disable the whole filter.
+    security-headers:
+      enabled: true
+      frame-options: SAMEORIGIN
+      content-type-options: nosniff
+      referrer-policy: strict-origin-when-cross-origin
+      # content-security-policy: "default-src 'self'; ..." # tune for the UI before enforcing
+      # content-security-policy-report-only: true # report-only intermediate step
+      # strict-transport-security: "max-age=31536000; includeSubDomains" # only sent when this server sees the request as HTTPS
 
   retries:
     attempts: 5
@@ -176,7 +173,6 @@ kestra:
         - "/api/v1/executions/webhook/"
         - "/api/v1/main/executions/webhook/"
         - "/api/v1/*/executions/webhook/"
-        - "/api/v1/basicAuthValidationErrors"
 
     preview:
       initial-rows: 100
@@ -201,6 +197,19 @@ kestra:
         initial-delay: 1h
         fixed-delay: 1d
         retention: 30d
+  controller:
+    port: 50051
+  worker:
+    controllers:
+      type: STATIC
+      static:
+        endpoints:
+          - host: localhost
+            port: ${kestra.controller.port}
+  queue:
+    message-protection:
+      enabled: true
+      limit: 1048576
 
   jdbc:
     queues:
@@ -208,17 +217,11 @@ kestra:
       max-poll-interval: 500ms
       poll-switch-interval: 60s
 
-    cleaner:
-      initial-delay: 1h
-      fixed-delay: 1h
-      retention: 7d
-      types:
-        - type: io.kestra.core.models.executions.LogEntry
-          retention: 1h
-        - type: io.kestra.core.models.executions.MetricEntry
-          retention: 1h
-
   plugins:
+    # No default: the schema bundle ships inside the Kestra JAR as the /plugins-schema.json
+    # classpath resource, so no instance needs to fetch it. Set this only to point at a bundle
+    # hosted somewhere yourself ({version} is replaced by the running stable version).
+    schema-bundle-url-template: ""
     repositories:
       central:
         url: https://repo.maven.apache.org/maven2/
@@ -240,6 +243,13 @@ kestra:
     cache-size: 1000
 
   metrics:
+    sharedServiceInstanceMetrics:
+      WORKER:
+        - kestra.worker.job.pending
+        - kestra.worker.job.thread
+        - kestra.worker.job.running
+      WEBSERVER:
+        - kestra.queue.message.lag.count
     prefix: kestra
 
   traces:
@@ -262,6 +272,15 @@ kestra:
     prefixes:
       - system.
       - internal.
+
+  async-operations:
+    wait-timeout: PT30S
+
+  tasks:
+    sdk:
+      authentication:
+        username: ${kestra.server.basic-auth.username:}
+        password: ${kestra.server.basic-auth.password:}
 
 otel:
   exclusions:
