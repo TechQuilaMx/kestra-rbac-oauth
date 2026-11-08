@@ -1,6 +1,7 @@
 package io.kestra.core.plugins;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -16,20 +17,26 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+
 import io.kestra.core.app.AppBlockInterface;
 import io.kestra.core.app.AppPluginInterface;
 import io.kestra.core.models.Plugin;
 import io.kestra.core.models.assets.Asset;
 import io.kestra.core.models.assets.AssetExporter;
-import io.kestra.core.models.conditions.Condition;
 import io.kestra.core.models.dashboards.DataFilter;
 import io.kestra.core.models.dashboards.DataFilterKPI;
 import io.kestra.core.models.dashboards.charts.Chart;
+import io.kestra.core.models.policies.RulePluginInterface;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.logs.LogExporter;
 import io.kestra.core.models.tasks.runners.TaskRunner;
 import io.kestra.core.models.triggers.AbstractTrigger;
+import io.kestra.core.models.ui.PluginUiModule;
+import io.kestra.core.preview.FileRenderer;
+import io.kestra.core.repositories.LogDataStoreInterface;
 import io.kestra.core.secret.SecretPluginInterface;
+import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.storages.StorageInterface;
 
 import io.swagger.v3.oas.annotations.Hidden;
@@ -38,6 +45,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PluginScanner {
     ClassLoader parent;
+
+    private static final String UI_MANIFEST_PATH = "plugin-ui/manifest.json";
+    private static final String SOURCE_HASH_KEY = "sourceHash";
 
     public PluginScanner(final ClassLoader parent) {
         this.parent = parent;
@@ -111,9 +121,9 @@ public class PluginScanner {
         Manifest manifest) {
         List<Class<? extends Task>> tasks = new ArrayList<>();
         List<Class<? extends AbstractTrigger>> triggers = new ArrayList<>();
-        List<Class<? extends Condition>> conditions = new ArrayList<>();
         List<Class<? extends StorageInterface>> storages = new ArrayList<>();
         List<Class<? extends SecretPluginInterface>> secrets = new ArrayList<>();
+        List<Class<? extends LogDataStoreInterface>> logDataStores = new ArrayList<>();
         List<Class<? extends TaskRunner<?>>> taskRunners = new ArrayList<>();
         List<Class<? extends Asset>> assets = new ArrayList<>();
         List<Class<? extends AssetExporter<?>>> assetExporters = new ArrayList<>();
@@ -123,9 +133,12 @@ public class PluginScanner {
         List<Class<? extends DataFilter<?, ?>>> dataFilters = new ArrayList<>();
         List<Class<? extends DataFilterKPI<?, ?>>> dataFiltersKPI = new ArrayList<>();
         List<Class<? extends LogExporter<?>>> logExporter = new ArrayList<>();
+        List<Class<? extends RulePluginInterface>> rules = new ArrayList<>();
         List<Class<? extends AdditionalPlugin>> additionalPlugins = new ArrayList<>();
+        List<Class<? extends FileRenderer>> fileRenderers = new ArrayList<>();
         List<String> guides = new ArrayList<>();
         Map<String, Class<?>> aliases = new HashMap<>();
+        Map<String, List<PluginUiModule>> pluginUiManifest = new HashMap<>();
 
         if (manifest == null) {
             manifest = getManifest(classLoader);
@@ -147,10 +160,6 @@ public class PluginScanner {
                         log.debug("Loading Trigger plugin: '{}'", plugin.getClass());
                         triggers.add(trigger.getClass());
                     }
-                    case Condition condition -> {
-                        log.debug("Loading Condition plugin: '{}'", plugin.getClass());
-                        conditions.add(condition.getClass());
-                    }
                     case StorageInterface storage -> {
                         log.debug("Loading Storage plugin: '{}'", plugin.getClass());
                         storages.add(storage.getClass());
@@ -158,6 +167,10 @@ public class PluginScanner {
                     case SecretPluginInterface storage -> {
                         log.debug("Loading Secret plugin: '{}'", plugin.getClass());
                         secrets.add(storage.getClass());
+                    }
+                    case LogDataStoreInterface logDataStore -> {
+                        log.debug("Loading LogDataStore plugin: '{}'", plugin.getClass());
+                        logDataStores.add(logDataStore.getClass());
                     }
                     case TaskRunner<?> runner -> {
                         log.debug("Loading TaskRunner plugin: '{}'", plugin.getClass());
@@ -200,9 +213,17 @@ public class PluginScanner {
                         log.debug("Loading LogExporter plugin: '{}'", plugin.getClass());
                         logExporter.add((Class<? extends LogExporter<?>>) shipper.getClass());
                     }
+                    case RulePluginInterface rule -> {
+                        log.debug("Loading Rule plugin: '{}'", plugin.getClass());
+                        rules.add(rule.getClass());
+                    }
                     case AdditionalPlugin additionalPlugin -> {
                         log.debug("Loading additional plugin: '{}'", plugin.getClass());
                         additionalPlugins.add(additionalPlugin.getClass());
+                    }
+                    case FileRenderer fileRenderer -> {
+                        log.debug("Loading fileRenderer plugin: '{}'", plugin.getClass());
+                        fileRenderers.add(fileRenderer.getClass());
                     }
                     default -> {
                     }
@@ -211,7 +232,7 @@ public class PluginScanner {
                 Plugin.getAliases(plugin.getClass()).forEach(alias -> aliases.put(alias, plugin.getClass()));
             }
         } catch (ServiceConfigurationError | NoClassDefFoundError e) {
-            Object location = externalPlugin != null ? externalPlugin.getLocation() : "core";
+            Object location = getLocation(externalPlugin);
             log.error(
                 "Unable to load all plugin classes from '{}'. Cause: [{}] {}",
                 location,
@@ -233,15 +254,37 @@ public class PluginScanner {
             }
         }
 
+        String pluginUiSourceHash = null;
+        try (InputStream in = classLoader.getResourceAsStream(UI_MANIFEST_PATH)) {
+            if (in != null) {
+                var rawManifest = JacksonMapper.ofJson().readValue(in, new TypeReference<Map<String, Object>>() {
+                });
+                var mapper = JacksonMapper.ofJson();
+                for (var entry : rawManifest.entrySet()) {
+                    if (SOURCE_HASH_KEY.equals(entry.getKey())) {
+                        pluginUiSourceHash = (String) entry.getValue();
+                    } else {
+                        pluginUiManifest.put(
+                            entry.getKey(),
+                            mapper.convertValue(entry.getValue(), new TypeReference<List<PluginUiModule>>() {
+                            })
+                        );
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.error("Unable to read plugin ui manifest for plugin {}", getLocation(externalPlugin));
+        }
+
         return RegisteredPlugin.builder()
             .externalPlugin(externalPlugin)
             .manifest(manifest)
             .classLoader(classLoader)
             .tasks(tasks)
             .triggers(triggers)
-            .conditions(conditions)
             .storages(storages)
             .secrets(secrets)
+            .logDataStores(logDataStores)
             .assets(assets)
             .assetExporters(assetExporters)
             .apps(apps)
@@ -252,7 +295,9 @@ public class PluginScanner {
             .dataFiltersKPI(dataFiltersKPI)
             .guides(guides)
             .logExporters(logExporter)
+            .rules(rules)
             .additionalPlugins(additionalPlugins)
+            .fileRenderers(fileRenderers)
             .aliases(
                 aliases.entrySet().stream().collect(
                     Collectors.toMap(
@@ -261,7 +306,14 @@ public class PluginScanner {
                     )
                 )
             )
+            .pluginUiManifest(pluginUiManifest)
+            .pluginUiSourceHash(pluginUiSourceHash)
             .build();
+    }
+
+    private static Object getLocation(ExternalPlugin externalPlugin) {
+        Object location = externalPlugin != null ? externalPlugin.getLocation() : "core";
+        return location;
     }
 
     private static void addGuidesThroughNewFileSystem(URL guidesDirectory, List<String> guides) {

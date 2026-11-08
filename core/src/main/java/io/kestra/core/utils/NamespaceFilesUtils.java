@@ -13,6 +13,7 @@ import org.apache.commons.lang3.time.StopWatch;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import io.kestra.core.contexts.KestraContext;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.executions.metrics.Timer;
 import io.kestra.core.models.tasks.FileExistComportment;
@@ -26,7 +27,7 @@ import reactor.core.scheduler.Schedulers;
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
 public final class NamespaceFilesUtils {
-    private static final int maxThreads = Math.max(Runtime.getRuntime().availableProcessors() * 4, 32);
+    private static final int maxThreads = Math.max(KestraContext.getContext().getAllocatedCpuCores() * 4, 32);
     private static final ExecutorService EXECUTOR_SERVICE = new ThreadPoolExecutor(
         0,
         maxThreads,

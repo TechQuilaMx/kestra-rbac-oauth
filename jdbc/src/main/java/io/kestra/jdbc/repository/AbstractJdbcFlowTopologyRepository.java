@@ -2,7 +2,6 @@ package io.kestra.jdbc.repository;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.jooq.*;
 import org.jooq.Record;
@@ -11,9 +10,8 @@ import org.jooq.impl.DSL;
 import io.kestra.core.models.flows.FlowInterface;
 import io.kestra.core.models.topologies.FlowTopology;
 import io.kestra.core.repositories.FlowTopologyRepositoryInterface;
-import io.kestra.jdbc.runner.JdbcQueueIndexerInterface;
 
-public abstract class AbstractJdbcFlowTopologyRepository extends AbstractJdbcRepository implements FlowTopologyRepositoryInterface, JdbcQueueIndexerInterface<FlowTopology> {
+public abstract class AbstractJdbcFlowTopologyRepository extends AbstractJdbcRepository implements FlowTopologyRepositoryInterface {
     protected final io.kestra.jdbc.AbstractJdbcRepository<FlowTopology> jdbcRepository;
 
     public AbstractJdbcFlowTopologyRepository(io.kestra.jdbc.AbstractJdbcRepository<FlowTopology> jdbcRepository) {
@@ -128,6 +126,7 @@ public abstract class AbstractJdbcFlowTopologyRepository extends AbstractJdbcRep
             });
     }
 
+    @Override
     public void save(FlowInterface flow, List<FlowTopology> flowTopologies) {
         jdbcRepository
             .getDslContextWrapper()
@@ -180,14 +179,6 @@ public abstract class AbstractJdbcFlowTopologyRepository extends AbstractJdbcRep
     @Override
     public FlowTopology save(FlowTopology flowTopology) {
         this.jdbcRepository.persist(flowTopology);
-
-        return flowTopology;
-    }
-
-    @Override
-    public FlowTopology save(DSLContext dslContext, FlowTopology flowTopology) {
-        Map<Field<Object>, Object> fields = this.jdbcRepository.persistFields(flowTopology);
-        this.jdbcRepository.persist(flowTopology, dslContext, fields);
 
         return flowTopology;
     }

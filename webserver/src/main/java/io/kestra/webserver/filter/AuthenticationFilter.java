@@ -1,20 +1,19 @@
 package io.kestra.webserver.filter;
 
-import java.util.Base64;
 import java.util.Collection;
 import java.util.Optional;
 
 import org.reactivestreams.Publisher;
 
-import io.kestra.core.utils.AuthUtils;
+import io.kestra.webserver.annotation.AnonymousAccess;
 import io.kestra.webserver.services.BasicAuthService;
 import io.kestra.webserver.services.OAuth2Service;
+
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
@@ -26,22 +25,21 @@ import jakarta.inject.Inject;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-//We want to authenticate only Kestra endpoints
-@Filter("/api/v1/**")
+@Filter(Filter.MATCH_ALL_PATTERN)
 @Requires(property = "kestra.server-type", pattern = "(WEBSERVER|STANDALONE)")
-@Requires(property = "micronaut.security.enabled", notEquals = "true") // don't add this filter in EE
+@Requires(property = "micronaut.security.enabled", notEquals = "true")
 public class AuthenticationFilter implements HttpServerFilter {
-    private static final String PREFIX_BASIC = "Basic";
     private static final String PREFIX_BEARER = "Bearer";
     private static final Integer ORDER = ServerFilterPhase.SECURITY.order();
-    public static final String BASIC_AUTH_COOKIE_NAME = "BASIC_AUTH";
+    /** @deprecated Use {@link BasicAuthService#BASIC_AUTH_COOKIE_NAME} */
+    public static final String BASIC_AUTH_COOKIE_NAME = BasicAuthService.BASIC_AUTH_COOKIE_NAME;
+    private static final String API_PREFIX = "/api/v1";
 
     @Inject
     private BasicAuthService basicAuthService;
-    
+
     @Inject
     private Optional<OAuth2Service> oauth2Service = Optional.empty();
-
 
     @Override
     public int getOrder() {
@@ -50,35 +48,55 @@ public class AuthenticationFilter implements HttpServerFilter {
 
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+        // Registered on "/**" instead of the Ant pattern "/api/v1/**", which Micronaut matches against
+        // the raw request target and which a percent-encoded separator therefore evades (GHSA-rjhm-qm6w-m7x9).
+        String rawPath = request.getPath();
+        boolean rawLooksLikeApi = rawPath.startsWith(API_PREFIX);
+        // Decoding only matters when there is something to decode or collapse; skip it otherwise so
+        // static assets and health checks don't pay for a URI parse on every request.
+        if (!rawLooksLikeApi && rawPath.indexOf('%') < 0 && !rawPath.contains("//")) {
+            return chain.proceed(request);
+        }
+        String normalizedPath = normalizePath(request.getUri().getPath());
+        if (!rawLooksLikeApi && !normalizedPath.startsWith(API_PREFIX)) {
+            return chain.proceed(request);
+        }
+
         return Mono.fromCallable(() -> basicAuthService.configuration())
             .subscribeOn(Schedulers.boundedElastic())
             .flux()
             .flatMap(basicAuthConfiguration ->
             {
-                String normalizedPath = normalizePath(request.getPath());
-                boolean isConfigEndpoint = "/api/v1/configs".equals(normalizedPath)
+                boolean isConfigEndpoint = "/api/v1/configs/login".equals(normalizedPath)
+                    || "/api/v1/login".equals(normalizedPath)
                     || ((normalizedPath.matches("/api/v1(/[^/]+)?/basicAuth") || "/api/v1/basicAuthValidationErrors".equals(normalizedPath))
                         && !basicAuthService.isBasicAuthInitialized());
 
-                boolean isOpenUrl = Optional.ofNullable(basicAuthConfiguration.openUrls())
-                    .map(Collection::stream)
-                    .map(stream -> stream.anyMatch(s -> request.getPath().startsWith(s)))
-                    .orElse(false);
-                
+                // A path prefix is not an identity: the router resolves it, so the route it picked must
+                // itself opt into anonymous access (GHSA-j5cv-8rw9-vv2p).
+                boolean isOpenUrl = isAnonymousRoute(request)
+                    && Optional.ofNullable(basicAuthConfiguration.openUrls())
+                        .map(Collection::stream)
+                        .map(stream -> stream.anyMatch(normalizedPath::startsWith))
+                        .orElse(false);
+
                 // Check OAuth2 openUrls as well
                 boolean isOAuth2OpenUrl = oauth2Service
                     .filter(OAuth2Service::isEnabled)
                     .map(service -> service.getConfiguration().getOpenUrls())
                     .map(Collection::stream)
-                    .map(stream -> stream.anyMatch(s -> request.getPath().startsWith(s)))
+                    .map(stream -> stream.anyMatch(normalizedPath::startsWith))
                     .orElse(false);
 
-                if (isConfigEndpoint || isOpenUrl || isOAuth2OpenUrl || isManagementEndpoint(request)) {
+                boolean mcpAuthHandled = request.getAttribute(McpServerAuthenticationFilter.MCP_AUTH_HANDLED, Boolean.class)
+                    .orElse(false);
+
+                if (isConfigEndpoint || isOpenUrl || isOAuth2OpenUrl || isManagementEndpoint(request) || mcpAuthHandled) {
                     return chain.proceed(request);
                 }
 
                 boolean oauth2Enabled = oauth2Service.isPresent() && oauth2Service.get().isEnabled();
-                
+
                 // Try OAuth2 Bearer token authentication first
                 if (oauth2Enabled) {
                     var bearerToken = fromBearerToken(request);
@@ -97,20 +115,15 @@ public class AuthenticationFilter implements HttpServerFilter {
                 }
 
                 // Fall back to Basic Auth
-                var basicAuth = fromCookie(request)
-                    .or(() -> fromAuthorizationHeader(request))
-                    .map(BasicAuth::from);
+                if (!basicAuthService.isAuthenticated(request)) {
+                    Boolean isFromLoginPage = Optional.ofNullable(request.getHeaders().get("Referer"))
+                        .map(referer -> referer.split("\\?")[0].endsWith("/login"))
+                        .orElse(false);
 
-                if (
-                    basicAuth.isEmpty() || basicAuthConfiguration.credentials() == null ||
-                        !basicAuth.get().username().equals(basicAuthConfiguration.credentials().getUsername()) ||
-                        !AuthUtils.encodePassword(
-                            basicAuthConfiguration.credentials().getSalt(),
-                            basicAuth.get().password()
-                        ).equals(basicAuthConfiguration.credentials().getPassword())
-                ) {
-                    Boolean isFromLoginPage = Optional.ofNullable(request.getHeaders().get("Referer")).map(referer -> referer.split("\\?")[0].endsWith("/login")).orElse(false);
-                    boolean acceptsHtml = Optional.ofNullable(request.getHeaders().get("Accept")).map(a -> a.contains("text/html")).orElse(false);
+                    boolean acceptsHtml = Optional.ofNullable(request.getHeaders().get("Accept"))
+                        .map(a -> a.contains("text/html"))
+                        .orElse(false);
+
                     boolean shouldChallengeWithBasic = !oauth2Enabled && !isFromLoginPage && acceptsHtml;
 
                     return Mono.just(HttpResponse.unauthorized())
@@ -125,25 +138,6 @@ public class AuthenticationFilter implements HttpServerFilter {
         return path.replaceAll("/+", "/");
     }
 
-    private Optional<String> fromCookie(HttpRequest<?> request) {
-        try {
-            return Optional.ofNullable(
-                request.getCookies()
-                    .get(BASIC_AUTH_COOKIE_NAME)
-            ).map(Cookie::getValue);
-        } catch (Exception e) {
-            // Can happen in tests because getCookies() is not implemented in NettyClientHttpRequest but is in NettyHttpRequest
-            return Optional.empty();
-        }
-    }
-
-    private Optional<String> fromAuthorizationHeader(HttpRequest<?> request) {
-        return request.getHeaders()
-            .getAuthorization()
-            .filter(auth -> auth.toLowerCase().startsWith(PREFIX_BASIC.toLowerCase()))
-            .map(cred -> cred.substring(PREFIX_BASIC.length() + 1));
-    }
-    
     private Optional<String> fromBearerToken(HttpRequest<?> request) {
         Optional<String> fromHeader = request.getHeaders()
             .getAuthorization()
@@ -167,12 +161,12 @@ public class AuthenticationFilter implements HttpServerFilter {
         return false;
     }
 
-    record BasicAuth(String username, String password) {
-        static BasicAuth from(String authentication) {
-            var decoded = new String(Base64.getDecoder().decode(authentication));
-            var username = decoded.substring(0, decoded.indexOf(':'));
-            var password = decoded.substring(decoded.indexOf(':') + 1);
-            return new BasicAuth(username, password);
+    @SuppressWarnings("rawtypes")
+    private boolean isAnonymousRoute(HttpRequest<?> request) {
+        Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatch(request);
+        if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch<?, ?> method) {
+            return method.getAnnotation(AnonymousAccess.class) != null;
         }
+        return false;
     }
 }

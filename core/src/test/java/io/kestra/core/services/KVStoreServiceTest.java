@@ -2,27 +2,31 @@ package io.kestra.core.services;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Optional;
+import java.time.Instant;
+import java.util.List;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.repositories.KvMetadataRepositoryInterface;
+import io.kestra.core.runners.KVMetadataStateStore;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.storages.kv.*;
+import io.kestra.core.utils.IdUtils;
 
 import io.micronaut.test.annotation.MockBean;
 import jakarta.inject.Inject;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @KestraTest
 class KVStoreServiceTest {
     private static final String TEST_EXISTING_NAMESPACE = "io.kestra.unittest";
 
     @Inject
-    KvMetadataRepositoryInterface kvMetadataRepository;
+    KVMetadataStateStore kvMetadataStateStore;
 
     @Inject
     KVStoreService storeService;
@@ -46,23 +50,72 @@ class KVStoreServiceTest {
         Assertions.assertNotNull(storeService.get(MAIN_TENANT, "io.kestra", TEST_EXISTING_NAMESPACE));
     }
 
+    /**
+     * Regression test for issue #10244 — "development" shares the "dev" string prefix but is not one
+     * of its dot-delimited descendants, so it must not be treated as a child namespace (which would
+     * skip both the cross-namespace ACL check and the namespace-existence check).
+     */
+    @Test
+    void shouldNotTreatSiblingNamespaceSharingPrefixAsChild() {
+        // Before the fix, "development".startsWith("dev") made this silently succeed with no ACL or
+        // existence check at all. After the fix, "dev" is correctly treated as unrelated to
+        // "development" and is rejected — as a real ACL denial or, absent one, a not-found namespace.
+        Assertions.assertThrows(
+            KVStoreException.class, () -> storeService.get(MAIN_TENANT, "dev", "development")
+        );
+    }
+
+    @Test
+    void shouldDenyKVStoreAccessWhenAccessingFromPrefixSiblingNamespace() {
+        assertThatThrownBy(() -> storeService.get(MAIN_TENANT, "prod", "prod2"))
+            .isInstanceOf(KVStoreException.class)
+            .hasMessageContaining("Access to 'prod' namespace is not allowed from 'prod2'");
+    }
+
     @Test
     void shouldGetKVStoreFromNonExistingNamespaceWithAKV() throws IOException {
-        KVStore kvStore = new InternalKVStore(MAIN_TENANT, "system", storageInterface, kvMetadataRepository);
+        KVStore kvStore = new InternalKVStore(MAIN_TENANT, "system", storageInterface, kvMetadataStateStore);
         kvStore.put("key", new KVValueAndMetadata(new KVMetadata("myDescription", Duration.ofHours(1)), "value"));
         Assertions.assertNotNull(storeService.get(MAIN_TENANT, "system", null));
+    }
+
+    @Test
+    void shouldPurgeKVStoreForSpecificVersions() throws IOException {
+        KVStore kvStore = new InternalKVStore(MAIN_TENANT, IdUtils.create(), storageInterface, kvMetadataStateStore);
+        String key = IdUtils.create();
+
+        kvStore.put(key, new KVValueAndMetadata(null, "value1"));
+        kvStore.put(key, new KVValueAndMetadata(null, "value2"));
+        kvStore.put(key, new KVValueAndMetadata(null, "value3"));
+
+        storeService.purge(
+            MAIN_TENANT, kvStore.namespace(), List.of(
+                new KVEntry(kvStore.namespace(), key, 1, null, Instant.now(), Instant.now(), null),
+                new KVEntry(kvStore.namespace(), key, 3, null, Instant.now(), Instant.now(), null)
+            )
+        );
+
+        List<KVEntry> kvEntries = storeService.listAll(MAIN_TENANT, kvStore.namespace());
+        assertThat(kvEntries).hasSize(1);
+        assertThat(kvEntries.getFirst().revision()).isEqualTo(2);
     }
 
     @MockBean(NamespaceService.class)
     public static class MockNamespaceService extends DefaultNamespaceService {
 
         public MockNamespaceService() {
-            super(Optional.empty());
+            super(null);
         }
 
         @Override
         public boolean isNamespaceExists(String tenant, String namespace) {
             return namespace.equals(TEST_EXISTING_NAMESPACE);
+        }
+
+        /** Emulates an EE allow-list where every namespace allows only itself, which OSS never denies. */
+        @Override
+        public boolean isAllowedNamespace(String tenant, String namespace, String fromTenant, String fromNamespace) {
+            return namespace.equals(fromNamespace);
         }
     }
 }

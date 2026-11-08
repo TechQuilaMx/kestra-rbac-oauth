@@ -31,13 +31,6 @@ class ExecutionFixture {
                                     .build()
                             )
                         )
-                        .outputs(
-                            Variables.inMemory(
-                                ImmutableMap.of(
-                                    "out", "value"
-                                )
-                            )
-                        )
                         .build()
                 )
             )
@@ -64,13 +57,6 @@ class ExecutionFixture {
                             Collections.singletonList(
                                 TaskRunAttempt.builder()
                                     .build()
-                            )
-                        )
-                        .outputs(
-                            Variables.inMemory(
-                                ImmutableMap.of(
-                                    "out", 1
-                                )
                             )
                         )
                         .build()
@@ -100,13 +86,6 @@ class ExecutionFixture {
                             Collections.singletonList(
                                 TaskRunAttempt.builder()
                                     .build()
-                            )
-                        )
-                        .outputs(
-                            Variables.inMemory(
-                                ImmutableMap.of(
-                                    "out", 1
-                                )
                             )
                         )
                         .build()

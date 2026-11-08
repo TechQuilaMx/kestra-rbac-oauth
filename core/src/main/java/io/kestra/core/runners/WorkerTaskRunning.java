@@ -27,7 +27,7 @@ public class WorkerTaskRunning extends WorkerJobRunning {
     private Task task;
 
     @NotNull
-    private RunContext runContext;
+    private WorkerTaskData data;
 
     /**
      * {@inheritDoc}
@@ -37,13 +37,12 @@ public class WorkerTaskRunning extends WorkerJobRunning {
         return this.taskRun.getId();
     }
 
-    public static WorkerTaskRunning of(WorkerTask workerTask, WorkerInstance workerInstance, int partition) {
+    public static WorkerTaskRunning of(WorkerTask workerTask, WorkerInstance workerInstance) {
         return WorkerTaskRunning.builder()
             .workerInstance(workerInstance)
-            .partition(partition)
             .taskRun(workerTask.getTaskRun())
             .task(workerTask.getTask())
-            .runContext(workerTask.getRunContext())
+            .data(workerTask.getData())
             .build();
     }
 }

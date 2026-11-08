@@ -11,7 +11,7 @@ import io.kestra.core.models.namespaces.files.NamespaceFileMetadata;
 
 import io.micronaut.data.model.Pageable;
 
-public interface NamespaceFileMetadataRepositoryInterface extends SaveRepositoryInterface<NamespaceFileMetadata> {
+public interface NamespaceFileMetadataRepositoryInterface {
     Set<String> findDistinctNamespace(String tenantId);
 
     Optional<NamespaceFileMetadata> findByPath(
@@ -37,6 +37,8 @@ public interface NamespaceFileMetadataRepositoryInterface extends SaveRepository
     default NamespaceFileMetadata delete(NamespaceFileMetadata namespaceFileMetadata) throws IOException {
         return this.save(namespaceFileMetadata.toBuilder().deleted(true).build());
     }
+
+    NamespaceFileMetadata save(NamespaceFileMetadata namespaceFileMetadata);
 
     /**
      * Purge (hard delete) a list of namespace files metadata. If no version is specified, all versions are purged.

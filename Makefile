@@ -44,7 +44,12 @@ buildSkipTests: clean
 test: clean
 	./gradlew test
 
-build-exec:
+# Set SKIP_NPM_CI=true when dependencies are already installed (e.g. the CI
+# workflow ran `npm ci` beforehand) to avoid a redundant reinstall.
+build-frontend:
+	cd ui && { [ "${SKIP_NPM_CI}" = "true" ] && [ -d node_modules ] || npm ci; } && npm run build
+
+build-exec: build-frontend
 	./gradlew -q executableJar --no-daemon --priority=normal
 
 install: build-exec
@@ -88,6 +93,11 @@ install-plugins:
 
 # Build docker image from Kestra source.
 build-docker: build-exec
+	$(MAKE) build-docker-from-exec
+
+# Build docker image from an existing build/executable (e.g. a CI artifact),
+# skipping the frontend/Gradle build entirely.
+build-docker-from-exec:
 	cp build/executable/* docker/app/kestra && chmod +x docker/app/kestra
 	echo "${DOCKER_IMAGE}:${VERSION}"
 	docker build \
@@ -97,44 +107,6 @@ build-docker: build-exec
 		--build-arg="APT_PACKAGES=python3 python-is-python3 python3-pip curl jattach" \
 		--build-arg="PYTHON_LIBRARIES=kestra" \
 		-t ${DOCKER_IMAGE}:${VERSION} ${DOCKER_PATH} || exit 1 ;
-
-# Build RBAC docker image with plugins from .plugins file
-build-docker-rbac:
-	@echo "🐳 Building Kestra RBAC Docker image with plugins..." ; \
-	KESTRA_PLUGINS=$$(grep -v '^#' .plugins | grep -v '^$$' | cut -d: -f2- | tr '\n' ' ') ; \
-	PLUGIN_COUNT=$$(echo $$KESTRA_PLUGINS | wc -w) ; \
-	echo "✓ Found $$PLUGIN_COUNT plugins to install" ; \
-	echo "Building image: kestra:${VERSION}-rbac" ; \
-	docker build \
-		--compress \
-		--rm \
-		-f ./Dockerfile.rbac \
-		--build-arg="APT_PACKAGES=python3 python-is-python3 python3-pip curl jattach" \
-		--build-arg="PYTHON_LIBRARIES=kestra" \
-		--build-arg="KESTRA_PLUGINS=$$KESTRA_PLUGINS" \
-		-t kestra:${VERSION}-rbac \
-		-t kestra:latest-rbac \
-		${DOCKER_PATH} || exit 1 ; \
-	echo "✅ Build completed successfully!" ; \
-	echo "🐳 Image: kestra:${VERSION}-rbac" ; \
-	echo "🔌 Plugins: $$PLUGIN_COUNT installed"
-
-# Build RBAC docker image without plugins (faster build)
-build-docker-rbac-no-plugins:
-	@echo "🐳 Building Kestra RBAC Docker image without plugins..." ; \
-	echo "⏭️  Skipping plugin installation" ; \
-	echo "Building image: kestra:${VERSION}-rbac" ; \
-	docker build \
-		--compress \
-		--rm \
-		-f ./Dockerfile.rbac \
-		--build-arg="APT_PACKAGES=python3 python-is-python3 python3-pip curl jattach" \
-		--build-arg="PYTHON_LIBRARIES=kestra" \
-		-t kestra:${VERSION}-rbac \
-		-t kestra:latest-rbac \
-		${DOCKER_PATH} || exit 1 ; \
-	echo "✅ Build completed successfully!" ; \
-	echo "🐳 Image: kestra:${VERSION}-rbac"
 
 # Verify whether Kestra is running
 health:

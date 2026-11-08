@@ -6,7 +6,6 @@ import java.time.ZoneId;
 import io.kestra.core.validations.TimezoneId;
 
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
@@ -14,7 +13,6 @@ import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 import jakarta.inject.Singleton;
 
 @Singleton
-@Introspected
 public class TimezoneIdValidator implements ConstraintValidator<TimezoneId, String> {
     @Override
     public boolean isValid(

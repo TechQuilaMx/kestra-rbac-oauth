@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -33,10 +34,13 @@ import io.kestra.core.models.tasks.VoidOutput;
 import io.kestra.core.runners.*;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.IdUtils;
+import io.kestra.core.utils.ListUtils;
 import io.kestra.core.utils.NamespaceFilesUtils;
 import io.kestra.core.validations.WorkingDirectoryTaskValidation;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.hibernate.validator.constraints.time.DurationMin;
+
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -173,9 +177,35 @@ import lombok.experimental.SuperBuilder;
                           const colors = require("colors");
                           console.log(colors.red("Hello"));
                 """
+        ),
+        @Example(
+            full = true,
+            title = "A working directory with a cache of the Python virtual environment.",
+            code = """
+                id: python_cached_dependencies
+                namespace: company.team
+
+                tasks:
+                  - id: working_dir
+                    type: io.kestra.plugin.core.flow.WorkingDirectory
+                    cache:
+                      patterns:
+                        - venv/**
+                      ttl: PT24H
+                    tasks:
+                      - id: python_script
+                        type: io.kestra.plugin.scripts.python.Commands
+                        taskRunner:
+                          type: io.kestra.plugin.core.runner.Process
+                        warningOnStdErr: false
+                        beforeCommands:
+                          - python -m venv venv
+                          - ./venv/bin/pip install pandas
+                        commands:
+                          - ./venv/bin/python -c "import pandas as pd; print(pd.__version__)"
+                """
         )
-    },
-    aliases = { "io.kestra.core.tasks.flows.WorkingDirectory", "io.kestra.core.tasks.flows.Worker" }
+    }
 )
 @WorkingDirectoryTaskValidation
 public class WorkingDirectory extends Sequential implements NamespaceFilesInterface, InputFilesInterface, OutputFilesInterface {
@@ -187,6 +217,8 @@ public class WorkingDirectory extends Sequential implements NamespaceFilesInterf
         description = """
             When a cache is configured, an archive of the files denoted by the cache configuration is created at the end of the task run and saved in Kestra's internal storage.
             Then, at the beginning of the next task execution, the file archive is retrieved and the working directory is initialized with it.
+
+            **Best Practice for Python Virtual Environments**: When caching Python virtual environments, use the full path to executables (e.g., `./venv/bin/pip` and `./venv/bin/python`) instead of attempting to activate the environment with `source` or `.` commands. This ensures compatibility across different shell environments and properly isolates dependencies within the cached venv.
             """
     )
     @PluginProperty
@@ -214,6 +246,16 @@ public class WorkingDirectory extends Sequential implements NamespaceFilesInterf
         return Collections.emptyList();
     }
 
+    @Override
+    public Optional<State.Type> resolveState(RunContext runContext, Execution execution, TaskRun parentTaskRun) throws IllegalVariableEvaluationException {
+        // subtasks run inside the Worker and each reports through its own queue message, so a failed
+        // subtask must not terminate the WorkingDirectory while a sibling's terminal result is still in flight
+        boolean hasInFlightSubtask = ListUtils.emptyOnNull(execution.getTaskRunList()).stream()
+            .anyMatch(taskRun -> parentTaskRun.getId().equals(taskRun.getParentTaskRunId()) && !taskRun.getState().isTerminated());
+
+        return hasInFlightSubtask ? Optional.empty() : super.resolveState(runContext, execution, parentTaskRun);
+    }
+
     public WorkerTask workerTask(TaskRun parent, Task task, RunContext runContext) {
         return WorkerTask.builder()
             .task(task)
@@ -229,7 +271,7 @@ public class WorkingDirectory extends Sequential implements NamespaceFilesInterf
                     .state(new State())
                     .build()
             )
-            .runContext(runContext)
+            .data(WorkerTaskData.from(runContext))
             .build();
     }
 
@@ -350,7 +392,7 @@ public class WorkingDirectory extends Sequential implements NamespaceFilesInterf
             return null;
         }
 
-        try (Reader is = new BufferedReader(new InputStreamReader(runContext.storage().getFile(uri)))) {
+        try (InputStream is = new BufferedInputStream(runContext.storage().getFile(uri), FileSerde.BUFFER_SIZE)) {
             Map<String, URI> outputs = FileSerde
                 .readAll(is, new TypeReference<Map<String, URI>>() {
                 })
@@ -378,7 +420,7 @@ public class WorkingDirectory extends Sequential implements NamespaceFilesInterf
     @NoArgsConstructor
     public static class Cache {
         @Schema(title = "Cache TTL (Time To Live), after this duration the cache will be deleted.")
-        private Property<Duration> ttl;
+        private Property<@DurationMin(millis = 1, message = "must be a positive duration") Duration> ttl;
 
         @Schema(
             title = "List of file [glob](https://en.wikipedia.org/wiki/Glob_(programming)) patterns to include in the cache",

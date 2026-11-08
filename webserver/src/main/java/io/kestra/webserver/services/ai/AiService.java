@@ -1,5 +1,7 @@
 package io.kestra.webserver.services.ai;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +14,8 @@ import io.kestra.core.models.dashboards.Dashboard;
 import io.kestra.core.models.flows.Flow;
 import io.kestra.core.plugins.PluginRegistry;
 import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.core.services.ExpressionContextService;
+import io.kestra.core.services.FlowParsingService;
 import io.kestra.core.services.InstanceService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.Version;
@@ -21,13 +25,19 @@ import io.kestra.libs.copilot.models.in.FlowGenerationPrompt;
 import io.kestra.libs.copilot.models.in.PluginMetadata;
 import io.kestra.libs.copilot.services.ai.*;
 import io.kestra.webserver.services.posthog.PosthogService;
+import io.kestra.webserver.utils.HttpClientUtils;
 
+import dev.langchain4j.http.client.HttpClientBuilderLoader;
+import dev.langchain4j.http.client.jdk.JdkHttpClientBuilder;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.listener.ChatModelListener;
 import dev.langchain4j.service.AiServices;
+import io.micronaut.core.annotation.Nullable;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public abstract class AiService<T extends AiConfiguration> implements AiServiceInterface {
     private final PosthogService postHogService;
     @Getter
@@ -37,7 +47,11 @@ public abstract class AiService<T extends AiConfiguration> implements AiServiceI
     private final VersionProvider versionProvider;
     private final FlowAiCopilot<Flow> flowAiCopilot;
     private final DashboardAiCopilot<Dashboard> dashboardAiCopilot;
+    private final ExpressionContextService expressionContextService;
+    private final FlowParsingService flowParsingService;
     private final NamespaceContextTool namespaceContextTool;
+    @Nullable
+    private volatile KestraDocsContextTool kestraDocsContextTool;
     private final String instanceUid;
     private final String aiProvider;
     private final String displayName;
@@ -49,6 +63,33 @@ public abstract class AiService<T extends AiConfiguration> implements AiServiceI
 
     protected String baseUrl() {
         return null;
+    }
+
+    /**
+     * Builds an HTTP client configured with the given client PEM certificate (and optional CA), for
+     * providers that support mutual-TLS. Returns empty when no client certificate is configured, so a
+     * caller applies it conditionally: {@code pemHttpClientBuilder(cfg.clientPem(), cfg.caPem()).ifPresent(builder::httpClientBuilder)}.
+     * Extracted here so the identical setup is not repeated in each provider's chat and streaming builders.
+     *
+     * @param clientPem the client certificate PEM, or {@code null} when mutual-TLS is not configured.
+     * @param caPem the CA certificate PEM, or {@code null}.
+     * @return the configured HTTP client builder, or empty when {@code clientPem} is {@code null}.
+     */
+    protected static Optional<JdkHttpClientBuilder> pemHttpClientBuilder(@Nullable String clientPem, @Nullable String caPem) {
+        if (clientPem == null) {
+            return Optional.empty();
+        }
+        try (
+            ByteArrayInputStream is = new ByteArrayInputStream(clientPem.getBytes(StandardCharsets.UTF_8));
+            ByteArrayInputStream caPemIs = caPem == null ? null : new ByteArrayInputStream(caPem.getBytes(StandardCharsets.UTF_8))
+        ) {
+            return Optional.of(
+                ((JdkHttpClientBuilder) HttpClientBuilderLoader.loadHttpClientBuilder())
+                    .httpClientBuilder(HttpClientUtils.withPemCertificate(is, caPemIs))
+            );
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Exception while trying to setup AI Service certificates", e);
+        }
     }
 
     protected List<ChatModelListener> listeners(String spanName, String conversationId) {
@@ -68,24 +109,22 @@ public abstract class AiService<T extends AiConfiguration> implements AiServiceI
     }
 
     protected FlowYamlBuilder flowYamlBuilder(String conversationId) {
-        return AiServices.builder(FlowYamlBuilder.class)
-            .chatModel(
-                this.chatModel(
-                    this.listeners("FlowYamlBuilder", conversationId)
-                )
-            )
-            .tools(namespaceContextTool)
-            .build();
+        var builder = AiServices.builder(FlowYamlBuilder.class)
+            .chatModel(this.chatModel(this.listeners("FlowYamlBuilder", conversationId)));
+        List<Object> tools = new ArrayList<>();
+        if (namespaceContextTool != null)
+            tools.add(namespaceContextTool);
+        if (kestraDocsContextTool != null)
+            tools.add(kestraDocsContextTool);
+        return tools.isEmpty() ? builder.build() : builder.tools(tools).build();
     }
 
     protected DashboardYamlBuilder dashboardYamlBuilder(String conversationId) {
-        return AiServices.builder(DashboardYamlBuilder.class)
-            .chatModel(
-                this.chatModel(
-                    this.listeners("DashboardYamlBuilder", conversationId)
-                )
-            )
-            .build();
+        var builder = AiServices.builder(DashboardYamlBuilder.class)
+            .chatModel(this.chatModel(this.listeners("DashboardYamlBuilder", conversationId)));
+        if (kestraDocsContextTool != null)
+            builder.tools(kestraDocsContextTool);
+        return builder.build();
     }
 
     public AiService(
@@ -94,11 +133,13 @@ public abstract class AiService<T extends AiConfiguration> implements AiServiceI
         final VersionProvider versionProvider,
         final InstanceService instanceService,
         final PosthogService postHogService,
-        final NamespaceContextTool namespaceContextTool,
+        @Nullable final NamespaceContextTool namespaceContextTool,
         final String aiProvider,
         final String displayName,
         final List<ChatModelListener> listeners,
-        final T aiConfiguration) {
+        final T aiConfiguration,
+        final ExpressionContextService expressionContextService,
+        final FlowParsingService flowParsingService) {
         this.pluginRegistry = pluginRegistry;
         this.jsonSchemaGenerator = jsonSchemaGenerator;
         this.instanceUid = instanceService.fetch();
@@ -107,11 +148,17 @@ public abstract class AiService<T extends AiConfiguration> implements AiServiceI
         this.displayName = displayName;
         this.listeners = listeners;
         this.aiConfiguration = aiConfiguration;
+        this.expressionContextService = expressionContextService;
+        this.flowParsingService = flowParsingService;
         this.namespaceContextTool = namespaceContextTool;
 
         this.flowAiCopilot = new FlowAiCopilot<>(Flow.class);
         this.dashboardAiCopilot = new DashboardAiCopilot<>(Dashboard.class);
         this.versionProvider = versionProvider;
+    }
+
+    public void setKestraDocsContextTool(KestraDocsContextTool kestraDocsContextTool) {
+        this.kestraDocsContextTool = kestraDocsContextTool;
     }
 
     @Override
@@ -123,13 +170,16 @@ public abstract class AiService<T extends AiConfiguration> implements AiServiceI
             )
         );
 
+        String pebbleExpressions = buildPebbleExpressions(tenantId, flowGenerationPrompt.getYaml(), flowGenerationPrompt.getNamespace());
+
         String generatedFlow = flowAiCopilot.generateFlow(
             this.pluginFinder(flowGenerationPrompt.getConversationId()),
             this.flowYamlBuilder(flowGenerationPrompt.getConversationId()),
             (plugins) -> JacksonMapper.ofJson().writeValueAsString(jsonSchemaGenerator.schemas(Flow.class, false, plugins, true)),
             allPluginsMetadata(),
             flowGenerationPrompt,
-            tenantId
+            tenantId,
+            pebbleExpressions
         );
 
         return GenerationResult.of(this.afterGeneration(ctx, "FlowGenerationResult", Map.of("generatedFlow", generatedFlow), generatedFlow, "generatedFlow"));
@@ -159,14 +209,45 @@ public abstract class AiService<T extends AiConfiguration> implements AiServiceI
         return displayName;
     }
 
+    public ExpressionContextService expressionContextService() {
+        return expressionContextService;
+    }
+
+    private String buildPebbleExpressions(@Nullable String tenantId, String flowYaml, @Nullable String namespace) {
+        if (flowYaml != null && !flowYaml.isBlank()) {
+            try {
+                Flow flow = flowParsingService.parse(tenantId, flowYaml, false);
+                return PebbleExpressionsFormatter.format(expressionContextService.buildExpressionContext(flow, null).toDisplayNameMap());
+            } catch (Exception e) {
+                log.debug("Could not parse flow YAML for pebble expression context, falling back to namespace context: {}", e.getMessage());
+            }
+        }
+        if (namespace != null && !namespace.isBlank()) {
+            try {
+                Flow flow = Flow.builder()
+                    .id("__ai_context__")
+                    .namespace(namespace)
+                    .tenantId(tenantId)
+                    .tasks(List.of())
+                    .build();
+                return PebbleExpressionsFormatter.format(expressionContextService.buildExpressionContext(flow, null).toDisplayNameMap());
+            } catch (Exception e) {
+                log.debug("Could not build namespace pebble expression context, falling back to global: {}", e.getMessage());
+            }
+        }
+        return PebbleExpressionsFormatter.format(expressionContextService.buildGlobalExpressionContext().toDisplayNameMap());
+    }
+
     public PluginFinder pluginFinderForConversation(String conversationId) {
         return this.pluginFinder(conversationId);
     }
 
     public <B> B buildAiService(Class<B> serviceClass, String spanName, String conversationId) {
-        return AiServices.builder(serviceClass)
-            .chatModel(this.chatModel(this.listeners(spanName, conversationId)))
-            .build();
+        var builder = AiServices.builder(serviceClass)
+            .chatModel(this.chatModel(this.listeners(spanName, conversationId)));
+        if (kestraDocsContextTool != null)
+            builder.tools(kestraDocsContextTool);
+        return builder.build();
     }
 
     public record ConversationMetadata(String conversationId, String ip, String parentSpanId, String uid) {

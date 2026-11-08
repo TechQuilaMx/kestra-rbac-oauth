@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import io.kestra.core.models.HasUID;
 import io.kestra.core.models.TenantInterface;
+import io.kestra.core.queues.event.BroadcastEvent;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -39,9 +40,10 @@ import lombok.experimental.SuperBuilder;
     {
         @JsonSubTypes.Type(value = ExecutionKilledExecution.class, name = "execution"),
         @JsonSubTypes.Type(value = ExecutionKilledTrigger.class, name = "trigger"),
+        @JsonSubTypes.Type(value = ExecutionKilledTaskRuns.class, name = "taskruns"),
     }
 )
-abstract public class ExecutionKilled implements TenantInterface, HasUID {
+abstract public class ExecutionKilled implements TenantInterface, HasUID, BroadcastEvent {
     abstract public String getType();
 
     public enum State {
@@ -58,4 +60,9 @@ abstract public class ExecutionKilled implements TenantInterface, HasUID {
      * The tenant attached to the execution.
      */
     protected String tenantId;
+
+    @Override
+    public String key() {
+        return uid();
+    }
 }

@@ -15,8 +15,9 @@ import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.junit.annotations.LoadFlows;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.executions.LogEntry;
-import io.kestra.core.repositories.LogRepositoryInterface;
+import io.kestra.core.repositories.LogDataStoreInterface;
 import io.kestra.core.runners.TestRunnerUtils;
+import io.kestra.core.services.TaskOutputService;
 
 import jakarta.inject.Inject;
 
@@ -24,14 +25,17 @@ import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@KestraTest(startRunner = true)
+@KestraTest(startRunner = true, startSystemWorker = true)
 class PurgeLogsTest {
 
     @Inject
-    private LogRepositoryInterface logRepository;
+    private LogDataStoreInterface logRepository;
 
     @Inject
     protected TestRunnerUtils runnerUtils;
+
+    @Inject
+    private TaskOutputService taskOutputService;
 
     @Test
     @LoadFlows("flows/valids/purge_logs_no_arguments.yaml")
@@ -51,7 +55,101 @@ class PurgeLogsTest {
 
         assertTrue(execution.getState().isSuccess());
         assertThat(execution.getTaskRunList()).hasSize(1);
-        assertThat((int) execution.getTaskRunList().getFirst().getOutputs().get("count")).isPositive();
+        assertThat((int) taskOutputService.getOutputs(execution.getTaskRunList().getFirst()).get("count")).isPositive();
+    }
+
+    @Test
+    @LoadFlows("flows/valids/purge_logs_execution_only.yaml")
+    void run_purge_execution_logs_only() throws Exception {
+        // create an execution log (with executionId)
+        logRepository.save(
+            LogEntry.builder()
+                .namespace("namespace")
+                .flowId("flowId")
+                .executionId("exec-123")
+                .tenantId(MAIN_TENANT)
+                .timestamp(Instant.now())
+                .level(Level.INFO)
+                .message("Execution log")
+                .build()
+        );
+
+        // create a non-execution log (without executionId)
+        logRepository.save(
+            LogEntry.builder()
+                .namespace("namespace")
+                .flowId("flowId")
+                .tenantId(MAIN_TENANT)
+                .timestamp(Instant.now())
+                .level(Level.INFO)
+                .message("Non-execution log")
+                .build()
+        );
+
+        Execution execution = runnerUtils.runOne(MAIN_TENANT, "io.kestra.tests", "purge_logs_execution_only");
+
+        assertTrue(execution.getState().isSuccess());
+        var outputs = taskOutputService.getOutputs(execution.getTaskRunList().getFirst());
+        assertThat((int) outputs.get("executionLogsCount")).isPositive();
+        assertThat((int) outputs.get("nonExecutionLogsCount")).isZero();
+    }
+
+    @Test
+    @LoadFlows("flows/valids/purge_logs_trigger_only.yaml")
+    void run_purge_non_execution_logs_only() throws Exception {
+        // create an execution log (with executionId)
+        logRepository.save(
+            LogEntry.builder()
+                .namespace("namespace")
+                .flowId("flowId")
+                .executionId("exec-456")
+                .tenantId(MAIN_TENANT)
+                .timestamp(Instant.now())
+                .level(Level.INFO)
+                .message("Execution log")
+                .build()
+        );
+
+        // create a non-execution log (without executionId)
+        logRepository.save(
+            LogEntry.builder()
+                .namespace("namespace")
+                .flowId("flowId")
+                .tenantId(MAIN_TENANT)
+                .timestamp(Instant.now())
+                .level(Level.INFO)
+                .message("Non-execution log")
+                .build()
+        );
+
+        Execution execution = runnerUtils.runOne(MAIN_TENANT, "io.kestra.tests", "purge_logs_trigger_only");
+
+        assertTrue(execution.getState().isSuccess());
+        var outputs = taskOutputService.getOutputs(execution.getTaskRunList().getFirst());
+        assertThat((int) outputs.get("executionLogsCount")).isZero();
+        assertThat((int) outputs.get("nonExecutionLogsCount")).isPositive();
+    }
+
+    @Test
+    @LoadFlows("flows/valids/purge_logs_with_batch_size.yaml")
+    void run_with_batch_size() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            logRepository.save(
+                LogEntry.builder()
+                    .namespace("namespace")
+                    .flowId("flowId")
+                    .tenantId(MAIN_TENANT)
+                    .timestamp(Instant.now())
+                    .level(Level.INFO)
+                    .message("Log entry " + i)
+                    .build()
+            );
+        }
+
+        Execution execution = runnerUtils.runOne(MAIN_TENANT, "io.kestra.tests", "purge_logs_with_batch_size");
+
+        assertTrue(execution.getState().isSuccess());
+        assertThat((int) taskOutputService.getOutputs(execution.getTaskRunList().getFirst()).get("count")).isGreaterThanOrEqualTo(5);
     }
 
     @org.junit.jupiter.api.parallel.Execution(ExecutionMode.SAME_THREAD)
@@ -65,7 +163,7 @@ class PurgeLogsTest {
 
         assertTrue(execution.getState().isSuccess());
         assertThat(execution.getTaskRunList().size()).isEqualTo(1);
-        assertThat(execution.getTaskRunList().getFirst().getOutputs().get("count")).as(failingReason).isEqualTo(resultCount);
+        assertThat(taskOutputService.getOutputs(execution.getTaskRunList().getFirst()).get("count")).as(failingReason).isEqualTo(resultCount);
     }
 
     static Stream<Arguments> buildArguments() {

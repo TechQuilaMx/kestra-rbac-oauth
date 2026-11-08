@@ -48,16 +48,16 @@ class FilesServiceTest {
     @Test
     void shouldRejectPathTraversalInInputFileNames() {
         RunContext runContext = runContextFactory.of();
-        assertThatThrownBy(() ->
-            FilesService.inputFiles(runContext, Map.of("../escape.txt", "content"))
+        assertThatThrownBy(
+            () -> FilesService.inputFiles(runContext, Map.of("../escape.txt", "content"))
         ).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void shouldRejectAbsolutePathInInputFileNames() {
         RunContext runContext = runContextFactory.of();
-        assertThatThrownBy(() ->
-            FilesService.inputFiles(runContext, Map.of("/etc/passwd", "content"))
+        assertThatThrownBy(
+            () -> FilesService.inputFiles(runContext, Map.of("/etc/passwd", "content"))
         ).isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -155,7 +155,7 @@ class FilesServiceTest {
     }
 
     private URI createFile() throws IOException {
-        File tempFile = File.createTempFile("file", ".txt");
+        File tempFile = Files.createTempFile(Path.of("/tmp"), "file", ".txt").toFile();
         Files.write(tempFile.toPath(), "Hello World".getBytes());
         return tempFile.toPath().toUri();
     }

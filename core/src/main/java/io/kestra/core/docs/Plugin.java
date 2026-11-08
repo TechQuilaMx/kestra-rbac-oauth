@@ -29,7 +29,6 @@ public class Plugin {
     private List<String> aliases;
     private List<PluginElementMetadata> tasks;
     private List<PluginElementMetadata> triggers;
-    private List<PluginElementMetadata> conditions;
     private List<PluginElementMetadata> controllers;
     private List<PluginElementMetadata> storages;
     private List<PluginElementMetadata> secrets;
@@ -92,7 +91,6 @@ public class Plugin {
         Predicate<Class<?>> packagePredicate = c -> subgroup == null || c.getPackageName().equals(subgroup);
         plugin.tasks = filterAndGetTypeWithMetadata(registeredPlugin.getTasks(), packagePredicate);
         plugin.triggers = filterAndGetTypeWithMetadata(registeredPlugin.getTriggers(), packagePredicate);
-        plugin.conditions = filterAndGetTypeWithMetadata(registeredPlugin.getConditions(), packagePredicate);
         plugin.storages = filterAndGetTypeWithMetadata(registeredPlugin.getStorages(), packagePredicate);
         plugin.secrets = filterAndGetTypeWithMetadata(registeredPlugin.getSecrets(), packagePredicate);
         plugin.taskRunners = filterAndGetTypeWithMetadata(registeredPlugin.getTaskRunners(), packagePredicate);
@@ -105,6 +103,37 @@ public class Plugin {
         plugin.additionalPlugins = filterAndGetTypeWithMetadata(registeredPlugin.getAdditionalPlugins(), packagePredicate);
 
         return plugin;
+    }
+
+    /**
+     * Resolves the human-readable title for a single plugin element (a task, trigger, ... class),
+     * using the exact same source of truth as {@link #of(RegisteredPlugin, String)} builds a whole
+     * (sub)plugin page from: the element's own subgroup title, declared via
+     * {@code @PluginSubGroup(title = ...)} on its package, when it lives in a registered subgroup;
+     * the raw subgroup package segment when that subgroup declares no title; or, when the element
+     * isn't part of any subgroup, the owning plugin's own title (as authored in its
+     * {@code metadata/index.yaml}, surfaced via {@link RegisteredPlugin#title()}).
+     * <p>
+     * Unlike guessing a display name from the element's fully qualified class name (for example the
+     * last Java package segment), this is driven entirely by each plugin's own declared identity, so
+     * two unrelated plugins that happen to share a package segment (for example
+     * {@code io.kestra.plugin.mongodb} and {@code io.kestra.plugin.debezium.mongodb}) never collide
+     * on the same derived label.
+     *
+     * @param registeredPlugin the plugin the element belongs to
+     * @param cls the plugin element's class
+     * @return a non-null, correctly-cased title
+     */
+    public static String titleFor(RegisteredPlugin registeredPlugin, Class<?> cls) {
+        String packageName = cls.getPackageName();
+        boolean isSubGroup = registeredPlugin.group() != null && packageName.length() != registeredPlugin.group().length();
+        PluginSubGroup pluginSubGroup = isSubGroup ? cls.getPackage().getDeclaredAnnotation(PluginSubGroup.class) : null;
+
+        if (pluginSubGroup == null) {
+            return registeredPlugin.title();
+        }
+
+        return !pluginSubGroup.title().isEmpty() ? pluginSubGroup.title() : packageName.substring(packageName.lastIndexOf('.') + 1);
     }
 
     /**

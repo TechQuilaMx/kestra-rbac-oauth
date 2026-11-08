@@ -1,6 +1,7 @@
 package io.kestra.core.models.tasks;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import io.kestra.core.exceptions.InternalException;
@@ -32,7 +33,8 @@ public interface ExecutableTask<T extends Output> {
     Optional<SubflowExecutionResult> createSubflowExecutionResult(RunContext runContext,
         TaskRun taskRun,
         FlowInterface flow,
-        Execution execution);
+        Execution execution,
+        Map<String, Object> outputs);
 
     /**
      * Whether to wait for the execution(s) of the subflow before terminating this tasks

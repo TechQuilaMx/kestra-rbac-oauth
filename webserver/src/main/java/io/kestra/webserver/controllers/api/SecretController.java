@@ -1,17 +1,19 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.io.IOException;
 import java.util.List;
 
 import io.kestra.core.models.QueryFilter;
+import io.kestra.core.models.QueryFilter.Resource;
 import io.kestra.core.repositories.ArrayListTotal;
 import io.kestra.core.secret.SecretService;
 import io.kestra.core.tenant.TenantService;
-import io.kestra.webserver.annotations.RequirePermission;
 import io.kestra.webserver.converters.QueryFilterFormat;
 import io.kestra.webserver.models.api.secret.ApiSecretListResponse;
 import io.kestra.webserver.models.api.secret.ApiSecretMeta;
-import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.utils.PageableUtils;
 
 import io.micronaut.core.annotation.Nullable;
@@ -22,12 +24,11 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
-import io.micronaut.validation.Validated;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.inject.Inject;
+import jakarta.validation.constraints.Max;
 
-@Validated
 @Controller("/api/v1/{tenant}/secrets")
 public class SecretController<META extends ApiSecretMeta> {
     @Inject
@@ -49,9 +50,9 @@ public class SecretController<META extends ApiSecretMeta> {
     @RequirePermission(Permission.SECRETS_VIEW)
     public HttpResponse<ApiSecretListResponse<META>> listSecrets(
         @Parameter(description = "The current page") @QueryValue(value = "page", defaultValue = "1") int page,
-        @Parameter(description = "The current page size") @QueryValue(value = "size", defaultValue = "10") int size,
+        @Parameter(description = "The current page size") @QueryValue(value = "size", defaultValue = "10") @Max(PageableUtils.MAX_PAGE_SIZE) int size,
         @Parameter(description = "The sort of current page") @Nullable @QueryValue(value = "sort") List<String> sort,
-        @Parameter(description = "Filters") @QueryFilterFormat List<QueryFilter> filters) throws IllegalArgumentException, IOException {
+        @Parameter(description = "Filters") @QueryFilterFormat(Resource.SECRET_METADATA) List<QueryFilter> filters) throws IllegalArgumentException, IOException {
         final String tenantId = this.tenantService.resolveTenant();
 
         Pageable pageable = PageableUtils.from(page, size, sort, this::sortMapper);

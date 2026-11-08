@@ -1,90 +1,101 @@
 <template>
-    <el-card class="card">
-        <div v-if="showIcon" class="header">
-            <el-link underline="never" :href="link" target="_blank">
-                <el-icon class="el-icon--right">
-                    <OpenInNew />
-                </el-icon>
-            </el-link>
+    <!-- Anchor attributes are only bound for the external-link variant: passing them as
+         `undefined` would fall through onto RouterLink's anchor and wipe the href it renders,
+         losing the native link cursor (https://github.com/kestra-io/kestra/issues/18148). -->
+    <component
+        :is="to ? RouterLink : link ? 'a' : 'div'"
+        :to="to"
+        v-bind="link ? {href: link, target: '_blank', rel: 'noopener noreferrer'} : {}"
+        class="card"
+    >
+        <KsIcon class="icon">
+            <component :is="icon" />
+        </KsIcon>
+        <div class="text">
+            <h5 class="title">
+                {{ title }}
+            </h5>
+            <p class="desc">
+                {{ description }}
+            </p>
         </div>
-        <div class="icon-row">
-            <el-icon :size="24">
-                <component :is="icon" />
-            </el-icon>
-            <div>
-                <h5 class="title">
-                    {{ title }}
-                </h5>
-                <div class="desc">
-                    <Markdown :source="$t(`execution_guide.${category}.text`)" />
-                </div>
-            </div>
-        </div>
-    </el-card>
+        <KsIcon v-if="link || to" class="open">
+            <OpenInNew v-if="link" />
+            <ChevronRight v-else />
+        </KsIcon>
+    </component>
 </template>
 
 <script setup lang="ts">
-    import OpenInNew from "vue-material-design-icons/OpenInNew.vue";
-    import Markdown from "../../layout/Markdown.vue";
+    import type {Component} from "vue"
+    import {RouterLink, type RouteLocationRaw} from "vue-router"
+    import OpenInNew from "vue-material-design-icons/OpenInNew.vue"
+    import ChevronRight from "vue-material-design-icons/ChevronRight.vue"
 
     defineProps<{
         title: string;
-        category: string;
-        content?: string;
+        description: string;
         link?: string;
-        icon?: any;
-        showIcon?: boolean;
-    }>();
+        to?: RouteLocationRaw;
+        icon?: Component;
+    }>()
 </script>
 
 <style scoped lang="scss">
-.el-card {
-    background-color: var(--ks-background-card);
-    border-color: var(--ks-border-primary);
-    box-shadow: 0px 2px 4px 0px var(--ks-card-shadow);
-    position: relative;
-    min-width: 100%;
-    min-height: 8.625rem;
-    border-radius: 0.5rem;
-    cursor: pointer;
-    text-align: left;
-}
-
 .card {
-    .header {
-        position: absolute;
-        top: 0.3125rem;
-        right: 0.3125rem;
+    display: flex;
+    align-items: center;
+    gap: var(--ks-spacing-4);
+    width: 100%;
+    padding: var(--ks-spacing-4) var(--ks-spacing-5);
+    background-color: var(--ks-bg-surface);
+    text-align: left;
+    text-decoration: none;
 
-        :deep(.el-icon) {
-            color: var(--ks-content-secondary);
-            font-size: 1rem;
-            position: absolute;
-            top: -0.875rem;
-            right: 0;
+    &:hover {
+        background-color: var(--ks-bg-hover);
 
-            &:hover {
-                color: var(--ks-content-tertiary);
-            }
+        .icon {
+            color: var(--ks-icon-hover);
         }
     }
 
-    .title {
-        font-weight: 700;
-        font-size: 0.875rem;
-        line-height: 1.375rem;
+    .icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--ks-icon-size-xl);
+        height: var(--ks-icon-size-lg);
+        color: var(--ks-icon-muted);
+
+        :deep(svg) {
+            width: var(--ks-icon-size-lg);
+            height: var(--ks-icon-size-lg);
+        }
     }
 
-    .desc {
-        margin: 0;
-        font-size: 0.75rem;
-        line-height: 1.25rem;
-        color: var(--ks-content-secondary);
-    }
-}
+    .text {
+        flex: 1;
 
-.icon-row {
-    display: inline-flex;
-    gap: 1rem;
+        .title {
+            margin: 0;
+            font-size: var(--ks-font-size-md);
+            font-weight: var(--ks-font-weight-semibold);
+            color: var(--ks-text-primary);
+        }
+
+        .desc {
+            margin: 0;
+            font-size: var(--ks-font-size-sm);
+            font-weight: var(--ks-font-weight-regular);
+            line-height: var(--ks-line-height-base);
+            color: var(--ks-text-secondary);
+        }
+    }
+
+    .open {
+        color: var(--ks-text-secondary);
+        font-size: var(--ks-font-size-base);
+    }
 }
 </style>

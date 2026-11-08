@@ -12,7 +12,6 @@ import io.kestra.plugin.core.dashboard.chart.TimeSeries;
 import io.kestra.plugin.core.dashboard.chart.timeseries.TimeSeriesColumnDescriptor;
 
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
@@ -20,7 +19,6 @@ import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 import jakarta.inject.Singleton;
 
 @Singleton
-@Introspected
 public class TimeSeriesChartValidator implements ConstraintValidator<TimeSeriesChartValidation, TimeSeries<?, ?>> {
     @Override
     public boolean isValid(

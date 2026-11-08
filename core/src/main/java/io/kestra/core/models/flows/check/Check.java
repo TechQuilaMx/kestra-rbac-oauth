@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -28,10 +29,19 @@ public class Check {
 
     /**
      * The condition to evaluate.
+     * <p>
+     * The expression must render to a real boolean {@code true} or {@code false}. A value that renders
+     * to anything else (for example the string {@code "true"} or {@code "yes"}, or a number) is treated
+     * as a <em>failed</em> check, because evaluation uses a strict {@code Boolean.TRUE.equals(...)} test.
+     * <p>
+     * If the expression cannot be evaluated at all (for example an undefined variable or a syntax error),
+     * the check fails safe: the execution is hard-blocked with {@link Behavior#BLOCK_EXECUTION} and
+     * {@link Style#ERROR}, overriding the declared {@code behavior} and {@code style} — a broken gate must
+     * never let a run through.
      */
     @NotNull
     @NotEmpty
-    String condition;
+    String when;
 
     /**
      * The message associated with this check, will be displayed when the condition evaluates to {@code false}.
@@ -42,12 +52,19 @@ public class Check {
     /**
      * Defines the style of the message displayed in the UI when the condition evaluates to {@code false}.
      */
+    @Builder.Default
     Style style = Style.INFO;
 
     /**
      * The behavior to apply when the condition evaluates to {@code false}.
      */
+    @Builder.Default
     Behavior behavior = Behavior.BLOCK_EXECUTION;
+
+    @Deprecated(forRemoval = true, since = "2.0.0")
+    public void setCondition(String condition) {
+        this.when = condition;
+    }
 
     /**
      * The visual style used to display the message when the check fails.

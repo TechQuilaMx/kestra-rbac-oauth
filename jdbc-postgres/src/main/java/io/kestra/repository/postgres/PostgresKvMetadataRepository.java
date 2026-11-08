@@ -3,13 +3,13 @@ package io.kestra.repository.postgres;
 import org.jooq.Condition;
 
 import io.kestra.core.models.kv.PersistedKvMetadata;
+import io.kestra.core.repositories.RepositoryBean;
 import io.kestra.jdbc.repository.AbstractJdbcKvMetadataRepository;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
-import jakarta.inject.Singleton;
 
-@Singleton
+@RepositoryBean
 @PostgresRepositoryEnabled
 public class PostgresKvMetadataRepository extends AbstractJdbcKvMetadataRepository {
     @Inject

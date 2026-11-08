@@ -1,6 +1,7 @@
 package io.kestra.core.models.hierarchies;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
@@ -54,8 +55,8 @@ public class SubflowGraphTask extends AbstractGraphTask {
         }
 
         @Override
-        public Optional<SubflowExecutionResult> createSubflowExecutionResult(RunContext runContext, TaskRun taskRun, FlowInterface flow, Execution execution) {
-            return subflowTask.createSubflowExecutionResult(runContext, taskRun, flow, execution);
+        public Optional<SubflowExecutionResult> createSubflowExecutionResult(RunContext runContext, TaskRun taskRun, FlowInterface flow, Execution execution, Map<String, Object> outputs) {
+            return subflowTask.createSubflowExecutionResult(runContext, taskRun, flow, execution, outputs);
         }
 
         @Override

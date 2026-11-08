@@ -6,10 +6,9 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
+import io.kestra.core.services.KVStoreService;
 import io.kestra.core.storages.kv.KVEntry;
-import io.kestra.core.storages.kv.KVStore;
 
-import io.micronaut.core.annotation.Introspected;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -24,9 +23,8 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @SuperBuilder
-@Introspected
 public abstract class KvPurgeBehavior {
     abstract public String getType();
 
-    protected abstract List<KVEntry> entriesToPurge(KVStore kvStore) throws IOException;
+    protected abstract List<KVEntry> entriesToPurge(String tenant, String namespace, KVStoreService service) throws IOException;
 }

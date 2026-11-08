@@ -1,5 +1,6 @@
 package io.kestra.core.runners;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
@@ -20,12 +21,10 @@ import lombok.experimental.SuperBuilder;
 @Data
 @SuperBuilder
 @NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class WorkerJobRunning implements HasUID {
     @NotNull
     private WorkerInstance workerInstance;
-
-    @NotNull
-    private int partition;
 
     abstract public String getType();
 

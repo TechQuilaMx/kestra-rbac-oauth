@@ -10,9 +10,9 @@ import io.kestra.core.models.SoftDeletable;
 import io.kestra.core.models.TenantInterface;
 import io.kestra.core.test.flow.UnitTest;
 import io.kestra.core.utils.IdUtils;
+import io.kestra.core.validations.TenantId;
 import io.kestra.core.validations.TestSuiteValidation;
 
-import io.micronaut.core.annotation.Introspected;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -23,7 +23,6 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-@Introspected
 @ToString
 @EqualsAndHashCode
 @TestSuiteValidation
@@ -35,7 +34,7 @@ public class TestSuite implements HasUID, TenantInterface, SoftDeletable<TestSui
     private String id;
 
     @Hidden
-    @Pattern(regexp = "^[a-z0-9][a-z0-9_-]*")
+    @TenantId
     private String tenantId;
 
     private String description;

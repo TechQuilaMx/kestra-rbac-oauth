@@ -2,6 +2,7 @@ package io.kestra.plugin.scripts.exec.scripts.runners;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
@@ -16,13 +17,15 @@ import io.kestra.core.models.tasks.runners.*;
 import io.kestra.core.models.tasks.runners.DefaultLogConsumer;
 import io.kestra.core.runners.FilesService;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.runners.RunVariables;
+import io.kestra.core.runners.WorkingDir;
+import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.NamespaceFilesUtils;
 import io.kestra.plugin.core.runner.Process;
 import io.kestra.plugin.scripts.exec.scripts.models.DockerOptions;
 import io.kestra.plugin.scripts.exec.scripts.models.RunnerType;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
-import io.kestra.plugin.scripts.runner.docker.Docker;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -33,6 +36,15 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @AllArgsConstructor
 @Getter
 public class CommandsWrapper implements TaskCommands {
+    private static final Set<String> EXECUTION_CONTEXT_EXCLUDED_VARIABLES = Set.of(
+        // already handed to the script as environment variables
+        "envs",
+        "globals",
+        // internal plumbing, not execution metadata
+        RunVariables.SECRET_CONSUMER_VARIABLE_NAME,
+        RunVariables.FIXTURE_FILES_KEY
+    );
+
     private RunContext runContext;
 
     private Path workingDirectory;
@@ -62,6 +74,7 @@ public class CommandsWrapper implements TaskCommands {
     private io.kestra.core.models.tasks.runners.AbstractLogConsumer logConsumer;
 
     @With
+    @Deprecated
     private RunnerType runnerType;
 
     @With
@@ -71,6 +84,7 @@ public class CommandsWrapper implements TaskCommands {
     private TaskRunner<?> taskRunner;
 
     @With
+    @Deprecated
     private DockerOptions dockerOptions;
 
     @With
@@ -93,6 +107,12 @@ public class CommandsWrapper implements TaskCommands {
 
     @With
     private TargetOS targetOS;
+
+    @With
+    private KotlpOptions kotlp;
+
+    @With
+    private boolean executionContext;
 
     public CommandsWrapper(RunContext runContext) {
         this.runContext = runContext;
@@ -125,7 +145,9 @@ public class CommandsWrapper implements TaskCommands {
             outputFiles,
             enableOutputDirectory,
             timeout,
-            targetOS
+            targetOS,
+            kotlp,
+            executionContext
         );
     }
 
@@ -147,16 +169,32 @@ public class CommandsWrapper implements TaskCommands {
         return this;
     }
 
+    /**
+     * Writes the execution context as JSON into the working directory, so a script can read its
+     * metadata as data instead of interpolating Pebble expressions into its own source.
+     *
+     * `envs` and `globals` are left out: both are already exposed to the script as environment
+     * variables, so writing them again would only widen what ends up on disk.
+     */
+    private void writeExecutionContextFile() throws IOException {
+        Map<String, Object> variables = new TreeMap<>(runContext.getVariables());
+        EXECUTION_CONTEXT_EXCLUDED_VARIABLES.forEach(variables::remove);
+
+        Files.write(
+            this.workingDirectory.resolve(WorkingDir.EXECUTION_CONTEXT_FILE_NAME),
+            JacksonMapper.ofJson().writeValueAsBytes(variables)
+        );
+    }
+
     public <T extends TaskRunnerDetailResult> ScriptOutput run() throws Exception {
         if (this.namespaceFiles != null && !Boolean.FALSE.equals(runContext.render(this.namespaceFiles.getEnabled()).as(Boolean.class).orElse(true))) {
             NamespaceFilesUtils.loadNamespaceFiles(runContext, this.namespaceFiles);
         }
 
-        TaskRunner<T> realTaskRunner = this.getTaskRunner();
         // Inject non-glob outputFiles into the Pebble render context as a name→path map before any rendering.
         // This makes {{ outputFiles["name"] }} resolvable in scripts, consistent with JDBC tasks.
         // Glob patterns are skipped here — they cannot resolve to a single path; post-run collection still handles them.
-        Map<String, Object> runnerVars = realTaskRunner.additionalVars(runContext, this);
+        Map<String, Object> runnerVars = taskRunner.additionalVars(runContext, this);
         if (this.outputFiles != null && !this.outputFiles.isEmpty()) {
             String workingDir = String.valueOf(runnerVars.getOrDefault(ScriptService.VAR_WORKING_DIR, this.workingDirectory));
             Map<String, String> outputFilesMap = new LinkedHashMap<>();
@@ -174,26 +212,68 @@ public class CommandsWrapper implements TaskCommands {
             FilesService.inputFiles(runContext, runnerVars, this.inputFiles);
         }
 
-        RunContext taskRunnerRunContext = runContext.cloneForPlugin(realTaskRunner);
+        if (this.executionContext) {
+            this.writeExecutionContextFile();
+        }
+
+        if (this.isKotlpEnabled()) {
+            KotlpUtils.copyTo(this.workingDirectory.resolve(kotlpBinaryName()));
+        }
+
+        RunContext taskRunnerRunContext = runContext.cloneForPlugin(taskRunner);
 
         List<String> renderedCommands = this.renderCommands(runContext, commands);
         List<String> renderedBeforeCommands = this.renderCommands(runContext, beforeCommands);
         List<String> renderedInterpreter = this.renderCommands(runContext, interpreter);
 
+        List<String> effectiveBeforeCommands = this.isBeforeCommandsWithOptions() ? getBeforeCommandsWithOptions(renderedBeforeCommands) : renderedBeforeCommands;
+        if (!renderedBeforeCommands.isEmpty()) {
+            List<String> marked = new ArrayList<>();
+            marked.add("echo '##kestra:log:debug##'");
+            marked.addAll(effectiveBeforeCommands);
+            marked.add("echo '##kestra:log:info##'");
+            effectiveBeforeCommands = marked;
+        }
+
         List<String> finalCommands = renderedBeforeCommands.isEmpty() && renderedInterpreter.isEmpty() ? renderedCommands
             : ScriptService.scriptCommands(
                 renderedInterpreter,
-                this.isBeforeCommandsWithOptions() ? getBeforeCommandsWithOptions(renderedBeforeCommands) : renderedBeforeCommands,
+                effectiveBeforeCommands,
                 renderedCommands,
                 Optional.ofNullable(targetOS).orElse(TargetOS.AUTO)
             );
+
+        if (this.isKotlpEnabled()) {
+            if (this.kotlp.logFlushInterval() != null && this.kotlp.logDir() == null) {
+                throw new IllegalArgumentException("The kotlp 'logFlushInterval' option requires 'logDir' to be set.");
+            }
+
+            String workingDir = String.valueOf(runnerVars.getOrDefault(ScriptService.VAR_WORKING_DIR, this.workingDirectory));
+            List<String> wrapped = new ArrayList<>(finalCommands.size() + 7);
+            if (!this.isWindowsTarget()) {
+                // The kotlp APE binary cannot be exec'd directly without kernel binfmt support; its header is a valid shell script that bootstraps it.
+                wrapped.add("/bin/sh");
+            }
+            wrapped.add(workingDir + "/" + kotlpBinaryName());
+            if (this.kotlp.logDir() != null) {
+                wrapped.add("--log-dir");
+                wrapped.add(this.kotlp.logDir());
+                if (this.kotlp.logFlushInterval() != null) {
+                    wrapped.add("--log-flush-interval");
+                    wrapped.add(String.valueOf(this.kotlp.logFlushInterval().toSeconds()));
+                }
+            }
+            wrapped.add("--");
+            wrapped.addAll(finalCommands);
+            finalCommands = wrapped;
+        }
 
         this.commands = Property.ofValue(finalCommands);
 
         ScriptOutput.ScriptOutputBuilder scriptOutputBuilder = ScriptOutput.builder();
 
         try {
-            TaskRunnerResult<T> taskRunnerResult = realTaskRunner.run(taskRunnerRunContext, this, this.outputFiles);
+            TaskRunnerResult<T> taskRunnerResult = (TaskRunnerResult<T>) taskRunner.run(taskRunnerRunContext, this, this.outputFiles);
             scriptOutputBuilder.exitCode(taskRunnerResult.getExitCode())
                 .outputFiles(getOutputFiles(taskRunnerRunContext))
                 .taskRunner(taskRunnerResult.getDetails());
@@ -211,9 +291,29 @@ public class CommandsWrapper implements TaskCommands {
                 .stdOutLineCount(e.getStdOutCount())
                 .stdErrLineCount(e.getStdErrCount())
                 .vars(e.getLogConsumer() != null ? e.getLogConsumer().getOutputs() : null)
+                .taskRunner(e.getDetails())
                 .outputFiles(getOutputFiles(taskRunnerRunContext))
                 .build();
             throw new RunnableTaskException(e, output);
+        } finally {
+            if (this.executionContext) {
+                this.deleteExecutionContextFile();
+            }
+        }
+    }
+
+    /**
+     * Removes the execution context file once the commands are done.
+     * <p>
+     * Inside a {@code WorkingDirectory} the working directory is shared between child tasks, so a
+     * leftover file would be picked up by a later task that never set `executionContext` — handing it
+     * the previous task's metadata instead of its own.
+     */
+    private void deleteExecutionContextFile() {
+        try {
+            Files.deleteIfExists(this.workingDirectory.resolve(WorkingDir.EXECUTION_CONTEXT_FILE_NAME));
+        } catch (IOException e) {
+            runContext.logger().debug("Unable to delete the execution context file", e);
         }
     }
 
@@ -227,38 +327,6 @@ public class CommandsWrapper implements TaskCommands {
             outputFiles.putAll(FilesService.outputFiles(taskRunnerRunContext, this.outputFiles));
         }
         return outputFiles;
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T extends TaskRunnerDetailResult> TaskRunner<T> getTaskRunner() {
-        // User-explicit taskRunner takes precedence over the deprecated runnerType (fixes PluginDefault precedence
-        // where a non-forced default sets `runner` but the flow explicitly sets `taskRunner`).
-        if (taskRunner != null) {
-            // special case to take into account the deprecated dockerOptions if set
-            if (taskRunner instanceof Docker && dockerOptions != null) {
-                return (TaskRunner<T>) Docker.from(dockerOptions);
-            }
-            return (TaskRunner<T>) taskRunner;
-        }
-
-        if (runnerType != null) {
-            return switch (runnerType) {
-                case DOCKER -> (TaskRunner<T>) Docker.from(dockerOptions);
-                case PROCESS -> (TaskRunner<T>) new Process();
-            };
-        }
-
-        return null;
-    }
-
-    public Boolean getEnableOutputDirectory() {
-        if (this.enableOutputDirectory == null) {
-            // For compatibility reasons, if legacy runnerType property is used (and no explicit taskRunner overrides it),
-            // we enable the output directory. Mirrors getTaskRunner() precedence: taskRunner wins over runnerType.
-            return this.runnerType != null && this.taskRunner == null;
-        }
-
-        return this.enableOutputDirectory;
     }
 
     public Path getOutputDirectory() {
@@ -333,16 +401,26 @@ public class CommandsWrapper implements TaskCommands {
     }
 
     protected List<String> getExitOnErrorCommands() {
-        TargetOS os = this.getTargetOS();
-
-        // If targetOS is Windows OR targetOS is AUTO && current system is windows and we use process as a runner.(TLDR will run on windows)
-        if (
-            os == TargetOS.WINDOWS ||
-                (os == TargetOS.AUTO && SystemUtils.IS_OS_WINDOWS && this.getTaskRunner() instanceof Process)
-        ) {
+        if (this.isWindowsTarget()) {
             return List.of("");
         }
         // errexit option may be unsupported by non-shell interpreter.
         return List.of("set -e");
+    }
+
+    // If targetOS is Windows OR targetOS is AUTO && current system is windows and we use process as a runner.(TLDR will run on windows)
+    private boolean isWindowsTarget() {
+        TargetOS os = this.getTargetOS();
+        return os == TargetOS.WINDOWS ||
+            (os == TargetOS.AUTO && SystemUtils.IS_OS_WINDOWS && this.getTaskRunner() instanceof Process);
+    }
+
+    private boolean isKotlpEnabled() {
+        return this.kotlp != null && this.kotlp.isEnabled();
+    }
+
+    // kotlp is a single portable binary; Windows only needs it renamed with an '.exe' extension.
+    private String kotlpBinaryName() {
+        return this.isWindowsTarget() ? KotlpUtils.WINDOWS_BINARY_NAME : KotlpUtils.BINARY_NAME;
     }
 }

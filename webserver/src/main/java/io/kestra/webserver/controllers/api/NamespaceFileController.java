@@ -1,10 +1,11 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,28 +20,28 @@ import java.util.zip.ZipOutputStream;
 import org.apache.commons.lang3.tuple.Pair;
 
 import io.kestra.core.exceptions.FlowProcessingException;
-import io.kestra.core.models.FetchVersion;
 import io.kestra.core.models.QueryFilter;
 import io.kestra.core.models.namespaces.files.NamespaceFileMetadata;
+import io.kestra.core.namespace.NamespaceFileService;
 import io.kestra.core.repositories.ArrayListTotal;
-import io.kestra.core.repositories.NamespaceFileMetadataRepositoryInterface;
+import io.kestra.core.security.ProtectedZipInputStream;
+import io.kestra.core.security.SecurityConfiguration;
 import io.kestra.core.services.FlowService;
 import io.kestra.core.storages.*;
 import io.kestra.core.tenant.TenantService;
-import io.kestra.webserver.annotations.RequirePermission;
-import io.kestra.webserver.models.auth.Permission;
 
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.Pageable;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
-import io.micronaut.validation.Validated;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.inject.Inject;
@@ -49,10 +50,13 @@ import lombok.extern.slf4j.Slf4j;
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
 @Slf4j
-@Validated
 @Controller("/api/v1/{tenant}/namespaces")
 public class NamespaceFileController {
     public static final String FLOWS_FOLDER = "_flows";
+
+    // Maximum length of a single file-name component on common filesystems (e.g. 255 bytes on ext4).
+    private static final int MAX_FILE_NAME_LENGTH = 255;
+
     @Inject
     private StorageInterface storageInterface;
     @Inject
@@ -62,7 +66,9 @@ public class NamespaceFileController {
     @Inject
     private NamespaceFactory namespaceFactory;
     @Inject
-    private NamespaceFileMetadataRepositoryInterface namespaceFileMetadataRepository;
+    private NamespaceFileService namespaceFileService;
+    @Inject
+    private SecurityConfiguration securityConfiguration;
 
     private final List<Pattern> forbiddenPathPatterns = List.of(
         Pattern.compile("/" + FLOWS_FOLDER + "(/.*)?$")
@@ -88,7 +94,7 @@ public class NamespaceFileController {
         @Nullable @Parameter(description = "The revision, if not provided, the latest revision will be returned") @QueryValue Integer revision) throws IOException, URISyntaxException {
         URI encodedPath = null;
         if (path != null) {
-            encodedPath = new URI(URLEncoder.encode(path, StandardCharsets.UTF_8));
+            encodedPath = toFileUri(path);
         }
         forbiddenPathsGuard(encodedPath);
 
@@ -107,7 +113,7 @@ public class NamespaceFileController {
         @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path) throws IOException, URISyntaxException {
         URI encodedPath = null;
         if (path != null) {
-            encodedPath = new URI(URLEncoder.encode(path, StandardCharsets.UTF_8));
+            encodedPath = toFileUri(path);
         }
         forbiddenPathsGuard(encodedPath);
 
@@ -133,18 +139,13 @@ public class NamespaceFileController {
         @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path) throws IOException, URISyntaxException {
         URI encodedPath = null;
         if (path != null) {
-            encodedPath = new URI(URLEncoder.encode(path, StandardCharsets.UTF_8));
+            encodedPath = toFileUri(path);
         }
         forbiddenPathsGuard(encodedPath);
 
         encodedPath = Optional.ofNullable(encodedPath).orElse(URI.create("/"));
 
-        ArrayListTotal<NamespaceFileMetadata> namespaceFileMetadata = namespaceFileMetadataRepository.find(
-            Pageable.UNPAGED, tenantService.resolveTenant(), List.of(
-                QueryFilter.builder().field(QueryFilter.Field.NAMESPACE).operation(QueryFilter.Op.EQUALS).value(namespace).build(),
-                QueryFilter.builder().field(QueryFilter.Field.PATH).operation(QueryFilter.Op.EQUALS).value(encodedPath.getPath()).build()
-            ), true, FetchVersion.ALL
-        );
+        ArrayListTotal<NamespaceFileMetadata> namespaceFileMetadata = namespaceFileService.findRevisions(tenantService.resolveTenant(), namespace, encodedPath.getPath());
 
         if (
             namespaceFileMetadata.stream()
@@ -155,7 +156,7 @@ public class NamespaceFileController {
             throw new FileNotFoundException("File not found: " + encodedPath.getPath());
         }
 
-        return namespaceFileMetadata.map(metadata -> new NamespaceFileRevision(metadata.getVersion()));
+        return namespaceFileMetadata.map(metadata -> new NamespaceFileRevision(metadata.getRevision()));
     }
 
     @ExecuteOn(TaskExecutors.IO)
@@ -167,7 +168,7 @@ public class NamespaceFileController {
         @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path) throws IOException, URISyntaxException {
         URI encodedPath = null;
         if (path != null) {
-            encodedPath = new URI(URLEncoder.encode(path, StandardCharsets.UTF_8));
+            encodedPath = toFileUri(path);
         }
         forbiddenPathsGuard(encodedPath);
 
@@ -194,7 +195,7 @@ public class NamespaceFileController {
         @Parameter(description = "The internal storage uri") @Nullable @QueryValue String path) throws IOException, URISyntaxException {
         URI encodedPath = null;
         if (path != null) {
-            encodedPath = new URI(URLEncoder.encode(path, StandardCharsets.UTF_8));
+            encodedPath = toFileUri(path);
         }
         forbiddenPathsGuard(encodedPath);
 
@@ -217,7 +218,7 @@ public class NamespaceFileController {
         String tenantId = tenantService.resolveTenant();
         List<NamespaceFile> createdFiles = new ArrayList<>();
         if (fileContent.getFilename().toLowerCase().endsWith(".zip")) {
-            try (ZipInputStream archive = new ZipInputStream(fileContent.getInputStream())) {
+            try (ZipInputStream archive = ProtectedZipInputStream.of(fileContent.getInputStream(), securityConfiguration.zipBombProtection())) {
                 ZipEntry entry;
                 while ((entry = archive.getNextEntry()) != null) {
                     if (entry.isDirectory()) {
@@ -225,7 +226,7 @@ public class NamespaceFileController {
                     }
 
                     try (BufferedInputStream inputStream = new BufferedInputStream(new ByteArrayInputStream(archive.readAllBytes()))) {
-                        createdFiles.addAll(putNamespaceFile(tenantId, namespace, URI.create("/" + entry.getName()), inputStream));
+                        createdFiles.addAll(putNamespaceFile(tenantId, namespace, toFileUri("/" + entry.getName()), inputStream));
                     }
                 }
             }
@@ -237,7 +238,7 @@ public class NamespaceFileController {
                     return (int) fileContent.getSize();
                 }
             }) {
-                createdFiles.addAll(putNamespaceFile(tenantId, namespace, new URI(URLEncoder.encode(path, StandardCharsets.UTF_8)), inputStream));
+                createdFiles.addAll(putNamespaceFile(tenantId, namespace, toFileUri(path), inputStream));
             }
         }
 
@@ -257,6 +258,16 @@ public class NamespaceFileController {
             return Collections.emptyList();
         }
         forbiddenPathsGuard(path);
+
+        // Reject over-long names before writing: otherwise the filesystem raises ENAMETOOLONG, which
+        // surfaces as a 500 leaking the absolute internal-storage path. The limit is per path component
+        // (255 bytes on common filesystems), so we check each segment rather than the whole path — a
+        // valid multi-component path must not be rejected. Return a clean 4xx instead.
+        for (Path component : Path.of(filePath)) {
+            if (component.toString().length() > MAX_FILE_NAME_LENGTH) {
+                throw new IllegalArgumentException("A file or folder name exceeds the maximum length of " + MAX_FILE_NAME_LENGTH + " characters.");
+            }
+        }
 
         Namespace namespaceStorage = namespaceFactory.of(tenantId, namespace, storageInterface);
         return namespaceStorage.putFile(Path.of(path.getPath()), inputStream);
@@ -292,17 +303,6 @@ public class NamespaceFileController {
                         archive.closeEntry();
                     }
                 }));
-
-            flowService.findByNamespaceWithSource(tenantId, namespace).forEach(throwConsumer(flowWithSource ->
-            {
-                try {
-                    archive.putNextEntry(new ZipEntry(FLOWS_FOLDER + "/" + flowWithSource.getId() + ".yml"));
-                    archive.write(flowWithSource.getSource().getBytes());
-                    archive.closeEntry();
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }));
 
             archive.finish();
 
@@ -346,7 +346,7 @@ public class NamespaceFileController {
         if (!path.startsWith("/")) {
             path = "/" + path;
         }
-        encodedPath = new URI(URLEncoder.encode(path, StandardCharsets.UTF_8));
+        encodedPath = toFileUri(path);
         ensureWritableNamespaceFile(encodedPath);
 
         String pathWithoutScheme = encodedPath.getPath();
@@ -356,7 +356,7 @@ public class NamespaceFileController {
         String zombieAwarePathToDelete = pathWithoutScheme;
         String parentPathToCheck = NamespaceFileMetadata.parentPath(zombieAwarePathToDelete);
         while (
-            parentPathToCheck != null && !parentPathToCheck.equals("/") && namespaceFileMetadataRepository.find(
+            parentPathToCheck != null && !parentPathToCheck.equals("/") && namespaceFileService.findMetadata(
                 Pageable.from(1, 2), tenantService.resolveTenant(), List.of(
                     QueryFilter.builder().field(QueryFilter.Field.PARENT_PATH).operation(QueryFilter.Op.EQUALS).value(parentPathToCheck).build()
                 ), false
@@ -370,9 +370,23 @@ public class NamespaceFileController {
         return namespaceStorage.delete(Path.of(zombieAwarePathToDelete));
     }
 
+    /**
+     * Builds a URI from an already-decoded namespace file path.
+     * Uses the multi-argument URI constructor so that only URI-illegal characters are percent-encoded
+     * (e.g. space → %20) while legal characters such as '+' are preserved,
+     * keeping "a b.txt" and "a+b.txt" as two distinct paths.
+     */
+    private static URI toFileUri(String path) throws URISyntaxException {
+        return new URI(null, null, path, null);
+    }
+
     private void forbiddenPathsGuard(URI path) {
         if (path == null) {
             return;
+        }
+
+        if (path.getPath() == null) {
+            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "The path '%s' is not a valid hierarchical path.".formatted(path));
         }
 
         if (forbiddenPathPatterns.stream().anyMatch(pattern -> pattern.matcher(path.getPath()).matches())) {

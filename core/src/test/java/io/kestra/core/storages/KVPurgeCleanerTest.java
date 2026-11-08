@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import io.kestra.core.exceptions.ResourceExpiredException;
 import io.kestra.core.repositories.FlowRepositoryInterface;
-import io.kestra.core.repositories.KvMetadataRepositoryInterface;
+import io.kestra.core.runners.KVMetadataStateStore;
 import io.kestra.core.storages.kv.InternalKVStore;
 import io.kestra.core.storages.kv.KVEntry;
 import io.kestra.core.storages.kv.KVMetadata;
@@ -36,7 +36,7 @@ public class KVPurgeCleanerTest {
     private StorageInterface storageInterface;
 
     @Inject
-    private KvMetadataRepositoryInterface kvMetadataRepository;
+    private KVMetadataStateStore kvMetadataStateStore;
 
     @Inject
     private FlowRepositoryInterface flowRepository;
@@ -50,7 +50,7 @@ public class KVPurgeCleanerTest {
     @Property(name = "kestra.kv.purge-expired.batch-size", value = "2")
     void should_purge_expired_kv_entries() throws IOException, ResourceExpiredException {
         String namespace1 = "io.kestra." + IdUtils.create();
-        InternalKVStore kvStore1 = new InternalKVStore(MAIN_TENANT, namespace1, storageInterface, kvMetadataRepository);
+        InternalKVStore kvStore1 = new InternalKVStore(MAIN_TENANT, namespace1, storageInterface, kvMetadataStateStore);
         String expiredKey1 = "key1";
         kvStore1.put(expiredKey1, new KVValueAndMetadata(new KVMetadata(null, Instant.now().minusSeconds(1)), "expired"));
         String expiredKey12 = "key2";
@@ -63,14 +63,14 @@ public class KVPurgeCleanerTest {
         kvStore1.put(key1, new KVValueAndMetadata(new KVMetadata(null), "present1"));
 
         String namespace2 = "io.kestra." + IdUtils.create();
-        InternalKVStore kvStore2 = new InternalKVStore(MAIN_TENANT, namespace2, storageInterface, kvMetadataRepository);
+        InternalKVStore kvStore2 = new InternalKVStore(MAIN_TENANT, namespace2, storageInterface, kvMetadataStateStore);
         String expiredKey2 = IdUtils.create() + "_expired";
         kvStore2.put(expiredKey2, new KVValueAndMetadata(new KVMetadata(null, Instant.now().minusSeconds(1)), "expired"));
         String key2 = IdUtils.create();
         kvStore2.put(key2, new KVValueAndMetadata(new KVMetadata(null), "present2"));
 
         String namespace3 = "io.kestra." + IdUtils.create();
-        InternalKVStore kvStore3 = new InternalKVStore(MAIN_TENANT, namespace3, storageInterface, kvMetadataRepository);
+        InternalKVStore kvStore3 = new InternalKVStore(MAIN_TENANT, namespace3, storageInterface, kvMetadataStateStore);
         String expiredKey3 = IdUtils.create() + "_expired";
         kvStore3.put(expiredKey3, new KVValueAndMetadata(new KVMetadata(null, Instant.now().minusSeconds(1)), "expired"));
         String key3 = IdUtils.create();
@@ -80,15 +80,15 @@ public class KVPurgeCleanerTest {
 
         kvPurgeCleaner.purgeExpired();
 
-        List<KVEntry> kvEntries1 = kvStore1.listAll();
+        List<KVEntry> kvEntries1 = kvStore1.list();
         assertThat(kvEntries1).hasSize(1);
         assertThat(kvStore1.getValue(kvEntries1.getFirst().key()).get().value()).isEqualTo("present1");
 
-        List<KVEntry> kvEntries2 = kvStore2.listAll();
+        List<KVEntry> kvEntries2 = kvStore2.list();
         assertThat(kvEntries2).hasSize(1);
         assertThat(kvStore2.getValue(kvEntries2.getFirst().key()).get().value()).isEqualTo("present2");
 
-        List<KVEntry> kvEntries3 = kvStore3.listAll();
+        List<KVEntry> kvEntries3 = kvStore3.list();
         assertThat(kvEntries3).hasSize(1);
         assertThat(kvStore3.getValue(kvEntries3.getFirst().key()).get().value()).isEqualTo("present3");
     }

@@ -4,7 +4,6 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
-import io.micronaut.core.annotation.Introspected;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -14,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor
-@Introspected
 @ToString
 @Slf4j
 @EqualsAndHashCode

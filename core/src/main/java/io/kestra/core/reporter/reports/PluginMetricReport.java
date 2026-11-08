@@ -16,7 +16,6 @@ import io.kestra.core.reporter.Types;
 import io.kestra.core.utils.ListUtils;
 
 import io.micrometer.core.instrument.Timer;
-import io.micronaut.core.annotation.Introspected;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import lombok.Builder;
@@ -31,7 +30,7 @@ public class PluginMetricReport extends AbstractReportable<PluginMetricReport.Pl
     @Inject
     public PluginMetricReport(PluginRegistry pluginRegistry,
         MetricRegistry metricRegistry) {
-        super(Types.PLUGIN_METRICS, Schedules.daily(), false);
+        super(Types.PLUGIN_METRICS, Schedules.hourly(), false);
         this.metricRegistry = metricRegistry;
         this.pluginRegistry = pluginRegistry;
 
@@ -53,7 +52,6 @@ public class PluginMetricReport extends AbstractReportable<PluginMetricReport.Pl
     }
 
     @Builder
-    @Introspected
     public record PluginMetricEvent(
         List<PluginMetric> pluginMetrics) implements Event {
     }

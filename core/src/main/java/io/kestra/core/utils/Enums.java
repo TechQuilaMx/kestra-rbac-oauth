@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import jakarta.annotation.Nullable;
@@ -16,6 +17,8 @@ import jakarta.validation.constraints.NotNull;
  * Utility method for Enums.
  */
 public final class Enums {
+
+    public static final Pattern NORMALIZE = Pattern.compile("([a-z])([A-Z])");
 
     /**
      * Gets the enum for specified string name.
@@ -144,6 +147,11 @@ public final class Enums {
             case String stringValue -> List.of(Enum.valueOf(enumClass, stringValue.toUpperCase()));
             default -> throw new IllegalArgumentException("Field requires a " + enumClass.getSimpleName() + " or List<" + enumClass.getSimpleName() + "> value");
         };
+    }
+
+    public static <T extends Enum<T>> T fromClassName(final Object o, final Class<T> enumType) {
+        String name = NORMALIZE.matcher(o.getClass().getSimpleName()).replaceAll("$1_$2").toUpperCase(Locale.ROOT);
+        return Enums.getForNameIgnoreCase(name, enumType);
     }
 
     private Enums() {

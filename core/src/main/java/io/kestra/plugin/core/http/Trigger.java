@@ -8,11 +8,9 @@ import java.util.Optional;
 import org.slf4j.Logger;
 
 import io.kestra.core.http.client.configurations.HttpConfiguration;
-import io.kestra.core.http.client.configurations.SslOptions;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.conditions.ConditionContext;
-import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.*;
 import io.kestra.core.runners.RunContext;
@@ -136,7 +134,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     private Property<Boolean> encryptBody = Property.ofValue(false);
 
     @Override
-    public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
+    public Optional<TriggerEvaluationResult> eval(ConditionContext conditionContext, TriggerContext context) throws Exception {
         RunContext runContext = conditionContext.getRunContext();
         Logger logger = runContext.logger();
 
@@ -145,7 +143,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
         }
         // we allow failed status code as it is the condition that must determine whether we trigger the flow
         options.setAllowFailed(Property.ofValue(true));
-        options.setSsl(this.options.getSsl() != null ? this.options.getSsl() : this.sslOptions);
+        options.setSsl(this.options.getSsl());
 
         var request = Request.builder()
             .uri(this.uri)
@@ -172,26 +170,9 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
         Map<String, Object> responseVariables = Map.of("response", response);
         String renderedCondition = runContext.render(this.responseCondition).as(String.class, responseVariables).orElse(null);
         if (TruthUtils.isTruthy(renderedCondition)) {
-            Execution execution = TriggerService.generateExecution(this, conditionContext, context, output);
-
-            return Optional.of(execution);
+            return Optional.of(TriggerService.generateEvaluationResult(this, conditionContext, output));
         }
 
         return Optional.empty();
-    }
-
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @Deprecated
-    private SslOptions sslOptions;
-
-    @Deprecated
-    public void sslOptions(SslOptions sslOptions) {
-        if (this.options == null) {
-            this.options = HttpConfiguration.builder()
-                .build();
-        }
-
-        this.sslOptions = sslOptions;
-        this.options.setSsl(sslOptions);
     }
 }

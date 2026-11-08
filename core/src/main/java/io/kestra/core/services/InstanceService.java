@@ -1,5 +1,7 @@
 package io.kestra.core.services;
 
+import java.util.Optional;
+
 import io.kestra.core.models.Setting;
 import io.kestra.core.repositories.SettingRepositoryInterface;
 import io.kestra.core.utils.IdUtils;
@@ -15,8 +17,8 @@ public class InstanceService {
     private final SettingRepositoryInterface settingRepository;
 
     @Inject
-    public InstanceService(SettingRepositoryInterface settingRepository) {
-        this.settingRepository = settingRepository;
+    public InstanceService(Optional<SettingRepositoryInterface> settingRepository) {
+        this.settingRepository = settingRepository.orElse(null);
     }
 
     private volatile Setting instanceIdSetting;

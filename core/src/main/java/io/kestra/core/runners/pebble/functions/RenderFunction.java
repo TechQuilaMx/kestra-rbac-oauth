@@ -12,7 +12,6 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.pebbletemplates.pebble.error.PebbleException;
-import io.pebbletemplates.pebble.extension.Function;
 import io.pebbletemplates.pebble.template.EvaluationContext;
 import io.pebbletemplates.pebble.template.EvaluationContextImpl;
 import io.pebbletemplates.pebble.template.PebbleTemplate;
@@ -21,7 +20,9 @@ import jakarta.inject.Singleton;
 
 @Singleton
 @Requires(property = "kestra.variables.recursive-rendering", value = StringUtils.FALSE, defaultValue = StringUtils.FALSE)
-public class RenderFunction implements Function, RenderingFunctionInterface {
+public class RenderFunction implements KestraFunction, RenderingFunctionInterface {
+    public static final String NAME = "render";
+
     @Inject
     private ApplicationContext applicationContext;
 
@@ -33,14 +34,24 @@ public class RenderFunction implements Function, RenderingFunctionInterface {
     }
 
     @Override
+    public Map<String, String> getArgumentDefaults() {
+        return Map.of(
+            "toRender", "inputs.inputWithPebble",
+            "recursive", "true"
+        );
+    }
+
+    @Override
     public Object execute(Map<String, Object> args, PebbleTemplate self, EvaluationContext context, int lineNumber) {
         int depth = context.getVariable(VariableRenderer.RENDER_DEPTH_VAR) instanceof Number n ? n.intValue() : 0;
         int maxDepth = variableConfiguration.getMaxRenderDepth();
         if (depth >= maxDepth) {
-            throw new PebbleException(null,
+            throw new PebbleException(
+                null,
                 "Maximum render() nesting depth (" + maxDepth + ") exceeded at line " + lineNumber +
                     " — check for circular render() calls in your template.",
-                lineNumber, self.getName());
+                lineNumber, self.getName()
+            );
         }
 
         if (!args.containsKey("toRender")) {

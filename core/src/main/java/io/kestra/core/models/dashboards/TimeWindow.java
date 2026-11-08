@@ -8,14 +8,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.kestra.core.validations.DashboardWindowValidation;
 
-import io.micronaut.core.annotation.Introspected;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 @SuperBuilder(toBuilder = true)
 @Getter
 @NoArgsConstructor
-@Introspected
 @ToString
 @EqualsAndHashCode
 @DashboardWindowValidation

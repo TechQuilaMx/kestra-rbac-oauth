@@ -1,6 +1,7 @@
 package io.kestra.plugin.core.flow;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -23,11 +24,13 @@ import io.kestra.core.runners.FlowableUtils;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.utils.GraphUtils;
 import io.kestra.core.utils.ListUtils;
+import io.kestra.core.utils.MapUtils;
 import io.kestra.core.utils.TruthUtils;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -39,7 +42,7 @@ import lombok.experimental.SuperBuilder;
 @Schema(
     title = "Branch tasks based on a rendered condition.",
     description = """
-        Renders `condition` and coerces it to boolean (empty string/0/null is false, everything else true). Executes `then` when true, `_else` when false, with optional `errors`/`finally` blocks.
+        Renders `condition` and coerces it to boolean (the strings `false`, `0`, `-0`, an empty string and null are false; every other value is true). Executes `then` when true, `else` when false, with optional `errors`/`finally` blocks.
 
         Frequently used after previous task results to drive control flow."""
 )
@@ -70,17 +73,17 @@ import lombok.experimental.SuperBuilder;
                         message: "Condition was false"
                 """
         )
-    },
-    aliases = "io.kestra.core.tasks.flows.If"
+    }
 )
 public class If extends Task implements FlowableTask<If.Output> {
     @Schema(
         title = "The `If` condition which can be any expression that evaluates to a boolean value.",
-        description = "Boolean coercion allows 0, -0, null and '' to evaluate to false, all other values will evaluate to true."
+        description = "Boolean coercion evaluates the strings 'false', '0', '-0', an empty string and null to false; all other values evaluate to true."
     )
     // Note: we can't use Property<String> here because of the cache of the property evaluation which causes issue when using If in a ForEach with concurrencyLimit > 1!
     // See https://github.com/kestra-io/kestra/issues/8697
     // At some point, if we need it, we should allow bypassing (or clearing) the property evaluation cache
+    @NotNull
     @PluginProperty(dynamic = true)
     private String condition;
 
@@ -156,15 +159,16 @@ public class If extends Task implements FlowableTask<If.Output> {
 
     @Override
     public List<ResolvedTask> childTasks(RunContext runContext, TaskRun parentTaskRun) throws IllegalVariableEvaluationException {
-        // We need to evaluate the condition once, so if the condition is impacted during the processing or a branch, the same branch is always taken.
+        // We need to evaluate the condition once, so if the condition is impacted during the processing of a branch, the same branch is always taken.
         // This can exist for ex if the condition is based on a KV and the KV is changed in the branch.
         // For this, we evaluate the condition in the outputs() method and get it from the outputs.
         // But unfortunately, the output may not have yet been computed in some cases, like if the task is inside a flowable, in this case we compute the result anyway.
+        Map<String, Object> outputs = runContext.currentOutput();
         Boolean evaluationResult;
-        if (parentTaskRun.getOutputs() == null || parentTaskRun.getOutputs().get("evaluationResult") == null) {
+        if (MapUtils.isEmpty(outputs) || outputs.get("evaluationResult") == null) {
             evaluationResult = isTrue(runContext);
         } else {
-            evaluationResult = (Boolean) parentTaskRun.getOutputs().get("evaluationResult");
+            evaluationResult = (Boolean) outputs.get("evaluationResult");
         }
 
         if (Boolean.TRUE.equals(evaluationResult)) {

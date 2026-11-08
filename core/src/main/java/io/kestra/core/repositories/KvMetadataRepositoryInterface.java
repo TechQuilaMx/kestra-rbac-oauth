@@ -11,7 +11,7 @@ import io.kestra.core.models.kv.PersistedKvMetadata;
 
 import io.micronaut.data.model.Pageable;
 
-public interface KvMetadataRepositoryInterface extends SaveRepositoryInterface<PersistedKvMetadata> {
+public interface KvMetadataRepositoryInterface {
     Set<String> findDistinctNamespace(String tenantId);
 
     Optional<PersistedKvMetadata> findByName(
@@ -35,6 +35,8 @@ public interface KvMetadataRepositoryInterface extends SaveRepositoryInterface<P
         boolean allowDeleted,
         boolean allowExpired,
         FetchVersion fetchBehavior);
+
+    PersistedKvMetadata save(PersistedKvMetadata item);
 
     default PersistedKvMetadata delete(PersistedKvMetadata persistedKvMetadata) throws IOException {
         return this.save(persistedKvMetadata.toDeleted());
