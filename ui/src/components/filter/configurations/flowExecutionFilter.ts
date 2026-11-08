@@ -1,10 +1,11 @@
-import {computed, ComputedRef} from "vue";
-import {FilterConfiguration, Comparators} from "../utils/filterTypes";
-import {useValues} from "../composables/useValues";
-import {useI18n} from "vue-i18n";
+import {computed, ComputedRef} from "vue"
+import {FilterConfiguration, Comparators, FilterMeta} from "@kestra-io/design-system"
+import {useValues} from "../composables/useValues"
+import {useI18n} from "vue-i18n"
+import {labelComparatorLabels} from "./labelComparatorLabels"
 
 export const useFlowExecutionFilter = (): ComputedRef<FilterConfiguration> => {
-    const {t} = useI18n();
+    const {t} = useI18n()
 
     return computed(() => {
         return {
@@ -18,23 +19,24 @@ export const useFlowExecutionFilter = (): ComputedRef<FilterConfiguration> => {
                     comparators: [Comparators.IN, Comparators.NOT_IN],
                     valueType: "multi-select",
                     valueProvider: async () => {
-                        const {VALUES} = useValues("executions");
-                        return VALUES.EXECUTION_STATES;
+                        const {VALUES} = useValues("executions")
+                        return VALUES.EXECUTION_STATES
                     },
                     searchable: true,
-                    visibleByDefault: true
+                    visibleByDefault: true,
+                    colored: true,
                 },
                 {
                     key: "scope",
                     label: t("filter.scope.label"),
                     description: t("filter.scope.description"),
-                    comparators: [Comparators.EQUALS, Comparators.NOT_EQUALS],
-                    valueType: "radio",
+                    comparators: [Comparators.IN, Comparators.NOT_IN],
+                    valueType: "multi-select",
                     valueProvider: async () => {
-                        const {VALUES} = useValues("executions");
-                        return VALUES.SCOPES;
+                        const {VALUES} = useValues("executions")
+                        return VALUES.SCOPES
                     },
-                    showComparatorSelection: false
+                    showComparatorSelection: false,
                 },
                 {
                     key: "childFilter",
@@ -43,9 +45,9 @@ export const useFlowExecutionFilter = (): ComputedRef<FilterConfiguration> => {
                     comparators: [Comparators.EQUALS],
                     valueType: "radio",
                     valueProvider: async () => {
-                        const {VALUES} = useValues("executions");
-                        return VALUES.CHILDS;
-                    }
+                        const {VALUES} = useValues("executions")
+                        return VALUES.CHILDS
+                    },
                 },
                 {
                     key: "kind",
@@ -54,9 +56,9 @@ export const useFlowExecutionFilter = (): ComputedRef<FilterConfiguration> => {
                     comparators: [Comparators.EQUALS],
                     valueType: "radio",
                     valueProvider: async () => {
-                        const {VALUES} = useValues("executions");
-                        return VALUES.KINDS;
-                    }
+                        const {VALUES} = useValues("executions")
+                        return VALUES.KINDS
+                    },
                 },
                 {
                     key: "timeRange",
@@ -64,29 +66,40 @@ export const useFlowExecutionFilter = (): ComputedRef<FilterConfiguration> => {
                     description: t("filter.timeRange.description"),
                     comparators: [Comparators.EQUALS],
                     valueType: "select",
+                    groupable: false,
                     valueProvider: async () => {
-                        const {VALUES} = useValues("executions");
-                        return VALUES.RELATIVE_DATE;
+                        const {VALUES} = useValues("executions")
+                        return VALUES.RELATIVE_DATE
                     },
                     dateFilterOptions: [
                         {value: "START_DATE", label: t("filter.timeRange.dateFilter.startDate")},
                         {value: "END_DATE", label: t("filter.timeRange.dateFilter.endDate")},
-                        {value: "START_OR_END_DATE", label: t("filter.timeRange.dateFilter.startOrEndDate")}
+                        {value: "START_OR_END_DATE", label: t("filter.timeRange.dateFilter.startOrEndDate")},
                     ],
-                    keyLabelProvider: (meta?: Record<string, string>) => {
+                    keyLabelProvider: (meta?: FilterMeta) => {
                         switch (meta?.dateFilter) {
-                        case "END_DATE": return t("filter.timeRange.chip.end");
-                        case "START_OR_END_DATE": return t("filter.timeRange.chip.startOrEnd");
-                        default: return t("filter.timeRange.chip.start");
+                        case "END_DATE": return t("filter.timeRange.chip.end")
+                        case "START_OR_END_DATE": return t("filter.timeRange.chip.startOrEnd")
+                        default: return t("filter.timeRange.chip.start")
                         }
-                    }
+                    },
                 },
                 {
                     key: "labels",
                     label: t("filter.labels_execution.label"),
                     description: t("filter.labels_execution.description"),
-                    comparators: [Comparators.EQUALS, Comparators.NOT_EQUALS],
+                    comparators: [
+                        Comparators.IN,
+                        Comparators.NOT_IN,
+                        Comparators.EQUALS,
+                        Comparators.CONTAINS,
+                        Comparators.NOT_CONTAINS,
+                        Comparators.IS_NOT_NULL,
+                        Comparators.IS_NULL,
+                    ],
+                    comparatorLabels: labelComparatorLabels(t),
                     valueType: "key-value",
+                    showComparatorSelection: true,
                 },
                 {
                     key: "triggerExecutionId",
@@ -97,12 +110,34 @@ export const useFlowExecutionFilter = (): ComputedRef<FilterConfiguration> => {
                         Comparators.NOT_EQUALS,
                         Comparators.CONTAINS,
                         Comparators.STARTS_WITH,
-                        Comparators.ENDS_WITH
+                        Comparators.ENDS_WITH,
                     ],
                     valueType: "text",
-                    searchable: true
-                }
-            ]
-        };
-    });
-};
+                    searchable: true,
+                },
+                {
+                    key: "parentId",
+                    label: t("filter.parentId.label"),
+                    description: t("filter.parentId.description"),
+                    comparators: [
+                        Comparators.EQUALS,
+                        Comparators.NOT_EQUALS,
+                    ],
+                    valueType: "text",
+                    searchable: true,
+                },
+                {
+                    key: "taskId",
+                    label: t("filter.taskId.label"),
+                    description: t("filter.taskId.description"),
+                    comparators: [
+                        Comparators.EQUALS,
+                        Comparators.NOT_EQUALS,
+                    ],
+                    valueType: "text",
+                    searchable: true,
+                },
+            ],
+        }
+    })
+}

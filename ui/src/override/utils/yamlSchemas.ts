@@ -1,52 +1,25 @@
-import {apiUrlWithoutTenants} from "override/utils/route";
-import {SchemasSettings} from "monaco-yaml";
-import InitialFlowSchema from "../../stores/flow-schema.json";
-
-const LOCAL_FLOW_SCHEMA_URI = `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(InitialFlowSchema))}`;
-
-const withAccessToken = (uri: string): string => {
-    try {
-        const rawTokens = sessionStorage.getItem("oauth2_tokens");
-        if (!rawTokens) {
-            return uri;
-        }
-
-        const parsedTokens = JSON.parse(rawTokens);
-        const token = parsedTokens?.accessToken;
-        if (!token) {
-            return uri;
-        }
-
-        const separator = uri.includes("?") ? "&" : "?";
-        return `${uri}${separator}token=${encodeURIComponent(token)}`;
-    } catch {
-        return uri;
-    }
-};
+import {apiUrlWithoutTenants} from "override/utils/route"
+import {SchemasSettings} from "monaco-yaml"
 
 export const yamlSchemas: () => SchemasSettings[] = () => [
     {
         fileMatch: ["flow-*.yaml"],
-        uri: LOCAL_FLOW_SCHEMA_URI
+        uri: `${apiUrlWithoutTenants()}/plugins/schemas/flow?includeCatalog=true`,
     },
     {
         fileMatch: ["task-*.yaml"],
-        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/task`)
-    },
-    {
-        fileMatch: ["template-*.yaml"],
-        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/template`)
+        uri: `${apiUrlWithoutTenants()}/plugins/schemas/task?includeCatalog=true`,
     },
     {
         fileMatch: ["trigger-*.yaml"],
-        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/trigger`)
+        uri: `${apiUrlWithoutTenants()}/plugins/schemas/trigger?includeCatalog=true`,
     },
     {
         fileMatch: ["plugindefault-*.yaml"],
-        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/plugindefault?arrayOf=true`)
+        uri: `${apiUrlWithoutTenants()}/plugins/schemas/plugindefault?arrayOf=true&includeCatalog=true`,
     },
     {
         fileMatch: ["dashboard-*.yaml"],
-        uri: withAccessToken(`${apiUrlWithoutTenants()}/plugins/schemas/dashboard`)
-    }
+        uri: `${apiUrlWithoutTenants()}/plugins/schemas/dashboard`,
+    },
 ]

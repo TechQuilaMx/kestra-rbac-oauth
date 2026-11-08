@@ -9,6 +9,7 @@ import io.kestra.core.exceptions.InvalidTriggerConfigurationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
+import io.kestra.core.scheduler.SchedulerClock;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -24,9 +25,24 @@ public interface PollingTriggerInterface extends WorkerTriggerInterface {
     Duration getInterval();
 
     /**
-     * Evaluate the trigger and create an execution if needed.
+     * Evaluate the trigger and produce a lightweight result.
+     * <p>
+     * New plugins should override this method. The default bridges to the
+     * deprecated {@link #evaluate} for backward compatibility.
      */
-    Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception;
+    default Optional<TriggerEvaluationResult> eval(ConditionContext conditionContext, TriggerContext context) throws Exception {
+        return evaluate(conditionContext, context).map(TriggerEvaluationResult::from);
+    }
+
+    /**
+     * Evaluate the trigger and create an execution if needed.
+     *
+     * @deprecated Override {@link #eval} instead.
+     */
+    @Deprecated(forRemoval = true, since = "2.0.0")
+    default Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
+        throw new UnsupportedOperationException("Implement eval() instead of evaluate()");
+    }
 
     /**
      * Compute the next evaluation date of the trigger based on the existing trigger context: by default, it uses the current date and the interval.
@@ -52,9 +68,9 @@ public interface PollingTriggerInterface extends WorkerTriggerInterface {
         Duration interval = this.getInterval();
 
         try {
-            return ZonedDateTime.now().plus(interval);
+            return SchedulerClock.now().plus(interval);
         } catch (DateTimeException | ArithmeticException e) {
-            throw new InvalidTriggerConfigurationException("Trigger interval too large", e);
+            throw new InvalidTriggerConfigurationException("Trigger interval duration too large '" + interval + "'", e);
         }
     }
 }

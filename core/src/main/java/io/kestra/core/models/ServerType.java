@@ -7,4 +7,5 @@ public enum ServerType {
     STANDALONE,
     WEBSERVER,
     WORKER,
+    CONTROLLER,
 }

@@ -5,15 +5,15 @@ import java.util.Date;
 import org.jooq.Field;
 
 import io.kestra.core.models.executions.MetricEntry;
+import io.kestra.core.repositories.RepositoryBean;
 import io.kestra.core.utils.DateUtils;
 import io.kestra.jdbc.repository.AbstractJdbcMetricRepository;
 import io.kestra.jdbc.services.JdbcFilterService;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
-import jakarta.inject.Singleton;
 
-@Singleton
+@RepositoryBean
 @H2RepositoryEnabled
 public class H2MetricRepository extends AbstractJdbcMetricRepository {
     @Inject

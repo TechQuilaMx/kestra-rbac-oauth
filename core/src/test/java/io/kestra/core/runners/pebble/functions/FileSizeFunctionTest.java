@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
-import io.pebbletemplates.pebble.error.PebbleException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -25,6 +24,7 @@ import io.kestra.core.utils.TestsUtils;
 
 import io.micronaut.context.annotation.Property;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.pebbletemplates.pebble.error.PebbleException;
 import jakarta.inject.Inject;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
@@ -184,7 +184,9 @@ public class FileSizeFunctionTest {
             "execution", Map.of("id", "notme")
         );
 
-        assertThrows(IllegalVariableEvaluationException.class, () -> variableRenderer.render("{{ fileSize('unsupported://path-to/file.txt') }}", variables));
+        var exception = assertThrows(IllegalVariableEvaluationException.class, () -> variableRenderer.render("{{ fileSize('unsupported://path-to/file.txt') }}", variables));
+        assertThat(exception.getCause()).isInstanceOf(PebbleException.class);
+        assertThat(exception.getCause().getMessage()).contains("Cannot process the URI unsupported://path-to/file.txt: scheme not supported.");
     }
 
     @Test
@@ -200,7 +202,8 @@ public class FileSizeFunctionTest {
             "file", file.toString()
         );
 
-        assertThrows(SecurityException.class, () -> variableRenderer.render("{{ fileSize(file) }}", variables));
+        var exception = assertThrows(IllegalVariableEvaluationException.class, () -> variableRenderer.render("{{ fileSize(file) }}", variables));
+        assertThat(exception.getCause()).isInstanceOf(SecurityException.class);
     }
 
     @Test
@@ -235,7 +238,8 @@ public class FileSizeFunctionTest {
             "file", file.toString()
         );
 
-        assertThrows(SecurityException.class, () -> variableRenderer.render("{{ fileSize(file) }}", variables));
+        var exception = assertThrows(IllegalVariableEvaluationException.class, () -> variableRenderer.render("{{ fileSize(file) }}", variables));
+        assertThat(exception.getCause()).isInstanceOf(SecurityException.class);
     }
 
     @Test
@@ -280,7 +284,7 @@ public class FileSizeFunctionTest {
     }
 
     private URI createFile() throws IOException {
-        File tempFile = File.createTempFile("%sfile".formatted(IdUtils.create()), ".txt");
+        File tempFile = Files.createTempFile(Path.of("/tmp"), "%sfile".formatted(IdUtils.create()), ".txt").toFile();
         Files.write(tempFile.toPath(), "Hello World".getBytes());
         return tempFile.toPath().toUri();
     }

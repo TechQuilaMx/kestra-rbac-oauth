@@ -4,10 +4,9 @@ import java.time.ZonedDateTime;
 import java.util.List;
 
 import io.kestra.core.models.executions.statistics.DailyExecutionStatistics;
-import io.kestra.core.repositories.ExecutionRepositoryInterface;
+import io.kestra.core.repositories.ExecutionStatisticsRepositoryInterface;
 import io.kestra.core.utils.DateUtils;
 
-import io.micronaut.core.annotation.Introspected;
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;
@@ -15,43 +14,36 @@ import lombok.extern.jackson.Jacksonized;
 @SuperBuilder
 @Getter
 @Jacksonized
-@Introspected
 public class ExecutionUsage {
     private final List<DailyExecutionStatistics> dailyExecutionsCount;
 
     public static ExecutionUsage of(final String tenantId,
-        final ExecutionRepositoryInterface executionRepository,
+        final ExecutionStatisticsRepositoryInterface executionStatisticRepository,
         final ZonedDateTime from,
         final ZonedDateTime to) {
 
         return ExecutionUsage.builder()
             .dailyExecutionsCount(
-                executionRepository.dailyStatistics(
-                    null,
+                executionStatisticRepository.statistics(
                     tenantId,
                     null,
                     null,
-                    null,
-                    from,
-                    to,
-                    DateUtils.GroupType.DAY,
-                    null
+                    from.toInstant(),
+                    to.toInstant(),
+                    DateUtils.GroupType.DAY
                 )
             )
             .build();
     }
 
-    public static ExecutionUsage of(final ExecutionRepositoryInterface repository,
+    public static ExecutionUsage of(final ExecutionStatisticsRepositoryInterface executionStatisticRepository,
         final ZonedDateTime from,
         final ZonedDateTime to) {
         return ExecutionUsage.builder()
             .dailyExecutionsCount(
-                repository.dailyStatisticsForAllTenants(
-                    null,
-                    null,
-                    null,
-                    from,
-                    to,
+                executionStatisticRepository.statisticsForAllTenants(
+                    from.toInstant(),
+                    to.toInstant(),
                     DateUtils.GroupType.DAY
                 )
             )

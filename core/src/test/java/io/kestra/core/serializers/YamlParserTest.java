@@ -125,8 +125,8 @@ class YamlParserTest {
     void inputs() {
         Flow flow = this.parse("flows/valids/inputs.yaml");
 
-        assertThat(flow.getInputs().size()).isEqualTo(31);
-        assertThat(flow.getInputs().stream().filter(Input::getRequired).count()).isEqualTo(12L);
+        assertThat(flow.getInputs().size()).isEqualTo(30);
+        assertThat(flow.getInputs().stream().filter(Input::getRequired).count()).isEqualTo(11L);
         assertThat(flow.getInputs().stream().filter(r -> !r.getRequired()).count()).isEqualTo(19L);
         assertThat(flow.getInputs().stream().filter(r -> r.getDefaults() != null).count()).isEqualTo(4L);
         assertThat(flow.getInputs().stream().filter(r -> r instanceof StringInput stringInput && stringInput.getValidator() != null).count()).isEqualTo(1L);
@@ -152,15 +152,14 @@ class YamlParserTest {
     }
 
     @Test
-    void listeners() {
+    void ifConditionRequired() {
         ConstraintViolationException exception = assertThrows(
             ConstraintViolationException.class,
-            () -> modelValidator.validate(this.parse("flows/invalids/listener.yaml"))
+            () -> modelValidator.validate(this.parse("flows/invalids/if-without-condition.yaml"))
         );
 
-        assertThat(exception.getConstraintViolations().size()).isEqualTo(2);
-        assertThat(new ArrayList<>(exception.getConstraintViolations()).getFirst().getMessage()).contains("must not be empty");
-        assertThat(new ArrayList<>(exception.getConstraintViolations()).get(1).getMessage()).isEqualTo("must not be empty");
+        assertThat(exception.getConstraintViolations()).hasSize(1);
+        assertThat(exception.getConstraintViolations().iterator().next().getMessage()).isEqualTo("must not be null");
     }
 
     @Test
@@ -169,7 +168,7 @@ class YamlParserTest {
 
         String s = MAPPER.writeValueAsString(flow);
         assertThat(s).isEqualTo(
-            "{\"id\":\"minimal\",\"namespace\":\"io.kestra.tests\",\"revision\":2,\"disabled\":false,\"deleted\":false,\"labels\":[{\"key\":\"system.readOnly\",\"value\":\"true\"},{\"key\":\"existing\",\"value\":\"label\"}],\"tasks\":[{\"id\":\"date\",\"type\":\"io.kestra.plugin.core.debug.Return\",\"format\":\"{{taskrun.startDate}}\"}]}"
+            "{\"id\":\"minimal\",\"namespace\":\"io.kestra.tests\",\"revision\":2,\"disabled\":false,\"deleted\":false,\"draft\":false,\"labels\":[{\"key\":\"system.readOnly\",\"value\":\"true\"},{\"key\":\"existing\",\"value\":\"label\"}],\"tasks\":[{\"id\":\"date\",\"type\":\"io.kestra.plugin.core.debug.Return\",\"format\":\"{{taskrun.startDate}}\"}]}"
         );
     }
 
@@ -191,7 +190,7 @@ class YamlParserTest {
 
         assertThat(exception.getConstraintViolations().size()).isEqualTo(2);
         assertThat(exception.getConstraintViolations().stream().filter(e -> e.getMessage().contains("Invalid type")).findFirst().orElseThrow().getMessage())
-            .contains("Invalid type: io.kestra.plugin.core.debug.MissingOne");
+            .contains("Invalid type: io.kestra.plugin.core.debug.MissingTwo");
     }
 
     @Test
@@ -229,8 +228,8 @@ class YamlParserTest {
         Optional<ConstraintViolationException> valid = modelValidator.isValid(parse);
 
         assertThat(valid.isPresent()).isTrue();
-        assertThat(valid.get().getConstraintViolations().size()).isEqualTo(10);
-        assertThat(new ArrayList<>(valid.get().getConstraintViolations()).stream().filter(r -> r.getMessage().contains("must not be empty")).count()).isEqualTo(3L);
+        assertThat(valid.get().getConstraintViolations().size()).isEqualTo(8);
+        assertThat(new ArrayList<>(valid.get().getConstraintViolations()).stream().filter(r -> r.getMessage().contains("cannot be empty")).count()).isEqualTo(3L);
     }
 
     @Test
@@ -241,7 +240,7 @@ class YamlParserTest {
         );
 
         assertThat(exception.getConstraintViolations().size()).isEqualTo(1);
-        assertThat(new ArrayList<>(exception.getConstraintViolations()).getFirst().getMessage()).contains("Duplicate field 'variables.tf'");
+        assertThat(new ArrayList<>(exception.getConstraintViolations()).getFirst().getMessage()).contains("Duplicate field 'message'");
     }
 
     @Test
@@ -254,6 +253,7 @@ class YamlParserTest {
                 "namespace: io.kestra.tests\n" +
                 "disabled: false\n" +
                 "deleted: false\n" +
+                "draft: false\n" +
                 "labels:\n" +
                 "- key: key1\n" +
                 "  value: 123\n" +

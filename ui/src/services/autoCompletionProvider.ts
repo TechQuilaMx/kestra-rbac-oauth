@@ -1,49 +1,80 @@
-import {YamlElement} from "@kestra-io/ui-libs";
-import {apiUrlWithoutTenants} from "../override/utils/route";
-import {useAxios} from "../utils/axios";
+import type {YamlElement} from "@kestra-io/topology/flow-yaml-utils"
+import {apiUrlWithoutTenants} from "../override/utils/route"
+import {useClient} from "@kestra-io/kestra-sdk"
 
-export const QUOTE = "'";
+export const QUOTE = "'"
 
-let cachedFilters: string[] | null = null;
-let cachedFunctions: string[] | null = null;
-
-export function resetExpressionCache() {
-    cachedFilters = null;
-    cachedFunctions = null;
+export interface FunctionArgument {
+    name: string;
+    defaultValue: string | null;
 }
 
-export function fillExpressionCache(filters: string[], functions: string[]) {
-    cachedFilters = filters;
-    cachedFunctions = functions;
+export interface PebbleFunctionDef {
+    name: string;
+    arguments: FunctionArgument[];
+}
+
+let cachedFilters: string[] | null = null
+let cachedFunctions: PebbleFunctionDef[] | null = null
+
+export function resetExpressionCache() {
+    cachedFilters = null
+    cachedFunctions = null
+}
+
+export function fillExpressionCache(filters: string[], functions: PebbleFunctionDef[]) {
+    cachedFilters = filters
+    cachedFunctions = functions
 }
 
 async function fetchExpressionFilters(): Promise<string[]> {
     if (cachedFilters === null) {
         try {
-            const axios = useAxios();
-            cachedFilters = (await axios.get<string[]>(`${apiUrlWithoutTenants()}/pebble/filters`)).data;
+            const axios = useClient()
+            cachedFilters = (await axios.get<string[]>(`${apiUrlWithoutTenants()}/pebble/filters`)).data
         } catch {
-            return [];
+            return []
         }
     }
-    return cachedFilters;
+    return cachedFilters
 }
 
-async function fetchExpressionFunctions(): Promise<string[]> {
+async function fetchExpressionFunctions(): Promise<PebbleFunctionDef[]> {
     if (cachedFunctions === null) {
         try {
-            const axios = useAxios();
-            cachedFunctions = (await axios.get<string[]>(`${apiUrlWithoutTenants()}/pebble/functions`)).data;
+            const axios = useClient()
+            cachedFunctions = (await axios.get<PebbleFunctionDef[]>(`${apiUrlWithoutTenants()}/pebble/functions`)).data
         } catch {
-            return [];
+            return []
         }
     }
-    return cachedFunctions;
+    return cachedFunctions
+}
+
+/**
+ * Converts a PebbleFunctionDef into a Monaco snippet string using named-argument syntax.
+ * Arguments with null defaults are omitted.
+ */
+export function functionToSnippet(fn: PebbleFunctionDef): string {
+    const argsWithDefaults = fn.arguments.filter(arg => arg.defaultValue !== null)
+    if (argsWithDefaults.length === 0) {
+        return `${fn.name}()`
+    }
+    const params = argsWithDefaults.map((arg, i) => {
+        const placeholder = `\${${i + 1}:${arg.defaultValue}}`
+        return `${arg.name}=${placeholder}`
+    }).join(", ")
+    return `${fn.name}(${params})`
+}
+
+export interface RootCompletionContext {
+    source: string
+    offset: number
 }
 
 export class PebbleAutoCompletion {
-    rootFieldAutoCompletion(): Promise<string[]> {
-        return Promise.resolve([]);
+    rootFieldAutoCompletion(_context?: RootCompletionContext): Promise<string[]> {
+        return Promise.resolve([])
     }
 
     nestedFieldAutoCompletion(_source: string, _parsed: any | undefined, _parentField: string, _cursorIndex?: number): Promise<string[]> {
@@ -51,20 +82,20 @@ export class PebbleAutoCompletion {
     }
 
     functionAutoCompletion(_parsed: any | undefined, _functionName: string, _args: Record<string, string>): Promise<string[]> {
-        return Promise.resolve([]);
+        return Promise.resolve([])
     }
 
     filterAutoCompletion(): Promise<string[]> {
-        return fetchExpressionFilters();
+        return fetchExpressionFilters()
     }
 
-    functionNames(): Promise<string[]> {
-        return fetchExpressionFunctions();
+    functionsWithDefaults(): Promise<PebbleFunctionDef[]> {
+        return fetchExpressionFunctions()
     }
 }
 
 export class YamlAutoCompletion extends PebbleAutoCompletion {
     valueAutoCompletion(_source: string, _parsed: any | undefined, _yamlElement: YamlElement | undefined): Promise<string[]> {
-        return Promise.resolve([]);
+        return Promise.resolve([])
     }
 }

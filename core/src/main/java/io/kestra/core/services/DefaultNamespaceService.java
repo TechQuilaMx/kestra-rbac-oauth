@@ -1,12 +1,12 @@
 package io.kestra.core.services;
 
 import java.util.Objects;
-import java.util.Optional;
 
 import io.kestra.core.exceptions.ResourceAccessDeniedException;
-import io.kestra.core.repositories.FlowRepositoryInterface;
+import io.kestra.core.runners.FlowMetaStoreInterface;
 
 import jakarta.inject.Inject;
+import jakarta.inject.Provider;
 import jakarta.inject.Singleton;
 
 /**
@@ -15,11 +15,11 @@ import jakarta.inject.Singleton;
 @Singleton
 public class DefaultNamespaceService implements NamespaceService {
 
-    private final Optional<FlowRepositoryInterface> flowRepository;
+    private final Provider<FlowMetaStoreInterface> flowMetaStore;
 
     @Inject
-    public DefaultNamespaceService(Optional<FlowRepositoryInterface> flowRepository) {
-        this.flowRepository = flowRepository;
+    public DefaultNamespaceService(Provider<FlowMetaStoreInterface> flowMetaStore) {
+        this.flowMetaStore = flowMetaStore;
     }
 
     /**
@@ -28,7 +28,7 @@ public class DefaultNamespaceService implements NamespaceService {
     @Override
     public boolean isNamespaceExists(String tenant, String namespace) {
         Objects.requireNonNull(namespace, "namespace cannot be null");
-        return flowRepository.map(repository -> repository.isNamespaceExists(tenant, namespace)).orElse(false);
+        return flowMetaStore.get().isNamespaceExists(tenant, namespace);
     }
 
     /**

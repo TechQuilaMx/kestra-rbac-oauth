@@ -1,18 +1,9 @@
 package io.kestra.repository.h2;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
-import org.jooq.Condition;
-import org.jooq.DSLContext;
-import org.jooq.Field;
-import org.jooq.LikeEscapeStep;
+import org.jooq.*;
 import org.jooq.Record;
-import org.jooq.RecordMapper;
-import org.jooq.Result;
-import org.jooq.SelectConditionStep;
 import org.jooq.impl.DSL;
 
 import io.kestra.core.repositories.ArrayListTotal;
@@ -22,6 +13,8 @@ import io.kestra.jdbc.repository.AbstractJdbcRepository;
 
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.data.model.Pageable;
 import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
@@ -29,7 +22,8 @@ import lombok.SneakyThrows;
 
 import static io.kestra.jdbc.repository.AbstractJdbcRepository.KEY_FIELD;
 
-@H2RepositoryEnabled
+@Requires(condition = H2Repository.H2Condition.class)
+@Requires(property = "kestra.server-type", notEquals = "WORKER")
 @EachBean(JdbcTableConfig.class)
 public class H2Repository<T> extends io.kestra.jdbc.AbstractJdbcRepository<T> {
 
@@ -91,7 +85,7 @@ public class H2Repository<T> extends io.kestra.jdbc.AbstractJdbcRepository<T> {
 
     public Condition fullTextCondition(List<String> fields, String query) {
         if (query == null || query.equals("*")) {
-            return DSL.trueCondition();
+            return DSL.noCondition();
         }
 
         if (fields.size() > 1) {
@@ -100,9 +94,10 @@ public class H2Repository<T> extends io.kestra.jdbc.AbstractJdbcRepository<T> {
 
         Field<Object> field = AbstractJdbcRepository.field(fields.getFirst());
 
-        List<LikeEscapeStep> match = Arrays
+        List<Condition> match = Arrays
             .stream(query.split("\\p{P}|\\p{S}|\\p{Z}"))
-            .map(s -> field.likeIgnoreCase("%" + s.toUpperCase(Locale.ROOT) + "%"))
+            .filter(s -> !s.isEmpty())
+            .map(s -> field.likeIgnoreCase("%" + escapeForLike(s.toUpperCase(Locale.ROOT)) + "%").escape('\\'))
             .toList();
 
         if (match.isEmpty()) {
@@ -110,6 +105,13 @@ public class H2Repository<T> extends io.kestra.jdbc.AbstractJdbcRepository<T> {
         }
 
         return DSL.and(match);
+    }
+
+    private static String escapeForLike(String s) {
+        return s
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_");
     }
 
     @SuppressWarnings("unchecked")
@@ -121,7 +123,7 @@ public class H2Repository<T> extends io.kestra.jdbc.AbstractJdbcRepository<T> {
                         .sort(select, pageable)
                         .asTable("page")
                 )
-                .where(DSL.trueCondition()),
+                .where(DSL.noCondition()),
             pageable
         )
             .fetch();
@@ -132,5 +134,16 @@ public class H2Repository<T> extends io.kestra.jdbc.AbstractJdbcRepository<T> {
             .map((Record record) -> mapper.map((R) record));
 
         return new ArrayListTotal<>(map, totalCount);
+    }
+
+    // We need to create H2 repositories for the queue as it uses an H2Repository named 'queue',
+    // we may find a way to only create this one at some point as here we create unnecessary beans.
+    static class H2Condition implements io.micronaut.context.condition.Condition {
+        @Override
+        public boolean matches(ConditionContext context) {
+            boolean isRepository = ((Optional<String>) context.get("kestra.repository.type", String.class)).map(it -> "h2".equals(it) || "memory".equals(it)).orElse(false);
+            boolean isQueue = ((Optional<String>) context.get("kestra.queue.type", String.class)).map(it -> "h2".equals(it) || "memory".equals(it)).orElse(false);
+            return isRepository || isQueue;
+        }
     }
 }

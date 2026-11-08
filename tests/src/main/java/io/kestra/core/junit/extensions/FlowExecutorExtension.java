@@ -1,6 +1,5 @@
 package io.kestra.core.junit.extensions;
 
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -20,15 +19,14 @@ import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.repositories.LocalFlowRepositoryLoader;
 import io.kestra.core.runners.TestRunnerUtils;
 import io.kestra.core.serializers.YamlParser;
+import io.kestra.core.services.FlowService;
 import io.kestra.core.utils.TestsUtils;
 
-import io.micronaut.context.ApplicationContext;
 import lombok.SneakyThrows;
 
-import static io.kestra.core.junit.extensions.ExtensionUtils.loadFile;
+import static io.kestra.core.utils.Rethrow.throwConsumer;
 
-public class FlowExecutorExtension implements AfterEachCallback, ParameterResolver {
-    private ApplicationContext context;
+public class FlowExecutorExtension extends AbstractLoaderExtension implements AfterEachCallback, ParameterResolver {
 
     @Override
     public boolean supportsParameter(ParameterContext parameterContext,
@@ -40,14 +38,8 @@ public class FlowExecutorExtension implements AfterEachCallback, ParameterResolv
     @Override
     public Object resolveParameter(ParameterContext parameterContext,
         ExtensionContext extensionContext) throws ParameterResolutionException {
-        if (context == null) {
-            context = extensionContext.getRoot().getStore(ExtensionContext.Namespace.create(KestraTestExtension.class, extensionContext.getTestClass().get()))
-                .get(ApplicationContext.class, ApplicationContext.class);
-
-            if (context == null) {
-                throw new IllegalStateException("No application context, to use '@LoadFlows' annotation, you need to add '@KestraTest'");
-            }
-        }
+        loadApplicationContext(extensionContext);
+        abortIfContextStopped();
 
         ExecuteFlow executeFlow = getExecuteFlow(extensionContext);
         String tenantId = executeFlow.tenantId();
@@ -57,6 +49,7 @@ public class FlowExecutorExtension implements AfterEachCallback, ParameterResolv
         if (url == null) {
             throw new IllegalArgumentException("Unable to load flow: " + path);
         }
+        createTenant(extensionContext, tenantId);
         LocalFlowRepositoryLoader repositoryLoader = context.getBean(LocalFlowRepositoryLoader.class);
         TestsUtils.loads(tenantId, repositoryLoader, Objects.requireNonNull(url));
 
@@ -66,23 +59,28 @@ public class FlowExecutorExtension implements AfterEachCallback, ParameterResolv
     }
 
     @Override
-    public void afterEach(ExtensionContext extensionContext) throws URISyntaxException {
+    public void afterEach(ExtensionContext extensionContext) throws Exception {
+        if (!isContextRunning()) {
+            return;
+        }
+
         ExecuteFlow executeFlow = getExecuteFlow(extensionContext);
         FlowRepositoryInterface flowRepository = context.getBean(FlowRepositoryInterface.class);
+        FlowService flowService = context.getBean(FlowService.class);
 
         String path = executeFlow.value();
-        URL resource = loadFile(path);
-        Flow loadedFlow = YamlParser.parse(Paths.get(resource.toURI()).toFile(), Flow.class);
+        Flow loadedFlow = getFlow(path);
         flowRepository.findAllForAllTenants().stream()
             .filter(flow -> Objects.equals(flow.getId(), loadedFlow.getId()))
             .filter(flow -> Objects.equals(flow.getTenantId(), executeFlow.tenantId()))
-            .forEach(flow -> flowRepository.delete(FlowWithSource.of(flow, "unused")));
+            .forEach(throwConsumer(flow -> flowService.delete(FlowWithSource.of(flow, "unused"))));
+
+        deleteTenant(executeFlow.tenantId());
     }
 
     private static ExecuteFlow getExecuteFlow(ExtensionContext extensionContext) {
-        ExecuteFlow executeFlow = extensionContext.getTestMethod()
+        return extensionContext.getTestMethod()
             .orElseThrow()
             .getAnnotation(ExecuteFlow.class);
-        return executeFlow;
     }
 }

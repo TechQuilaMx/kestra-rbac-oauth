@@ -7,26 +7,28 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
+import io.kestra.core.executor.command.Create;
+import io.kestra.core.executor.command.ExecutionCommand;
+import io.kestra.core.executor.command.Unqueue;
 import io.kestra.core.junit.annotations.ExecuteFlow;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.junit.annotations.LoadFlows;
 import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.executions.ExecutionId;
 import io.kestra.core.models.flows.Flow;
 import io.kestra.core.models.flows.State;
+import io.kestra.core.queues.BroadcastQueueInterface;
+import io.kestra.core.queues.DispatchQueueInterface;
 import io.kestra.core.queues.QueueException;
-import io.kestra.core.queues.QueueFactoryInterface;
-import io.kestra.core.queues.QueueInterface;
+import io.kestra.core.repositories.ConcurrencyLimitRepositoryInterface;
 import io.kestra.core.repositories.FlowRepositoryInterface;
-import io.kestra.core.runners.ConcurrencyLimit;
-import io.kestra.core.runners.TestRunnerUtils;
+import io.kestra.core.runners.*;
 import io.kestra.core.utils.TestsUtils;
 
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
 import reactor.core.publisher.Flux;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,7 +38,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ConcurrencyLimitServiceTest {
     private static final String TESTS_FLOW_NS = "io.kestra.tests";
-    private static final String TENANT_ID = "main";
     private static final String CONCURRENCY_LIMIT_SERVICE_TEST_UNQUEUE_EXECUTION_TENANT = "concurrency_limit_service_test_unqueue_execution_tenant";
 
     @Inject
@@ -46,41 +47,34 @@ class ConcurrencyLimitServiceTest {
     private ConcurrencyLimitService concurrencyLimitService;
 
     @Inject
+    private BroadcastQueueInterface<FollowExecutionEvent> executionEventQueue;
+    @Inject
     private FlowRepositoryInterface flowRepositoryInterface;
 
     @Inject
-    @Named(QueueFactoryInterface.EXECUTION_NAMED)
-    private QueueInterface<Execution> executionQueue;
+    private DispatchQueueInterface<ExecutionCommand> executionCommandQueue;
 
-    @AfterEach
-    void tearDown() {
-        concurrencyLimitService.find(TENANT_ID)
-            .forEach(limit -> concurrencyLimitService.update(limit.withRunning(0)));
-    }
+    @Inject
+    private ConcurrencyLimitRepositoryInterface concurrencyLimitRepository;
 
     @Test
     @LoadFlows(value = "flows/valids/flow-concurrency-queue.yml", tenantId = CONCURRENCY_LIMIT_SERVICE_TEST_UNQUEUE_EXECUTION_TENANT)
     void unqueueExecution() throws QueueException, TimeoutException, InterruptedException {
+        // await for the executions to be terminated
+        CountDownLatch terminated = new CountDownLatch(2);
+        Flux<FollowExecutionEvent> receive = TestsUtils.receive(executionEventQueue, (either) ->
+        {
+            if (either.getLeft().flowId().equals("flow-concurrency-queue") && either.getLeft().eventType() == ExecutionEventType.TERMINATED) {
+                terminated.countDown();
+            }
+        });
+
         // run a first flow so the second is queued
         Execution first = runnerUtils.runOneUntilRunning(CONCURRENCY_LIMIT_SERVICE_TEST_UNQUEUE_EXECUTION_TENANT, TESTS_FLOW_NS, "flow-concurrency-queue");
         Execution result = runUntilQueued(CONCURRENCY_LIMIT_SERVICE_TEST_UNQUEUE_EXECUTION_TENANT, TESTS_FLOW_NS, "flow-concurrency-queue");
         assertThat(result.getState().isQueued()).isTrue();
 
-        // await for the execution to be terminated
-        CountDownLatch terminated = new CountDownLatch(2);
-        Flux<Execution> receive = TestsUtils.receive(executionQueue, (either) ->
-        {
-            if (either.getLeft().getId().equals(first.getId()) && either.getLeft().getState().isTerminated()) {
-                terminated.countDown();
-            }
-            if (either.getLeft().getId().equals(result.getId()) && either.getLeft().getState().isTerminated()) {
-                terminated.countDown();
-            }
-        });
-
-        Execution unqueued = concurrencyLimitService.unqueue(result, State.Type.RUNNING);
-        assertThat(unqueued.getState().isRunning()).isTrue();
-        executionQueue.emit(unqueued);
+        executionCommandQueue.emit(Unqueue.from(result, State.Type.RUNNING));
 
         assertTrue(terminated.await(10, TimeUnit.SECONDS));
         receive.blockLast();
@@ -89,7 +83,7 @@ class ConcurrencyLimitServiceTest {
     @Test
     @ExecuteFlow(value = "flows/valids/flow-concurrency-queue.yml", tenantId = "concurrency_limit_service_test_find_by_id_tenant")
     void findById(Execution execution) {
-        Optional<ConcurrencyLimit> limit = concurrencyLimitService.findById(execution.getTenantId(), execution.getNamespace(), execution.getFlowId());
+        Optional<ConcurrencyLimit> limit = concurrencyLimitRepository.findById(execution.getTenantId(), execution.getNamespace(), execution.getFlowId());
 
         assertThat(limit).isNotEmpty();
         assertThat(limit.get().getTenantId()).isEqualTo(execution.getTenantId());
@@ -100,13 +94,13 @@ class ConcurrencyLimitServiceTest {
     @Test
     @ExecuteFlow(value = "flows/valids/flow-concurrency-queue.yml", tenantId = "concurrency_limit_service_test_update_tenant")
     void update(Execution execution) {
-        Optional<ConcurrencyLimit> limit = concurrencyLimitService.findById(execution.getTenantId(), execution.getNamespace(), execution.getFlowId());
+        Optional<ConcurrencyLimit> limit = concurrencyLimitRepository.findById(execution.getTenantId(), execution.getNamespace(), execution.getFlowId());
 
         assertThat(limit).isNotEmpty();
         ConcurrencyLimit updated = limit.get().withRunning(99);
-        concurrencyLimitService.update(updated);
+        concurrencyLimitRepository.update(updated);
 
-        limit = concurrencyLimitService.findById(execution.getTenantId(), execution.getNamespace(), execution.getFlowId());
+        limit = concurrencyLimitRepository.findById(execution.getTenantId(), execution.getNamespace(), execution.getFlowId());
         assertThat(limit).isNotEmpty();
         assertThat(limit.get().getRunning()).isEqualTo(99);
     }
@@ -114,7 +108,7 @@ class ConcurrencyLimitServiceTest {
     @Test
     @ExecuteFlow(value = "flows/valids/flow-concurrency-queue.yml", tenantId = "concurrency_limit_service_test_list_tenant")
     void list(Execution execution) {
-        List<ConcurrencyLimit> list = concurrencyLimitService.find(execution.getTenantId());
+        List<ConcurrencyLimit> list = concurrencyLimitRepository.find(execution.getTenantId());
 
         assertThat(list).isNotEmpty();
         assertThat(list.getFirst().getTenantId()).isEqualTo(execution.getTenantId());
@@ -128,7 +122,7 @@ class ConcurrencyLimitServiceTest {
 
     private Execution runUntilState(String tenantId, String namespace, String flowId, State.Type state) throws QueueException {
         Execution execution = this.createExecution(tenantId, namespace, flowId);
-        this.executionQueue.emit(execution);
+        executionCommandQueue.emit(Create.of(new ExecutionId(tenantId, namespace, flowId, execution.getId(), execution.getFlowRevision())));
         return runnerUtils.awaitExecution(
             it -> execution.getId().equals(it.getId()) && it.getState().getCurrent() == state,
             execution,

@@ -79,16 +79,16 @@ import lombok.experimental.SuperBuilder;
 
                 tasks:
                   - id: before
-                    type: io.kestra.plugin.core.debug.Echo
-                    format: I'm before the fail on condition
+                    type: io.kestra.plugin.core.log.Log
+                    message: I'm before the fail on condition
 
                   - id: fail
                     type: io.kestra.plugin.core.execution.Fail
                     condition: '{{ inputs.param == "fail" }}'
 
                   - id: after
-                    type: io.kestra.plugin.core.debug.Echo
-                    format: I'm after the fail on condition
+                    type: io.kestra.plugin.core.log.Log
+                    message: I'm after the fail on condition
                 """
         ),
         @Example(
@@ -105,7 +105,7 @@ import lombok.experimental.SuperBuilder;
 
                 errors:
                 - id: slack
-                    type: io.kestra.plugin.notifications.slack.SlackIncomingWebhook
+                    type: io.kestra.plugin.slack.notifications.SlackIncomingWebhook
                     url: "{{ secret('SLACK_WEBHOOK') }}"
                     payload: |
                     {
@@ -113,8 +113,7 @@ import lombok.experimental.SuperBuilder;
                     }
                 """
         )
-    },
-    aliases = "io.kestra.core.tasks.executions.Fail"
+    }
 )
 public class Fail extends Task implements RunnableTask<VoidOutput> {
     @Schema(

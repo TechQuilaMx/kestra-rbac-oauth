@@ -85,10 +85,12 @@ public class PluginDeserializer<T extends Plugin> extends JsonDeserializer<T> {
     private T fromObjectNode(JsonParser jp,
         JsonNode node,
         DeserializationContext context) throws IOException {
-        Class<? extends Plugin> pluginType = null;
+        Class<? extends Plugin> pluginType;
 
         final String identifier = extractPluginRawIdentifier(node, pluginRegistry.isVersioningSupported());
-        if (identifier != null) {
+        if (identifier == null) {
+            pluginType = defaultClass();
+        } else {
             log.trace(
                 "Looking for Plugin for: {}",
                 identifier
@@ -113,7 +115,7 @@ public class PluginDeserializer<T extends Plugin> extends JsonDeserializer<T> {
                 final Class<? extends Plugin> dataFilterClass = pluginRegistry.findClassByIdentifier(extractPluginRawIdentifier(node.get("data"), pluginRegistry.isVersioningSupported()));
                 ParameterizedType genericDataFilterClass = (ParameterizedType) dataFilterClass.getGenericSuperclass();
                 Type dataFieldsEnum = genericDataFilterClass.getActualTypeArguments()[0];
-                TypeFactory typeFactory = JacksonMapper.ofJson().getTypeFactory();
+                TypeFactory typeFactory = JacksonMapper.ofJson(true).getTypeFactory();
                 Type chartAwareColumnDescriptorClass = ((ParameterizedType) ((WildcardType) ((ParameterizedType) ((TypeVariable<?>)
                 // DataChart generic class
                 ((ParameterizedType) pluginType.getGenericSuperclass())
@@ -122,7 +124,7 @@ public class PluginDeserializer<T extends Plugin> extends JsonDeserializer<T> {
                 // ColumnDescriptor implementation class
                 ).getActualTypeArguments()[1]).getUpperBounds()[0]).getRawType();
 
-                return JacksonMapper.ofJson().convertValue(
+                return JacksonMapper.ofJson(true).convertValue(
                     node, typeFactory.constructParametricType(
                         pluginType,
                         typeFactory.constructType(dataFieldsEnum),
@@ -165,6 +167,13 @@ public class PluginDeserializer<T extends Plugin> extends JsonDeserializer<T> {
     }
 
     protected Class<? extends Plugin> fallbackClass() {
+        return null;
+    }
+
+    /**
+     * The class to deserialize to when no type is declared, {@code null} making a missing type an error.
+     */
+    protected Class<? extends Plugin> defaultClass() {
         return null;
     }
 }

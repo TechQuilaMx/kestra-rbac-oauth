@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -15,12 +14,12 @@ import io.kestra.core.exceptions.InvalidTriggerConfigurationException;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.conditions.ConditionContext;
-import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.VoidOutput;
 import io.kestra.core.models.triggers.*;
 import io.kestra.core.runners.RunContext;
-import io.kestra.core.validations.TimezoneId;
+import io.kestra.core.scheduler.SchedulerClock;
+import io.kestra.core.serializers.JacksonMapper;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -55,10 +54,6 @@ public class ScheduleOnDates extends AbstractTrigger implements Schedulable, Tri
 
     private Map<String, Object> inputs;
 
-    @TimezoneId
-    @Schema(
-        title = "The [time zone identifier](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) (i.e. the second column in [the Wikipedia table](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones#List)) to use for evaluating the cron expression. Default value is the server default zone ID."
-    )
     @PluginProperty(dynamic = true)
     @Builder.Default
     private String timezone = ZoneId.systemDefault().toString();
@@ -69,7 +64,7 @@ public class ScheduleOnDates extends AbstractTrigger implements Schedulable, Tri
     private RecoverMissedSchedules recoverMissedSchedules;
 
     @Override
-    public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext triggerContext) throws Exception {
+    public Optional<TriggerEvaluationResult> eval(ConditionContext conditionContext, TriggerContext triggerContext) throws Exception {
         RunContext runContext = conditionContext.getRunContext();
 
         ZonedDateTime lastEvaluation = triggerContext.getDate();
@@ -78,15 +73,20 @@ public class ScheduleOnDates extends AbstractTrigger implements Schedulable, Tri
         if (nextDate.isPresent()) {
             log.info("Schedule execution on {}", nextDate.get());
 
-            Execution execution = SchedulableExecutionFactory.createExecution(
-                this,
-                conditionContext,
-                triggerContext,
-                Collections.emptyMap(),
-                nextDate.orElse(null)
-            );
+            Map<String, Object> rawVariables = Map.of("date", nextDate.get());
+            Map<String, Object> variables = timezone != null
+                ? JacksonMapper.toMap(rawVariables, ZoneId.of(runContext.render(timezone)))
+                : JacksonMapper.toMap(rawVariables);
 
-            return Optional.of(execution);
+            return Optional.of(
+                SchedulableExecutionFactory.createExecution(
+                    this,
+                    conditionContext,
+                    triggerContext,
+                    variables,
+                    nextDate.orElse(null)
+                )
+            );
         }
 
         return Optional.empty();
@@ -94,10 +94,11 @@ public class ScheduleOnDates extends AbstractTrigger implements Schedulable, Tri
 
     @Override
     public ZonedDateTime nextEvaluationDate(ConditionContext conditionContext, Optional<? extends TriggerContext> triggerContext) {
+        ZonedDateTime now = SchedulerClock.now();
         return triggerContext
             .map(ctx -> ctx.getBackfill() != null ? ctx.getBackfill().getCurrentDate() : ctx.getDate())
             .map(this::withTimeZone)
-            .or(() -> Optional.of(ZonedDateTime.now()))
+            .or(() -> Optional.of(now))
             .flatMap(dt ->
             {
                 try {
@@ -106,13 +107,13 @@ public class ScheduleOnDates extends AbstractTrigger implements Schedulable, Tri
                     log.warn("Failed to evaluate schedule dates for trigger '{}': {}", this.getId(), e.getMessage());
                     throw new InvalidTriggerConfigurationException("Failed to evaluate schedule 'dates'. Cause: " + e.getMessage());
                 }
-            }).orElseGet(() -> ZonedDateTime.now().plusYears(1));
+            }).orElseGet(() -> now.plusYears(1));
     }
 
     @Override
     public ZonedDateTime nextEvaluationDate() {
         // TODO this may be the next date from now?
-        return ZonedDateTime.now();
+        return SchedulerClock.now();
     }
 
     @Override

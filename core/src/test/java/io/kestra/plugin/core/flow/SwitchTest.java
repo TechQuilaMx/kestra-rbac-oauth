@@ -12,7 +12,9 @@ import io.kestra.core.junit.annotations.LoadFlows;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.flows.State;
 import io.kestra.core.queues.QueueException;
+import io.kestra.core.repositories.ExecutionRepositoryInterface;
 import io.kestra.core.runners.TestRunnerUtils;
+import io.kestra.core.services.TaskOutputService;
 
 import jakarta.inject.Inject;
 
@@ -24,9 +26,15 @@ class SwitchTest {
     @Inject
     private TestRunnerUtils runnerUtils;
 
+    @Inject
+    private TaskOutputService taskOutputService;
+
+    @Inject
+    private ExecutionRepositoryInterface executionRepository;
+
     @Test
     @LoadFlows(value = { "flows/valids/switch.yaml" }, tenantId = "switch")
-    void switchFirst() throws TimeoutException, QueueException {
+    void switchFirst() throws TimeoutException, QueueException, io.kestra.core.exceptions.InternalException {
         Execution execution = runnerUtils.runOne(
             "switch",
             "io.kestra.tests",
@@ -36,13 +44,13 @@ class SwitchTest {
         );
 
         assertThat(execution.getTaskRunList().get(1).getTaskId()).isEqualTo("t1");
-        assertThat(execution.findTaskRunsByTaskId("parent-seq").getFirst().getOutputs().get("value")).isEqualTo("FIRST");
-        assertThat((Boolean) execution.findTaskRunsByTaskId("parent-seq").getFirst().getOutputs().get("defaults")).isEqualTo(false);
+        assertThat(taskOutputService.getOutputs(execution.findTaskRunsByTaskId("parent-seq").getFirst()).get("value")).isEqualTo("FIRST");
+        assertThat((Boolean) taskOutputService.getOutputs(execution.findTaskRunsByTaskId("parent-seq").getFirst()).get("defaults")).isEqualTo(false);
     }
 
     @Test
     @LoadFlows(value = { "flows/valids/switch.yaml" }, tenantId = "second")
-    void switchSecond() throws TimeoutException, QueueException {
+    void switchSecond() throws TimeoutException, QueueException, io.kestra.core.exceptions.InternalException {
         Execution execution = runnerUtils.runOne(
             "second",
             "io.kestra.tests",
@@ -52,14 +60,14 @@ class SwitchTest {
         );
 
         assertThat(execution.getTaskRunList().get(1).getTaskId()).isEqualTo("t2");
-        assertThat(execution.findTaskRunsByTaskId("parent-seq").getFirst().getOutputs().get("value")).isEqualTo("SECOND");
-        assertThat((Boolean) execution.findTaskRunsByTaskId("parent-seq").getFirst().getOutputs().get("defaults")).isFalse();
+        assertThat(taskOutputService.getOutputs(execution.findTaskRunsByTaskId("parent-seq").getFirst()).get("value")).isEqualTo("SECOND");
+        assertThat((Boolean) taskOutputService.getOutputs(execution.findTaskRunsByTaskId("parent-seq").getFirst()).get("defaults")).isFalse();
         assertThat(execution.getTaskRunList().get(2).getTaskId()).isEqualTo("t2_sub");
     }
 
     @Test
     @LoadFlows(value = { "flows/valids/switch.yaml" }, tenantId = "switchthird")
-    void switchThird() throws TimeoutException, QueueException {
+    void switchThird() throws TimeoutException, QueueException, io.kestra.core.exceptions.InternalException {
         Execution execution = runnerUtils.runOne(
             "switchthird",
             "io.kestra.tests",
@@ -69,15 +77,15 @@ class SwitchTest {
         );
 
         assertThat(execution.getTaskRunList().get(1).getTaskId()).isEqualTo("t3");
-        assertThat(execution.findTaskRunsByTaskId("parent-seq").getFirst().getOutputs().get("value")).isEqualTo("THIRD");
-        assertThat((Boolean) execution.findTaskRunsByTaskId("parent-seq").getFirst().getOutputs().get("defaults")).isFalse();
+        assertThat(taskOutputService.getOutputs(execution.findTaskRunsByTaskId("parent-seq").getFirst()).get("value")).isEqualTo("THIRD");
+        assertThat((Boolean) taskOutputService.getOutputs(execution.findTaskRunsByTaskId("parent-seq").getFirst()).get("defaults")).isFalse();
         assertThat(execution.getTaskRunList().get(2).getTaskId()).isEqualTo("failed");
         assertThat(execution.getTaskRunList().get(3).getTaskId()).isEqualTo("error-t1");
     }
 
     @Test
     @LoadFlows(value = { "flows/valids/switch.yaml" }, tenantId = "switchdefault")
-    void switchDefault() throws TimeoutException, QueueException {
+    void switchDefault() throws TimeoutException, QueueException, io.kestra.core.exceptions.InternalException {
         Execution execution = runnerUtils.runOne(
             "switchdefault",
             "io.kestra.tests",
@@ -87,8 +95,8 @@ class SwitchTest {
         );
 
         assertThat(execution.getTaskRunList().get(1).getTaskId()).isEqualTo("default");
-        assertThat(execution.findTaskRunsByTaskId("parent-seq").getFirst().getOutputs().get("value")).isEqualTo("DEFAULT");
-        assertThat((Boolean) execution.findTaskRunsByTaskId("parent-seq").getFirst().getOutputs().get("defaults")).isTrue();
+        assertThat(taskOutputService.getOutputs(execution.findTaskRunsByTaskId("parent-seq").getFirst()).get("value")).isEqualTo("DEFAULT");
+        assertThat((Boolean) taskOutputService.getOutputs(execution.findTaskRunsByTaskId("parent-seq").getFirst()).get("defaults")).isTrue();
     }
 
     @Test
@@ -109,9 +117,13 @@ class SwitchTest {
     @ExecuteFlow(value = "flows/valids/switch-in-concurrent-loop.yaml", tenantId = "switchinconcurrentloop")
     void switchInConcurrentLoop(Execution execution) {
         assertThat(execution.getState().getCurrent()).isEqualTo(State.Type.SUCCESS);
-        assertThat(execution.getTaskRunList()).hasSize(5);
-        // we check that OOMCRM_EB_DD_000 and OOMCRM_EB_DD_001 have been processed once
-        assertThat(execution.getTaskRunList().stream().filter(t -> t.getTaskId().equals("OOMCRM_EB_DD_000")).count()).isEqualTo(1);
-        assertThat(execution.getTaskRunList().stream().filter(t -> t.getTaskId().equals("OOMCRM_EB_DD_001")).count()).isEqualTo(1);
+        assertThat(execution.getTaskRunList()).hasSize(1);
+
+        var subExecutions = executionRepository.findLoopSubExecutions(execution.getTenantId(), execution.getId(), null);
+        assertThat(subExecutions.size()).isEqualTo(2);
+
+        // we check that OOMCRM_EB_DD_000 and OOMCRM_EB_DD_001 have been processed once across all sub-executions
+        assertThat(subExecutions.stream().flatMap(e -> e.getTaskRunList().stream()).filter(t -> t.getTaskId().equals("OOMCRM_EB_DD_000")).count()).isEqualTo(1);
+        assertThat(subExecutions.stream().flatMap(e -> e.getTaskRunList().stream()).filter(t -> t.getTaskId().equals("OOMCRM_EB_DD_001")).count()).isEqualTo(1);
     }
 }

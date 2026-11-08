@@ -1,5 +1,6 @@
 package io.kestra.core.models.flows;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -9,11 +10,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 import io.kestra.core.models.Label;
 import io.kestra.core.models.flows.input.StringInput;
-import io.kestra.core.models.listeners.Listener;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.IdUtils;
-import io.kestra.plugin.core.condition.Expression;
 import io.kestra.plugin.core.debug.Return;
 import io.kestra.plugin.core.log.Log;
 import io.kestra.plugin.core.trigger.Schedule;
@@ -129,29 +128,9 @@ class FlowWithSourceTest {
                         .build()
                 )
             )
-            .listeners(
-                List.of(
-                    Listener.builder()
-                        .conditions(List.of(Expression.builder().expression(Property.ofValue("true")).build()))
-                        .build()
-                )
-            )
             .triggers(
                 List.of(
                     Schedule.builder().id("schedule").cron("0 1 9 * * *").build()
-                )
-            )
-            .pluginDefaults(
-                List.of(
-                    PluginDefault.builder()
-                        .type(Log.class.getName())
-                        .forced(true)
-                        .values(
-                            Map.of(
-                                "message", "Default message"
-                            )
-                        )
-                        .build()
                 )
             )
             .concurrency(
@@ -166,5 +145,31 @@ class FlowWithSourceTest {
 
         assertThat(of.equalsWithoutRevision(flow)).isTrue();
         assertThat(of.getSource()).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void toFlowShouldPreserveRevisionAndUpdated() {
+        Instant updated = Instant.parse("2026-08-06T08:55:00.788514407Z");
+        FlowWithSource flowWithSource = FlowWithSource.builder()
+            .id(IdUtils.create())
+            .namespace("io.kestra.unittest")
+            .revision(2)
+            .updated(updated)
+            .tasks(
+                List.of(
+                    Log.builder()
+                        .id(IdUtils.create())
+                        .type(Log.class.getName())
+                        .message("Hello World")
+                        .build()
+                )
+            )
+            .source("source")
+            .build();
+
+        Flow flow = flowWithSource.toFlow();
+
+        assertThat(flow.getRevision()).isEqualTo(2);
+        assertThat(flow.getUpdated()).isEqualTo(updated);
     }
 }

@@ -35,7 +35,6 @@ import com.github.fge.jsonpatch.JsonPatchException;
 import com.github.fge.jsonpatch.diff.JsonDiff;
 
 import io.kestra.core.plugins.PluginModule;
-import io.kestra.core.runners.RunContextModule;
 import io.kestra.core.serializers.ion.IonFactory;
 import io.kestra.core.serializers.ion.IonModule;
 
@@ -58,16 +57,17 @@ public final class JacksonMapper {
         );
     }
 
-    private static final ObjectMapper MAPPER = JacksonMapper.configure(
-        new ObjectMapper()
-    );
+    // Registered the KestraDateTimeModule only for the JSON mapper.
+    // YAML should not change the date format as it would break compatibility, and ION has its own date format.
+    private static final ObjectMapper MAPPER = JacksonMapper.configure(new ObjectMapper())
+        .registerModule(new KestraDateTimeModule());
 
     private static final ObjectMapper NON_STRICT_MAPPER = MAPPER
         .copy()
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public static ObjectMapper ofJson() {
-        return JacksonMapper.ofJson(true);
+        return JacksonMapper.ofJson(false);
     }
 
     public static ObjectMapper ofJson(boolean strict) {
@@ -84,7 +84,7 @@ public final class JacksonMapper {
                 .configure(YAMLGenerator.Feature.USE_NATIVE_TYPE_ID, false)
                 .configure(YAMLGenerator.Feature.SPLIT_LINES, false)
                 .build()
-        )
+        ).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
     );
 
     public static ObjectMapper ofYaml() {
@@ -135,10 +135,15 @@ public final class JacksonMapper {
         }
     }
 
-    private static final ObjectMapper ION_MAPPER = createIonObjectMapper();
+    private static final ObjectMapper ION_MAPPER = createIonObjectMapper(false);
+    private static final ObjectMapper ION_BINARY_MAPPER = createIonObjectMapper(true);
 
     public static ObjectMapper ofIon() {
         return ION_MAPPER;
+    }
+
+    public static ObjectMapper ofIonBinary() {
+        return ION_BINARY_MAPPER;
     }
 
     private static ObjectMapper configure(ObjectMapper mapper) {
@@ -153,14 +158,18 @@ public final class JacksonMapper {
             .registerModule(new ParameterNamesModule())
             .registerModules(new GuavaModule())
             .registerModule(new PluginModule())
-            .registerModule(new RunContextModule())
             .registerModule(durationDeserialization)
             .setTimeZone(TimeZone.getDefault());
     }
 
-    private static ObjectMapper createIonObjectMapper() {
-        return configure(new IonObjectMapper(new IonFactory(createIonSystem())))
+    private static ObjectMapper createIonObjectMapper(boolean binary) {
+        IonFactory ionFactory = new IonFactory(createIonSystem());
+        if (binary) {
+            ionFactory.setCreateBinaryWriters(true);
+        }
+        return configure(new IonObjectMapper(ionFactory))
             .setDefaultPropertyInclusion(JsonInclude.Include.ALWAYS)
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             .registerModule(new IonModule());
     }
 

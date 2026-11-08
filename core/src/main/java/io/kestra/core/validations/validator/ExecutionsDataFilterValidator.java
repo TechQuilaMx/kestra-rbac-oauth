@@ -7,7 +7,6 @@ import io.kestra.core.validations.ExecutionsDataFilterValidation;
 import io.kestra.plugin.core.dashboard.data.Executions;
 
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
@@ -15,7 +14,6 @@ import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 import jakarta.inject.Singleton;
 
 @Singleton
-@Introspected
 public class ExecutionsDataFilterValidator implements ConstraintValidator<ExecutionsDataFilterValidation, Executions<?>> {
     @Override
     public boolean isValid(
@@ -30,16 +28,16 @@ public class ExecutionsDataFilterValidator implements ConstraintValidator<Execut
 
         executionsDataFilter.getColumns().forEach((key, value) ->
         {
-            if (value.getField() == Executions.Fields.LABELS && value.getLabelKey() == null) {
-                violations.add("Column `" + key + "` must have a `labelKey`.");
+            if (value.getField() == Executions.Fields.LABELS && value.getKey() == null) {
+                violations.add("Column `" + key + "` must have a `key`.");
             }
         });
 
         if (executionsDataFilter.getWhere() != null) {
             executionsDataFilter.getWhere().forEach(filter ->
             {
-                if (filter.getField() == Executions.Fields.LABELS && filter.getLabelKey() == null) {
-                    violations.add("Label filters must have a `labelKey`.");
+                if (filter.getField() == Executions.Fields.LABELS && filter.getKey() == null) {
+                    violations.add("Label filters must have a `key`.");
                 }
             });
         }

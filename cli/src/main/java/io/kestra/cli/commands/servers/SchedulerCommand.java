@@ -1,15 +1,16 @@
 package io.kestra.cli.commands.servers;
 
 import java.util.Map;
+import java.util.Optional;
 
 import com.google.common.collect.ImmutableMap;
 
 import io.kestra.core.models.ServerType;
+import io.kestra.core.runners.Scheduler;
 import io.kestra.core.utils.Await;
-import io.kestra.scheduler.AbstractScheduler;
 
-import io.micronaut.context.ApplicationContext;
 import jakarta.inject.Inject;
+import jakarta.inject.Provider;
 import lombok.extern.slf4j.Slf4j;
 import picocli.CommandLine;
 
@@ -20,7 +21,10 @@ import picocli.CommandLine;
 @Slf4j
 public class SchedulerCommand extends AbstractServerCommand {
     @Inject
-    private ApplicationContext applicationContext;
+    private Provider<Scheduler> scheduler;
+
+    @CommandLine.Option(names = { "-t", "--max-threads" }, description = "The maximum number of threads used by the scheduler for evaluating triggers.")
+    private Integer maxThread;
 
     @SuppressWarnings("unused")
     public static Map<String, Object> propertiesOverrides() {
@@ -33,10 +37,9 @@ public class SchedulerCommand extends AbstractServerCommand {
     public Integer call() throws Exception {
         super.call();
 
-        AbstractScheduler scheduler = applicationContext.getBean(AbstractScheduler.class);
-        scheduler.run();
+        scheduler.get().start(Optional.ofNullable(this.maxThread).orElse(Scheduler.defaultMaxNumThreads()));
 
-        Await.until(() -> !this.applicationContext.isRunning());
+        Await.await().forever().until(() -> !this.applicationContext.isRunning());
 
         return 0;
     }

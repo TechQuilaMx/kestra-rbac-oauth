@@ -23,6 +23,7 @@ import io.kestra.core.models.flows.Flow;
 import io.kestra.core.models.flows.GenericFlow;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.validations.ModelValidator;
+import io.kestra.core.namespace.NamespaceFileService;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.storages.Namespace;
@@ -55,6 +56,9 @@ public class PurgeFilesTest {
 
     @Inject
     ModelValidator modelValidator;
+
+    @Inject
+    NamespaceFileService namespaceFileService;
 
     @BeforeEach
     protected void setup() throws IOException {
@@ -160,7 +164,7 @@ public class PurgeFilesTest {
         Instant afterFirstVersion = Instant.now();
         namespaceStorage.putFile(Path.of("my/first/file.txt"), new ByteArrayInputStream("another value".getBytes(StandardCharsets.UTF_8)));
 
-        List<NamespaceFile> namespaceFiles = namespaceStorage.find(Pageable.UNPAGED, Collections.emptyList(), true, FetchVersion.ALL);
+        List<NamespaceFile> namespaceFiles = namespaceFileService.find(Pageable.UNPAGED, MAIN_TENANT, namespace, Collections.emptyList(), true, FetchVersion.ALL);
         // "/", "/my", "/my/first", "/my/first/file.txt" x2 versions
         assertThat(namespaceFiles.size()).isEqualTo(5);
 
@@ -172,11 +176,11 @@ public class PurgeFilesTest {
 
         assertThat(run.getSize()).isEqualTo(1L);
 
-        namespaceFiles = namespaceStorage.find(Pageable.UNPAGED, Collections.emptyList(), true, FetchVersion.ALL);
+        namespaceFiles = namespaceFileService.find(Pageable.UNPAGED, MAIN_TENANT, namespace, Collections.emptyList(), true, FetchVersion.ALL);
         assertThat(namespaceFiles.size()).isEqualTo(4);
         List<NamespaceFile> files = namespaceFiles.stream().filter(nsFile -> nsFile.path().endsWith("file.txt")).toList();
         assertThat(files.size()).isEqualTo(1);
-        assertThat(files.getFirst().version()).isEqualTo(2);
+        assertThat(files.getFirst().revision()).isEqualTo(2);
     }
 
     @Test
@@ -191,7 +195,7 @@ public class PurgeFilesTest {
         namespaceStorage.putFile(Path.of("my/first/file.txt"), new ByteArrayInputStream("another value".getBytes(StandardCharsets.UTF_8)));
         namespaceStorage.putFile(Path.of("my/first/file.txt"), new ByteArrayInputStream("yet another value".getBytes(StandardCharsets.UTF_8)));
 
-        List<NamespaceFile> namespaceFiles = namespaceStorage.find(Pageable.UNPAGED, Collections.emptyList(), true, FetchVersion.ALL);
+        List<NamespaceFile> namespaceFiles = namespaceFileService.find(Pageable.UNPAGED, MAIN_TENANT, namespace, Collections.emptyList(), true, FetchVersion.ALL);
         assertThat(namespaceFiles.size()).isEqualTo(6);
 
         PurgeFiles purgeFiles = PurgeFiles.builder()
@@ -202,11 +206,11 @@ public class PurgeFilesTest {
 
         assertThat(run.getSize()).isEqualTo(1L);
 
-        namespaceFiles = namespaceStorage.find(Pageable.UNPAGED, Collections.emptyList(), true, FetchVersion.ALL);
+        namespaceFiles = namespaceFileService.find(Pageable.UNPAGED, MAIN_TENANT, namespace, Collections.emptyList(), true, FetchVersion.ALL);
         assertThat(namespaceFiles.size()).isEqualTo(5);
         List<NamespaceFile> files = namespaceFiles.stream().filter(nsFile -> nsFile.path().endsWith("file.txt")).toList();
         assertThat(files.size()).isEqualTo(2);
-        assertThat(files.stream().map(NamespaceFile::version)).containsExactlyInAnyOrder(2, 3);
+        assertThat(files.stream().map(NamespaceFile::revision)).containsExactlyInAnyOrder(2, 3);
     }
 
     @Test

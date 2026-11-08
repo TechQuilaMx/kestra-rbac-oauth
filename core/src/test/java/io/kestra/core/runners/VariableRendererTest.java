@@ -7,65 +7,57 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.runners.configuration.VariableConfiguration;
+import io.kestra.core.runners.pebble.PebbleEngineFactory;
 
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.pebbletemplates.pebble.PebbleEngine;
 import jakarta.inject.Inject;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @MicronautTest
 class VariableRendererTest {
-
-    @Inject
-    ApplicationContext applicationContext;
-
-    @Inject
-    VariableRenderer.VariableConfiguration variableConfiguration;
-
     @Inject
     VariableRenderer variableRenderer;
 
-    @Test
-    void shouldRenderUsingAlternativeRendering() throws IllegalVariableEvaluationException {
-        TestVariableRenderer renderer = new TestVariableRenderer(applicationContext, variableConfiguration);
-        String render = renderer.render("{{ dummy }}", Map.of());
-        Assertions.assertEquals("result", render);
-    }
+    @Inject
+    VariableConfiguration variableConfiguration;
+
+    @Inject
+    private PebbleEngineFactory pebbleEngineFactory;
 
     @Test
     void shouldRenderContactUntypedStringExpression() throws IllegalVariableEvaluationException {
-        TestVariableRenderer renderer = new TestVariableRenderer(applicationContext, variableConfiguration);
-        String render = renderer.render("{{ prefix }}.kestra.{{ suffix }}", Map.of("prefix", "io", "suffix", "unittest"));
+        String render = variableRenderer.render("{{ prefix }}.kestra.{{ suffix }}", Map.of("prefix", "io", "suffix", "unittest"));
         Assertions.assertEquals("io.kestra.unittest", render);
     }
 
     @Test
     void shouldRenderContactTypedStringExpression() throws IllegalVariableEvaluationException {
-        TestVariableRenderer renderer = new TestVariableRenderer(applicationContext, variableConfiguration);
-        Object render = renderer.renderTyped("{{ prefix }}.kestra.{{ suffix }}", Map.of("prefix", "io", "suffix", "unittest"));
+        Object render = variableRenderer.renderTyped("{{ prefix }}.kestra.{{ suffix }}", Map.of("prefix", "io", "suffix", "unittest"));
         Assertions.assertEquals("io.kestra.unittest", render);
     }
 
     @Test
     void shouldRenderMixedTypeInString() throws IllegalVariableEvaluationException {
-        TestVariableRenderer renderer = new TestVariableRenderer(applicationContext, variableConfiguration);
-        Object render = renderer.renderTyped("{\"a\": {{[1,2,3 ]}} }", Map.of());
+        Object render = variableRenderer.renderTyped("{\"a\": {{[1,2,3 ]}} }", Map.of());
         Assertions.assertEquals(Map.of("a", List.of(1, 2, 3)), render);
     }
 
     @Test
     void shouldRenderContactTypedNumberExpression() throws IllegalVariableEvaluationException {
-        TestVariableRenderer renderer = new TestVariableRenderer(applicationContext, variableConfiguration);
-        Object render = renderer.renderTyped("{{ prefix }}{{ suffix }}", Map.of("prefix", 10, "suffix", 42L));
+        Object render = variableRenderer.renderTyped("{{ prefix }}{{ suffix }}", Map.of("prefix", 10, "suffix", 42L));
         Assertions.assertEquals("1042", render);
     }
 
     @Test
     void shouldRenderTypedValueExpression() throws IllegalVariableEvaluationException {
-        TestVariableRenderer renderer = new TestVariableRenderer(applicationContext, variableConfiguration);
+        TestVariableRenderer renderer = new TestVariableRenderer(pebbleEngineFactory, variableConfiguration);
         for (Object o : List.of(
             42, // Integer
             3.14, // Double
@@ -77,9 +69,27 @@ class VariableRendererTest {
             new Object(), // Arbitrary object
             new BigDecimal("123.45") // BigDecimal
         )) {
-            Object render = renderer.renderTyped("{{ input }}", Map.of("input", o));
+            Object render = variableRenderer.renderTyped("{{ input }}", Map.of("input", o));
             Assertions.assertEquals(o, render);
         }
+    }
+
+    @Test
+    void shouldWrapRuntimeExceptionInIllegalVariableEvaluationException() {
+        // Given
+        PebbleEngine mockEngine = Mockito.mock(PebbleEngine.class);
+        Mockito.when(mockEngine.getLiteralTemplate(Mockito.anyString()))
+            .thenThrow(new RuntimeException("unexpected runtime exception"));
+
+        VariableRenderer renderer = new VariableRenderer(pebbleEngineFactory, variableConfiguration);
+        renderer.setPebbleEngine(mockEngine);
+
+        // When / Then
+        assertThatThrownBy(() -> renderer.render("{{ test }}", Map.of()))
+            .isInstanceOf(IllegalVariableEvaluationException.class)
+            .cause()
+            .isInstanceOf(RuntimeException.class)
+            .hasMessage("unexpected runtime exception");
     }
 
     @Test
@@ -140,16 +150,17 @@ class VariableRendererTest {
         assertThat(result).containsKey("key1");
     }
 
+    @Test
+    void shouldRenderMixedFilterAndOperator() throws IllegalVariableEvaluationException {
+        Map<String, Object> variables = Map.of("outputs", Map.of("after", Map.of("value", "300"), "before", Map.of("value", "250")));
+        assertThat(variableRenderer.render("{{ outputs.after.value | number - outputs.before.value | number >= 5 }}", variables)).isEqualTo("true");
+    }
+
     public static class TestVariableRenderer extends VariableRenderer {
 
-        public TestVariableRenderer(ApplicationContext applicationContext,
+        public TestVariableRenderer(PebbleEngineFactory pebbleEngineFactory,
             VariableConfiguration variableConfiguration) {
-            super(applicationContext, variableConfiguration);
-        }
-
-        @Override
-        protected String alternativeRender(Exception e, String inline, Map<String, Object> variables) throws IllegalVariableEvaluationException {
-            return "result";
+            super(pebbleEngineFactory, variableConfiguration);
         }
     }
 

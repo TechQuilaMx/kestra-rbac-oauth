@@ -10,7 +10,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.validations.ModelValidator;
 
-import io.micronaut.core.annotation.Introspected;
 import jakarta.inject.Inject;
 import jakarta.validation.ConstraintViolationException;
 import lombok.AllArgsConstructor;
@@ -25,7 +24,6 @@ class DateFormatTest {
     private ModelValidator modelValidator;
 
     @AllArgsConstructor
-    @Introspected
     @Getter
     @Builder
     public static class DateFormatCls {

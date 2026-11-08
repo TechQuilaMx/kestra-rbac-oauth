@@ -12,7 +12,6 @@ import io.kestra.core.events.CrudEventType;
 import io.kestra.core.models.Setting;
 import io.kestra.core.repositories.SettingRepositoryInterface;
 
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import lombok.SneakyThrows;
 
@@ -22,9 +21,9 @@ public abstract class AbstractJdbcSettingRepository extends AbstractJdbcCrudRepo
     @SuppressWarnings("unchecked")
     public AbstractJdbcSettingRepository(
         io.kestra.jdbc.AbstractJdbcRepository<Setting> jdbcRepository,
-        ApplicationContext applicationContext) {
+        ApplicationEventPublisher<CrudEvent<Setting>> eventPublisher) {
         super(jdbcRepository);
-        this.eventPublisher = applicationContext.getBean(ApplicationEventPublisher.class);
+        this.eventPublisher = eventPublisher;
     }
 
     public Boolean isTaskRunEnabled() {
@@ -33,17 +32,17 @@ public abstract class AbstractJdbcSettingRepository extends AbstractJdbcCrudRepo
 
     @Override
     public Optional<Setting> findByKey(String key) {
-        return findOne(DSL.trueCondition(), KEY_FIELD.eq(key));
+        return findOne(DSL.noCondition(), KEY_FIELD.eq(key));
     }
 
     @Override
     public List<Setting> findAll() {
-        return findAll(DSL.trueCondition());
+        return findAll(DSL.noCondition());
     }
 
     @Override
     public Setting save(Setting setting) {
-        this.eventPublisher.publishEvent(new CrudEvent<>(setting, CrudEventType.UPDATE));
+        this.eventPublisher.publishEvent(new CrudEvent<>(setting, null, CrudEventType.UPDATE));
 
         return internalSave(setting);
     }
@@ -77,6 +76,6 @@ public abstract class AbstractJdbcSettingRepository extends AbstractJdbcCrudRepo
 
     @Override
     protected Condition defaultFilter() {
-        return DSL.trueCondition();
+        return DSL.noCondition();
     }
 }

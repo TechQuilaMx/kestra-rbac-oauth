@@ -3,32 +3,27 @@ package io.kestra.core.reporter.reports;
 import java.time.Duration;
 import java.time.Instant;
 
-import io.kestra.core.contexts.KestraContext;
-import io.kestra.core.models.ServerType;
 import io.kestra.core.models.collectors.ServiceUsage;
 import io.kestra.core.reporter.AbstractReportable;
 import io.kestra.core.reporter.Schedules;
 import io.kestra.core.reporter.Types;
 import io.kestra.core.repositories.ServiceInstanceRepositoryInterface;
 
-import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import lombok.Builder;
 
 @Singleton
+@Requires(property = "kestra.server-type", pattern = "STANDALONE|EXECUTOR|WEBSERVER")
 public class ServiceUsageReport extends AbstractReportable<ServiceUsageReport.ServiceUsageEvent> {
 
     private final ServiceInstanceRepositoryInterface serviceInstanceRepository;
-    private final boolean isEnabled;
 
     @Inject
     public ServiceUsageReport(ServiceInstanceRepositoryInterface serviceInstanceRepository) {
         super(Types.SERVICE_USAGE, Schedules.daily(), false);
         this.serviceInstanceRepository = serviceInstanceRepository;
-
-        ServerType serverType = KestraContext.getContext().getServerType();
-        this.isEnabled = ServerType.STANDALONE.equals(serverType) || ServerType.EXECUTOR.equals(serverType);
     }
 
     @Override
@@ -40,13 +35,7 @@ public class ServiceUsageReport extends AbstractReportable<ServiceUsageReport.Se
             .build();
     }
 
-    @Override
-    public boolean isEnabled() {
-        return isEnabled;
-    }
-
     @Builder
-    @Introspected
     public record ServiceUsageEvent(
         ServiceUsage services) implements Event {
     }

@@ -10,11 +10,11 @@ import io.kestra.core.models.flows.FlowWithSource;
 import io.kestra.core.models.hierarchies.*;
 import io.kestra.core.models.tasks.ExecutableTask;
 import io.kestra.core.models.tasks.Task;
-import io.kestra.core.models.triggers.Trigger;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.repositories.TriggerRepositoryInterface;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.scheduler.model.TriggerState;
 import io.kestra.core.utils.GraphUtils;
 import io.kestra.core.utils.PebbleUtil;
 
@@ -34,7 +34,7 @@ public class GraphService {
     @Inject
     private TriggerRepositoryInterface triggerRepository;
     @Inject
-    private PluginDefaultService pluginDefaultService;
+    private FlowParsingService flowParsingService;
     @Inject
     private RunContextFactory runContextFactory;
 
@@ -64,8 +64,8 @@ public class GraphService {
     public GraphCluster of(GraphCluster baseGraph, FlowWithSource flow, List<String> expandedSubflows, Map<String, FlowWithSource> flowByUid, Execution execution)
         throws IllegalVariableEvaluationException, FlowProcessingException {
         String tenantId = flow.getTenantId();
-        flow = pluginDefaultService.injectAllDefaults(flow, false);
-        List<Trigger> triggers = null;
+        flow = flowParsingService.parse(flow, false);
+        List<TriggerState> triggers = null;
         if (flow.getTriggers() != null) {
             triggers = triggerRepository.find(Pageable.UNPAGED, null, tenantId, flow.getNamespace(), flow.getId(), null);
         }
@@ -134,7 +134,7 @@ public class GraphService {
                     );
                 }
             );
-            subflow = pluginDefaultService.injectAllDefaults(subflow, false);
+            subflow = flowParsingService.parse(subflow, false);
 
             SubflowGraphTask finalSubflowGraphTask = subflowGraphTask;
             return new TaskToClusterReplacer(

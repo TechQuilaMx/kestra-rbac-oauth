@@ -8,11 +8,12 @@ import java.util.stream.Stream;
 import com.google.common.annotations.VisibleForTesting;
 
 import io.kestra.core.models.Label;
-import io.kestra.core.models.conditions.Condition;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.flows.Flow;
 import io.kestra.core.models.flows.FlowInterface;
 import io.kestra.core.models.flows.FlowWithSource;
+import io.kestra.core.models.flows.input.MultiselectInput;
+import io.kestra.core.models.flows.input.SelectInput;
 import io.kestra.core.models.hierarchies.Graph;
 import io.kestra.core.models.tasks.ExecutableTask;
 import io.kestra.core.models.topologies.FlowNode;
@@ -22,10 +23,11 @@ import io.kestra.core.models.topologies.FlowTopologyGraph;
 import io.kestra.core.models.triggers.AbstractTrigger;
 import io.kestra.core.repositories.FlowRepositoryInterface;
 import io.kestra.core.repositories.FlowTopologyRepositoryInterface;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.services.ConditionService;
 import io.kestra.core.utils.ListUtils;
-import io.kestra.core.utils.MapUtils;
-import io.kestra.plugin.core.condition.*;
+import io.kestra.core.utils.PebbleUtil;
 
 import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Inject;
@@ -45,6 +47,9 @@ public class FlowTopologyService {
 
     @Inject
     private FlowTopologyRepositoryInterface flowTopologyRepository;
+
+    @Inject
+    private RunContextFactory runContextFactory;
 
     public FlowTopologyGraph graph(Stream<FlowTopology> flows, Function<FlowNode, FlowNode> anonymize) {
         Graph<FlowNode, FlowRelation> graph = new Graph<>();
@@ -159,6 +164,10 @@ public class FlowTopologyService {
             return FlowRelation.FLOW_TRIGGER;
         }
 
+        if (this.isInputChild(parent, child)) {
+            return FlowRelation.SUBFLOW_FUNCTION;
+        }
+
         return null;
     }
 
@@ -194,89 +203,46 @@ public class FlowTopologyService {
 
         // simulated execution: we add a "simulated" label so conditions can know that the evaluation is for a simulated execution
         Execution execution = Execution.newExecution(parent, (f, e) -> null, List.of(SIMULATED_EXECUTION), Optional.empty());
+        RunContext runContext = runContextFactory.of(parent, execution);
 
         boolean conditionMatch = flowTriggers
             .stream()
-            .flatMap(flow -> ListUtils.emptyOnNull(flow.getConditions()).stream())
-            .allMatch(condition -> validateCondition(condition, parent, execution));
+            .allMatch(trigger -> conditionService.isValid(trigger, parent, runContext));
 
-        boolean preconditionMatch = flowTriggers.stream()
-            .anyMatch(flow -> flow.getPreconditions() == null || validatePreconditions(flow.getPreconditions(), parent, execution));
+        boolean dependsOnMatch = flowTriggers.stream()
+            .anyMatch(flow -> ListUtils.isEmpty(flow.getDependsOn()) || validateDependsOn(flow.getDependsOn(), parent, execution, runContext));
 
-        return conditionMatch && preconditionMatch;
+        return conditionMatch && dependsOnMatch;
     }
 
-    private boolean validateCondition(Condition condition, FlowInterface child, Execution execution) {
-        if (isFilterCondition(condition)) {
-            return true;
-        }
+    /**
+     * Check that any SELECT or MULTISELECT input is using the subflow function configured with the child flow.
+     */
+    protected boolean isInputChild(Flow parent, Flow child) {
+        boolean selectMatch = ListUtils.emptyOnNull(parent.getInputs()).stream()
+            .filter(SelectInput.class::isInstance)
+            .map(SelectInput.class::cast)
+            .anyMatch(selectInput -> isSubflowFunctionFor(selectInput.getExpression(), child));
 
-        if (condition instanceof io.kestra.core.models.triggers.multipleflows.MultipleCondition multipleCondition) {
-            return validateMultipleConditions(multipleCondition.getConditions(), child, execution);
-        }
+        boolean multiSelectMatch = ListUtils.emptyOnNull(parent.getInputs()).stream()
+            .filter(MultiselectInput.class::isInstance)
+            .map(MultiselectInput.class::cast)
+            .anyMatch(selectInput -> isSubflowFunctionFor(selectInput.getExpression(), child));
 
-        try {
-            return this.conditionService.isValid(condition, child, execution);
-        } catch (Exception e) {
-            // extra safety net, it means there is a bug
-            log.error("unable to validate condition in FlowTopologyService, flow: {}, condition: {}", child.uid(), condition, e);
-            return false;
-        }
+        return selectMatch || multiSelectMatch;
     }
 
-    private boolean validateMultipleConditions(Map<String, Condition> multipleConditions, FlowInterface child, Execution execution) {
-        List<Condition> conditions = multipleConditions
-            .values()
+    // best effort: we use regexes as a substitute for proper parsing of Pebble expressions
+    private boolean isSubflowFunctionFor(String expression, Flow child) {
+        return expression != null && PebbleUtil.containsOpeningBlockDelimiter(expression) &&
+            expression.matches(".*subflow\\s*\\(.*\\).*") &&
+            expression.matches(".*id\\s*=\\s*['\"]?" + child.getId() + "['\"]?\\s*[\\s,)].*") &&
+            expression.matches(".*namespace\\s*=\\s*['\"]?" + child.getNamespace() + "['\"]?\\s*[\\s,)].*");
+    }
+
+    private boolean validateDependsOn(List<io.kestra.plugin.core.trigger.Flow.Dependency> dependsOn, FlowInterface child, Execution execution, RunContext runContext) {
+        return ListUtils.emptyOnNull(dependsOn)
             .stream()
-            .filter(c -> !isFilterCondition(c))
-            .toList();
-
-        return (conditions
-            .stream()
-            .filter(c -> !isMandatoryMultipleCondition(c))
-            .anyMatch(c -> validateCondition(c, child, execution)))
-            && (conditions
-                .stream()
-                .filter(this::isMandatoryMultipleCondition)
-                .allMatch(c -> validateCondition(c, child, execution)));
-    }
-
-    private boolean isMandatoryMultipleCondition(Condition condition) {
-        return condition.getClass().isAssignableFrom(Expression.class);
-    }
-
-    private boolean validatePreconditions(io.kestra.plugin.core.trigger.Flow.Preconditions preconditions, FlowInterface child, Execution execution) {
-        boolean upstreamFlowMatched = MapUtils.emptyOnNull(preconditions.getUpstreamFlowsConditions())
-            .values()
-            .stream()
-            .filter(c -> !isFilterCondition(c))
-            .anyMatch(c -> validateCondition(c, child, execution));
-
-        boolean whereMatched = MapUtils.emptyOnNull(preconditions.getWhereConditions())
-            .values()
-            .stream()
-            .filter(c -> !isFilterCondition(c))
-            .allMatch(c -> validateCondition(c, child, execution));
-
-        // to be a dependency, if upstream flow is set it must be either inside it so it's a AND between upstream flow and where
-        return upstreamFlowMatched && whereMatched;
-    }
-
-    private boolean isFilterCondition(Condition condition) {
-        return Stream
-            .of(
-                DateTimeBetween.class,
-                DayWeek.class,
-                DayWeekInMonth.class,
-                ExecutionLabels.class,
-                ExecutionOutputs.class,
-                ExecutionStatus.class,
-                Expression.class,
-                HasRetryAttempt.class,
-                PublicHoliday.class,
-                TimeBetween.class,
-                Weekend.class
-            )
-            .anyMatch(aClass -> condition.getClass().isAssignableFrom(aClass));
+            .anyMatch(c -> conditionService.isValid(c.asCondition(), child, execution, runContext));
     }
 }

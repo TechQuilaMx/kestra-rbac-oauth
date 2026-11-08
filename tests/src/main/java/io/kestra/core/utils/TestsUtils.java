@@ -7,7 +7,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeoutException;
@@ -28,16 +27,20 @@ import io.kestra.core.models.executions.LogEntry;
 import io.kestra.core.models.executions.TaskRun;
 import io.kestra.core.models.flows.Flow;
 import io.kestra.core.models.flows.FlowInterface;
+import io.kestra.core.models.flows.FlowWithSource;
 import io.kestra.core.models.flows.State;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.triggers.AbstractTrigger;
-import io.kestra.core.models.triggers.Trigger;
+import io.kestra.core.queues.BroadcastQueueInterface;
 import io.kestra.core.queues.QueueInterface;
+import io.kestra.core.queues.QueueSubscriber;
+import io.kestra.core.queues.event.BroadcastEvent;
 import io.kestra.core.repositories.LocalFlowRepositoryLoader;
 import io.kestra.core.runners.DefaultRunContext;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.scheduler.model.TriggerState;
 import io.kestra.core.serializers.JacksonMapper;
 
 import lombok.extern.slf4j.Slf4j;
@@ -48,12 +51,19 @@ import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 @Slf4j
 abstract public class TestsUtils {
     private static final ThreadLocal<List<Runnable>> queueConsumersCancellations = ThreadLocal.withInitial(ArrayList::new);
+    private static final ThreadLocal<List<QueueSubscriber>> subscribers = ThreadLocal.withInitial(ArrayList::new);
 
     private static final ObjectMapper mapper = JacksonMapper.ofYaml();
 
     public static void queueConsumersCleanup() {
         queueConsumersCancellations.get().forEach(Runnable::run);
         queueConsumersCancellations.get().clear();
+        subscribers.get().forEach(QueueSubscriber::close);
+        subscribers.get().clear();
+    }
+
+    public static String randomPassword() {
+        return IdUtils.create() + "Aa1!";
     }
 
     public static String randomNamespace(String... prefix) {
@@ -106,12 +116,12 @@ abstract public class TestsUtils {
         return mapper.readValue(read, cls);
     }
 
-    public static void loads(String tenantId, LocalFlowRepositoryLoader repositoryLoader) throws IOException, URISyntaxException {
-        TestsUtils.loads(tenantId, repositoryLoader, Objects.requireNonNull(TestsUtils.class.getClassLoader().getResource("flows/valids")));
+    public static List<FlowWithSource> loads(String tenantId, LocalFlowRepositoryLoader repositoryLoader) throws IOException, URISyntaxException {
+        return TestsUtils.loads(tenantId, repositoryLoader, Objects.requireNonNull(TestsUtils.class.getClassLoader().getResource("flows/valids")));
     }
 
-    public static void loads(String tenantId, LocalFlowRepositoryLoader repositoryLoader, URL url) throws IOException, URISyntaxException {
-        repositoryLoader.load(tenantId, url);
+    public static List<FlowWithSource> loads(String tenantId, LocalFlowRepositoryLoader repositoryLoader, URL url) throws IOException, URISyntaxException {
+        return repositoryLoader.load(tenantId, url);
     }
 
     public static List<LogEntry> filterLogs(List<LogEntry> logs, TaskRun taskRun) {
@@ -208,24 +218,20 @@ abstract public class TestsUtils {
             .withState(State.Type.RUNNING);
     }
 
-    public static Map.Entry<ConditionContext, Trigger> mockTrigger(RunContextFactory runContextFactory, AbstractTrigger trigger) {
+    public static Map.Entry<ConditionContext, TriggerState> mockTrigger(RunContextFactory runContextFactory, AbstractTrigger trigger) {
         StackTraceElement caller = Thread.currentThread().getStackTrace()[2];
         Flow flow = TestsUtils.mockFlow(caller);
 
-        Trigger triggerContext = Trigger.builder()
-            .triggerId(trigger.getId())
-            .flowId(flow.getId())
-            .tenantId(flow.getTenantId())
-            .namespace(flow.getNamespace())
-            .date(ZonedDateTime.now())
-            .build();
+        TriggerState state = TriggerState.of(flow, trigger, 0);
 
+        DefaultRunContext runContext = runContextFactory.initializer()
+            .forScheduler((DefaultRunContext) runContextFactory.of(flow, trigger), state.context(), trigger);
         return new AbstractMap.SimpleEntry<>(
             ConditionContext.builder()
-                .runContext(runContextFactory.initializer().forScheduler((DefaultRunContext) runContextFactory.of(flow, trigger), triggerContext, trigger))
+                .runContext(runContext)
                 .flow(flow)
                 .build(),
-            triggerContext
+            state
         );
     }
 
@@ -247,24 +253,8 @@ abstract public class TestsUtils {
         return runContext;
     }
 
-    public static <T> Flux<T> receive(QueueInterface<T> queue) {
-        return TestsUtils.receive(queue, null);
-    }
-
     public static <T> Flux<T> receive(QueueInterface<T> queue, Consumer<Either<T, DeserializationException>> consumer) {
         return TestsUtils.receive(queue, null, null, consumer, null);
-    }
-
-    public static <T> Flux<T> receive(QueueInterface<T> queue, Class<?> queueType, Consumer<Either<T, DeserializationException>> consumer) {
-        return TestsUtils.receive(queue, null, queueType, consumer, null);
-    }
-
-    public static <T> Flux<T> receive(QueueInterface<T> queue, String consumerGroup, Class<?> queueType, Consumer<Either<T, DeserializationException>> consumer) {
-        return TestsUtils.receive(queue, consumerGroup, queueType, consumer, null);
-    }
-
-    public static <T> Flux<T> receive(QueueInterface<T> queue, String consumerGroup, Consumer<Either<T, DeserializationException>> consumer) {
-        return TestsUtils.receive(queue, consumerGroup, null, consumer, null);
     }
 
     public static <T> Flux<T> receive(QueueInterface<T> queue, String consumerGroup, Class<?> queueType, Consumer<Either<T, DeserializationException>> consumer, Duration timeout) {
@@ -297,6 +287,42 @@ abstract public class TestsUtils {
         })
             .timeout(Optional.ofNullable(timeout).orElse(Duration.ofMinutes(1)))
             .doFinally(signalType -> receiveCancellation.run());
+    }
+
+    public static <T extends BroadcastEvent> Flux<T> receive(BroadcastQueueInterface<T> queue, Consumer<Either<T, DeserializationException>> consumer) {
+        return TestsUtils.receive(queue, consumer, null);
+    }
+
+    public static <T extends BroadcastEvent> Flux<T> receive(BroadcastQueueInterface<T> queue, Consumer<Either<T, DeserializationException>> consumer, Duration timeout) {
+        List<T> elements = new CopyOnWriteArrayList<>();
+        AtomicReference<DeserializationException> exceptionRef = new AtomicReference<>();
+        Consumer<Either<T, DeserializationException>> eitherConsumer = (either) ->
+        {
+            if (either.isLeft()) {
+                elements.add(either.getLeft());
+            } else {
+                exceptionRef.set(either.getRight());
+            }
+
+            if (consumer != null) {
+                consumer.accept(either);
+            }
+        };
+        QueueSubscriber<T> receiveCancellation = queue.subscriber().subscribe(eitherConsumer);
+        subscribers.get().add(receiveCancellation);
+
+        return Flux.<T> create(sink ->
+        {
+            DeserializationException exception = exceptionRef.get();
+            if (exception == null) {
+                elements.forEach(sink::next);
+                sink.complete();
+            } else {
+                sink.error(exception);
+            }
+        })
+            .timeout(Optional.ofNullable(timeout).orElse(Duration.ofMinutes(1)))
+            .doFinally(signalType -> receiveCancellation.close());
     }
 
     public static <T> Property<List<T>> propertyFromList(List<T> list) throws JsonProcessingException {

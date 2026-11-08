@@ -16,8 +16,8 @@ import io.kestra.core.exceptions.InternalException;
 import io.kestra.core.models.HasUID;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.flows.check.Check;
+import io.kestra.core.models.flows.quota.Quota;
 import io.kestra.core.models.flows.sla.SLA;
-import io.kestra.core.models.listeners.Listener;
 import io.kestra.core.models.tasks.FlowableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.retrys.AbstractRetry;
@@ -27,7 +27,6 @@ import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.ListUtils;
 import io.kestra.core.validations.FlowValidation;
 
-import io.micronaut.core.annotation.Introspected;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -44,7 +43,6 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder(toBuilder = true)
 @Getter
 @NoArgsConstructor
-@Introspected
 @ToString
 @EqualsAndHashCode
 @FlowValidation
@@ -87,32 +85,22 @@ public class Flow extends AbstractFlow implements HasUID {
     }
 
     @Valid
-    @Deprecated
-    List<Listener> listeners;
-
-    @Valid
     List<Task> afterExecution;
 
     @Valid
     List<AbstractTrigger> triggers;
 
-    @Valid
-    List<PluginDefault> pluginDefaults;
+    @Schema(
+        title = "References to governance policies (Enterprise Edition).",
+        description = "Identifiers of `enforcement: REFERENCE` policies to attach to this flow, resolved within the flow's tenant/namespace scope chain. Enterprise Edition only; parsed but ignored in the open-source edition."
+    )
+    @PluginProperty
+    List<String> policyRefs;
 
-    @Valid
-    List<PluginDefault> taskDefaults;
-
-    @Deprecated
-    public void setTaskDefaults(List<PluginDefault> taskDefaults) {
-        this.pluginDefaults = taskDefaults;
-        this.taskDefaults = taskDefaults;
-    }
-
-    @Deprecated
-    public List<PluginDefault> getTaskDefaults() {
-        return this.taskDefaults;
-    }
-
+    @Schema(
+        title = "Concurrency",
+        description = "Limits the number of concurrent executions of the flow."
+    )
     @Valid
     Concurrency concurrency;
 
@@ -147,11 +135,20 @@ public class Flow extends AbstractFlow implements HasUID {
     @PluginProperty
     List<Check> checks;
 
+    @Schema(
+        title = "Quotas evaluated before the flow is executed (EE only).",
+        description = """
+            A list of quotas that are evaluated before the flow is executed. If no quotas are defined, the flow executes normally.
+            Quotas can also be defined at the namespace and tenant level."""
+    )
+    @Valid
+    @PluginProperty
+    List<Quota> quotas;
+
     public Stream<String> allTypes() {
         return Stream.of(
             Optional.ofNullable(triggers).orElse(Collections.emptyList()).stream().map(AbstractTrigger::getType),
-            allTasks().map(Task::getType),
-            Optional.ofNullable(pluginDefaults).orElse(Collections.emptyList()).stream().map(PluginDefault::getType)
+            allTasks().map(Task::getType)
         ).reduce(Stream::concat).orElse(Stream.empty())
             .distinct();
     }
@@ -161,7 +158,7 @@ public class Flow extends AbstractFlow implements HasUID {
             this.tasks != null ? this.tasks : Collections.<Task> emptyList(),
             this.errors != null ? this.errors : Collections.<Task> emptyList(),
             this._finally != null ? this._finally : Collections.<Task> emptyList(),
-            this.afterExecutionTasks()
+            this.afterExecution != null ? this.afterExecution : Collections.<Task> emptyList()
         )
             .flatMap(Collection::stream);
     }
@@ -260,58 +257,6 @@ public class Flow extends AbstractFlow implements HasUID {
             .filter(trigger -> trigger.getId().equals(triggerId))
             .findFirst()
             .orElse(null);
-    }
-
-    /**
-     * @deprecated should not be used
-     */
-    @Deprecated(forRemoval = true, since = "0.21.0")
-    public Flow updateTask(String taskId, Task newValue) throws InternalException {
-        Task task = this.findTaskByTaskId(taskId);
-        Flow flow = this instanceof FlowWithSource flowWithSource ? flowWithSource.toFlow() : this;
-
-        Map<String, Object> map = NON_DEFAULT_OBJECT_MAPPER.convertValue(flow, JacksonMapper.MAP_TYPE_REFERENCE);
-
-        return NON_DEFAULT_OBJECT_MAPPER.convertValue(
-            recursiveUpdate(map, task, newValue),
-            Flow.class
-        );
-    }
-
-    private static Object recursiveUpdate(Object object, Task previous, Task newValue) {
-        if (object instanceof Map<?, ?> value) {
-            if (
-                value.containsKey("id") && value.get("id").equals(previous.getId()) &&
-                    value.containsKey("type") && value.get("type").equals(previous.getType())
-            ) {
-                return NON_DEFAULT_OBJECT_MAPPER.convertValue(newValue, JacksonMapper.MAP_TYPE_REFERENCE);
-            } else {
-                return value
-                    .entrySet()
-                    .stream()
-                    .map(
-                        e -> new AbstractMap.SimpleEntry<>(
-                            e.getKey(),
-                            recursiveUpdate(e.getValue(), previous, newValue)
-                        )
-                    )
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-            }
-        } else if (object instanceof Collection<?> value) {
-            return value
-                .stream()
-                .map(r -> recursiveUpdate(r, previous, newValue))
-                .toList();
-        } else {
-            return object;
-        }
-    }
-
-    private List<Task> afterExecutionTasks() {
-        return ListUtils.concat(
-            ListUtils.emptyOnNull(this.getListeners()).stream().flatMap(listener -> listener.getTasks().stream()).toList(),
-            this.getAfterExecution()
-        );
     }
 
     public boolean equalsWithoutRevision(FlowInterface o) {

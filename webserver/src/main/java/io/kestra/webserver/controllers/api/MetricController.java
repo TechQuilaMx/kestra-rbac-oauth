@@ -1,16 +1,15 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.time.ZonedDateTime;
 import java.util.List;
 
 import io.kestra.core.models.executions.MetricEntry;
 import io.kestra.core.models.executions.metrics.MetricAggregations;
-import io.kestra.core.queues.QueueFactoryInterface;
-import io.kestra.core.queues.QueueInterface;
 import io.kestra.core.repositories.MetricRepositoryInterface;
 import io.kestra.core.tenant.TenantService;
-import io.kestra.webserver.annotations.RequirePermission;
-import io.kestra.webserver.models.auth.Permission;
 import io.kestra.webserver.responses.PagedResults;
 import io.kestra.webserver.utils.PageableUtils;
 
@@ -23,25 +22,19 @@ import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
-import io.micronaut.validation.Validated;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
 import static io.kestra.core.utils.DateUtils.validateTimeline;
 
-@Validated
 @Controller("/api/v1/{tenant}/metrics")
 @Requires(beans = MetricRepositoryInterface.class)
 public class MetricController {
     @Inject
     private MetricRepositoryInterface metricsRepository;
-
-    @Inject
-    @Named(QueueFactoryInterface.METRIC_QUEUE)
-    protected QueueInterface<MetricEntry> metricQueue;
 
     @Inject
     private TenantService tenantService;
@@ -52,7 +45,7 @@ public class MetricController {
     @RequirePermission(Permission.EXECUTIONS_VIEW)
     public PagedResults<MetricEntry> searchByExecution(
         @Parameter(description = "The current page") @QueryValue(defaultValue = "1") @Min(1) int page,
-        @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) int size,
+        @Parameter(description = "The current page size") @QueryValue(defaultValue = "10") @Min(1) @Max(PageableUtils.MAX_PAGE_SIZE) int size,
         @Parameter(description = "The sort of current page") @Nullable @QueryValue List<String> sort,
         @Parameter(description = "The execution id") @PathVariable String executionId,
         @Parameter(description = "The taskrun id") @Nullable @QueryValue String taskRunId,

@@ -3,6 +3,7 @@ package io.kestra.repository.postgres;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -22,6 +23,8 @@ import io.kestra.jdbc.JooqDSLContextWrapper;
 
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.data.model.Pageable;
 import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
@@ -30,7 +33,8 @@ import lombok.SneakyThrows;
 import static io.kestra.jdbc.repository.AbstractJdbcRepository.KEY_FIELD;
 import static io.kestra.jdbc.repository.AbstractJdbcRepository.VALUE_FIELD;
 
-@PostgresRepositoryEnabled
+@Requires(condition = PostgresRepository.PostgresCondition.class)
+@Requires(property = "kestra.server-type", notEquals = "WORKER")
 @EachBean(JdbcTableConfig.class)
 public class PostgresRepository<T> extends io.kestra.jdbc.AbstractJdbcRepository<T> {
 
@@ -43,7 +47,7 @@ public class PostgresRepository<T> extends io.kestra.jdbc.AbstractJdbcRepository
     @Override
     public Condition fullTextCondition(List<String> fields, String query) {
         if (query == null || query.equals("*")) {
-            return DSL.trueCondition();
+            return DSL.noCondition();
         }
 
         if (fields.size() > 1) {
@@ -73,7 +77,7 @@ public class PostgresRepository<T> extends io.kestra.jdbc.AbstractJdbcRepository
             .set(finalFields)
             .onConflict(KEY_FIELD)
             .doUpdate()
-            .set(finalFields)
+            .set(excluded(finalFields))
             .execute();
     }
 
@@ -87,7 +91,7 @@ public class PostgresRepository<T> extends io.kestra.jdbc.AbstractJdbcRepository
             .set(fields)
             .onConflict(KEY_FIELD)
             .doUpdate()
-            .set(fields);
+            .set(excluded(fields));
     }
 
     @SuppressWarnings("unchecked")
@@ -100,7 +104,7 @@ public class PostgresRepository<T> extends io.kestra.jdbc.AbstractJdbcRepository
                         .sort(select, pageable)
                         .asTable("page")
                 )
-                .where(DSL.trueCondition()),
+                .where(DSL.noCondition()),
             pageable
         )
             .fetch();
@@ -119,6 +123,17 @@ public class PostgresRepository<T> extends io.kestra.jdbc.AbstractJdbcRepository
             return deserializer.apply(record);
         } else {
             return this.deserialize(record.get("value", JSONB.class).data());
+        }
+    }
+
+    // We need to create H2 repositories for the queue as it uses an H2Repository named 'queue',
+    // we may find a way to only create this one at some point as here we create unnecessary beans.
+    static class PostgresCondition implements io.micronaut.context.condition.Condition {
+        @Override
+        public boolean matches(ConditionContext context) {
+            boolean isRepository = ((Optional<String>) context.get("kestra.repository.type", String.class)).map(it -> "postgres".equals(it)).orElse(false);
+            boolean isQueue = ((Optional<String>) context.get("kestra.queue.type", String.class)).map(it -> "postgres".equals(it)).orElse(false);
+            return isRepository || isQueue;
         }
     }
 }

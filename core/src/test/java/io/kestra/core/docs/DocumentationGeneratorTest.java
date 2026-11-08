@@ -12,19 +12,27 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
+import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
+import io.kestra.core.models.tasks.VoidOutput;
 import io.kestra.core.plugins.PluginClassAndMetadata;
 import io.kestra.core.plugins.PluginScanner;
 import io.kestra.core.plugins.RegisteredPlugin;
-import io.kestra.plugin.core.debug.Echo;
+import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.core.debug.Return;
 import io.kestra.plugin.core.flow.Dag;
 import io.kestra.plugin.core.flow.Subflow;
 import io.kestra.plugin.core.runner.Process;
-import io.kestra.plugin.core.state.Set;
 
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
+import jakarta.validation.constraints.NotBlank;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -44,9 +52,16 @@ class DocumentationGeneratorTest {
         PluginScanner pluginScanner = new PluginScanner(ClassPluginDocumentationTest.class.getClassLoader());
         List<RegisteredPlugin> scan = pluginScanner.scan(plugins);
 
-        assertThat(scan.size()).isEqualTo(1);
-        PluginClassAndMetadata<Task> metadata = PluginClassAndMetadata.create(scan.getFirst(), scan.getFirst().getTasks().getFirst(), Task.class, null);
-        ClassPluginDocumentation<? extends Task> doc = ClassPluginDocumentation.of(jsonSchemaGenerator, metadata, scan.getFirst().version(), false);
+        assertThat(scan.size()).isEqualTo(2);
+        RegisteredPlugin templatePlugin = scan
+            .stream()
+            .filter(rp -> rp.group().equals("io.kestra.plugin.templates"))
+            .findFirst()
+            .orElseThrow();
+        PluginClassAndMetadata<Task> metadata = PluginClassAndMetadata.create(
+            templatePlugin, templatePlugin.getTasks().getFirst(), Task.class, null
+        );
+        ClassPluginDocumentation<? extends Task> doc = ClassPluginDocumentation.of(jsonSchemaGenerator, metadata, templatePlugin.version(), false);
 
         String render = DocumentationGenerator.render(doc);
 
@@ -127,35 +142,19 @@ class DocumentationGeneratorTest {
         assertThat(render).contains("* **Default:** `false`");
     }
 
-    @SuppressWarnings({ "unchecked", "deprecation" })
-    @Test
-    void echo() throws IOException {
-        PluginScanner pluginScanner = new PluginScanner(ClassPluginDocumentationTest.class.getClassLoader());
-        RegisteredPlugin scan = pluginScanner.scan();
-        Class<Echo> bash = scan.findClass(Echo.class.getName()).orElseThrow();
-
-        PluginClassAndMetadata<Task> metadata = PluginClassAndMetadata.create(scan, bash, Task.class, null);
-        ClassPluginDocumentation<? extends Task> doc = ClassPluginDocumentation.of(jsonSchemaGenerator, metadata, scan.version(), false);
-
-        String render = DocumentationGenerator.render(doc);
-
-        assertThat(render).contains("Echo");
-        assertThat(render).contains("This feature is deprecated and will be removed in the future");
-    }
-
     @SuppressWarnings("unchecked")
     @Test
-    void state() throws IOException {
+    void deprecated() throws IOException {
         PluginScanner pluginScanner = new PluginScanner(ClassPluginDocumentationTest.class.getClassLoader());
         RegisteredPlugin scan = pluginScanner.scan();
-        Class<Set> set = scan.findClass(Set.class.getName()).orElseThrow();
+        Class<DeprecatedTask> set = scan.findClass(DeprecatedTask.class.getName()).orElseThrow();
 
         PluginClassAndMetadata<Task> metadata = PluginClassAndMetadata.create(scan, set, Task.class, null);
         ClassPluginDocumentation<? extends Task> doc = ClassPluginDocumentation.of(jsonSchemaGenerator, metadata, scan.version(), false);
 
         String render = DocumentationGenerator.render(doc);
 
-        assertThat(render).contains("Set");
+        assertThat(render).contains("DeprecatedTask");
         assertThat(render).contains("::alert{type=\"warning\"}\n");
     }
 
@@ -196,5 +195,27 @@ class DocumentationGeneratorTest {
 
         assertThat(render).contains("title: Process");
         assertThat(render).contains("Run tasks as local subprocesses on the worker.");
+    }
+
+    @SuperBuilder
+    @ToString
+    @EqualsAndHashCode
+    @Getter
+    @NoArgsConstructor
+    @Deprecated
+    public static class DeprecatedTask extends Task implements RunnableTask<VoidOutput> {
+        @PluginProperty(dynamic = true)
+        @Deprecated
+        private String someProperty;
+
+        @NotBlank
+        @PluginProperty(dynamic = true)
+        @Deprecated
+        private String additionalProperty;
+
+        @Override
+        public VoidOutput run(RunContext runContext) {
+            return null;
+        }
     }
 }

@@ -7,6 +7,7 @@ import java.util.concurrent.ForkJoinPool;
 import io.kestra.core.server.LocalServiceState;
 import io.kestra.core.server.Service;
 import io.kestra.core.server.ServiceRegistry;
+import io.kestra.core.server.ServiceType;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
@@ -38,7 +39,9 @@ public class GracefulEmbeddedServiceShutdownListener implements ApplicationEvent
     }
 
     /**
-     * Wait for services' close actions
+     * Wait for services' close actions.
+     * The Controller is closed last to ensure workers can gracefully disconnect
+     * before the gRPC server shuts down.
      *
      * @param event the event to respond to
      */
@@ -51,12 +54,17 @@ public class GracefulEmbeddedServiceShutdownListener implements ApplicationEvent
 
         log.debug("Shutdown event received");
 
+        // Close all services except the Controller first
         List<CompletableFuture<Void>> futures = states.stream()
+            .filter(state -> state.service().getType() != ServiceType.CONTROLLER)
             .map(state -> CompletableFuture.runAsync(() -> closeService(state), ForkJoinPool.commonPool()))
             .toList();
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture<?>[0])).join();
 
-        // Wait for all services to close, before shutting down the embedded server
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        // Then close the Controller
+        states.stream()
+            .filter(state -> state.service().getType() == ServiceType.CONTROLLER)
+            .forEach(this::closeService);
     }
 
     private void closeService(LocalServiceState state) {

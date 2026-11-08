@@ -7,19 +7,13 @@ import io.kestra.core.exceptions.InternalException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.executions.Execution;
-import io.kestra.core.models.executions.ExecutionKilled;
-import io.kestra.core.models.executions.ExecutionKilledExecution;
 import io.kestra.core.models.executions.TaskRun;
 import io.kestra.core.models.flows.State;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.ExecutionUpdatableTask;
 import io.kestra.core.models.tasks.Task;
-import io.kestra.core.queues.QueueFactoryInterface;
-import io.kestra.core.queues.QueueInterface;
-import io.kestra.core.runners.DefaultRunContext;
 import io.kestra.core.runners.RunContext;
 
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -87,21 +81,9 @@ public class Exit extends Task implements ExecutionUpdatableTask {
     public Execution update(Execution execution, RunContext runContext) throws Exception {
         State.Type exitState = executionState(runContext);
 
-        // if the state is killed, we send a kill event and end here
         if (exitState == State.Type.KILLED) {
-            @SuppressWarnings("unchecked")
-            QueueInterface<ExecutionKilled> killQueue = ((DefaultRunContext) runContext).getApplicationContext()
-                .getBean(QueueInterface.class, Qualifiers.byName(QueueFactoryInterface.KILL_NAMED));
-            killQueue.emit(
-                ExecutionKilledExecution
-                    .builder()
-                    .state(ExecutionKilled.State.REQUESTED)
-                    .executionId(execution.getId())
-                    .isOnKillCascade(false)
-                    .tenantId(execution.getTenantId())
-                    .build()
-            );
-            return execution.withState(exitState);
+            // the executor will detect it and send a killing event
+            return execution.withState(State.Type.KILLED);
         }
 
         return execution.findLastNotTerminated()
@@ -132,12 +114,14 @@ public class Exit extends Task implements ExecutionUpdatableTask {
     }
 
     private State.Type executionState(RunContext runContext) throws IllegalVariableEvaluationException {
-        return switch (runContext.render(this.state).as(ExitState.class).orElseThrow()) {
+        // the executor reuses the task instance of its cached flow for every execution of the flow,
+        // so the rendering cache of the property must be skipped to render with the current execution context
+        return switch (runContext.render(this.state.skipCache()).as(ExitState.class).orElseThrow()) {
             case ExitState.SUCCESS -> State.Type.SUCCESS;
             case WARNING -> State.Type.WARNING;
             case KILLED -> State.Type.KILLED;
             case FAILED -> State.Type.FAILED;
-            case CANCELED, CANCELLED -> State.Type.CANCELLED;
+            case CANCELLED -> State.Type.CANCELLED;
         };
     }
 
@@ -146,8 +130,6 @@ public class Exit extends Task implements ExecutionUpdatableTask {
         WARNING,
         KILLED,
         FAILED,
-        @Deprecated(since = "1.3", forRemoval = true)
-        CANCELED,
         CANCELLED
     }
 }

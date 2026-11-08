@@ -1,12 +1,13 @@
 package io.kestra.webserver.controllers.api;
 
+
+import io.kestra.webserver.annotations.RequirePermission;
+import io.kestra.webserver.models.auth.Permission;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import io.kestra.webserver.annotations.RequirePermission;
-import io.kestra.webserver.models.auth.Permission;
 
 import io.kestra.core.tenant.TenantService;
 import io.kestra.webserver.services.ai.AiServiceInterface;
@@ -26,7 +27,6 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.server.util.HttpClientAddressResolver;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
-import io.micronaut.validation.Validated;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import jakarta.inject.Inject;
@@ -34,7 +34,6 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-@Validated
 @Controller("/api/v1/main/ai")
 @Requires(bean = AiServiceManager.class)
 public class AiController {
@@ -56,29 +55,11 @@ public class AiController {
         HttpRequest<?> httpRequest) {
         AiServiceInterface service = aiServiceManager.getAiService(flowGenerationPrompt.getProviderId());
         if (service == null) {
-            return HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).body("AI Copilot is not available: no AI provider is configured or reachable.");
+            return HttpResponse.<String> status(HttpStatus.SERVICE_UNAVAILABLE).body("AI Copilot is not available: no AI provider is configured or reachable.");
         }
 
         GenerationResult result = service
             .generateFlow(new UserInfo(httpClientAddressResolver.resolve(httpRequest), httpRequest.getHeaders().get("X-Kestra-User-Id")), flowGenerationPrompt, tenantService.resolveTenant());
-        return toHttpResponse(result);
-    }
-
-    @ExecuteOn(TaskExecutors.IO)
-    @Post(uri = "/generate/dashboard", produces = "application/yaml")
-    @Operation(tags = { "AI" }, summary = "Generate or regenerate a dashboard based on a prompt")
-    @RequirePermission(Permission.DASHBOARDS_CREATE)
-
-    public HttpResponse<String> generateDashboard(
-        @RequestBody(description = "Prompt and context required for dashboard generation") @Body DashboardGenerationPrompt dashboardGenerationPrompt,
-        HttpRequest<?> httpRequest) {
-        AiServiceInterface service = aiServiceManager.getAiService(dashboardGenerationPrompt.getProviderId());
-        if (service == null) {
-            return HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).body("AI Copilot is not available: no AI provider is configured or reachable.");
-        }
-
-        GenerationResult result = service
-            .generateDashboard(new UserInfo(httpClientAddressResolver.resolve(httpRequest), httpRequest.getHeaders().get("X-Kestra-User-Id")), dashboardGenerationPrompt);
         return toHttpResponse(result);
     }
 
@@ -111,18 +92,6 @@ public class AiController {
         @JsonCreator
         public FlowGenerationPrompt(String conversationId, String userPrompt, String yaml, String namespace, String providerId) {
             super(conversationId, userPrompt, yaml, namespace);
-
-            this.providerId = providerId;
-        }
-    }
-
-    @Getter
-    public static class DashboardGenerationPrompt extends io.kestra.libs.copilot.models.in.DashboardGenerationPrompt {
-        private final String providerId;
-
-        @JsonCreator
-        public DashboardGenerationPrompt(String conversationId, String userPrompt, String yaml, String providerId) {
-            super(conversationId, userPrompt, yaml);
 
             this.providerId = providerId;
         }
